@@ -1,8 +1,8 @@
 # TASK-004: Cấu hình thông tin SQL local qua file `.env` được Git bỏ qua
 
-- Trạng thái: Bị chặn
+- Trạng thái: Đang làm
 - Mục tiêu: Cấu hình API thực tế sử dụng kết nối SQL của lập trình viên từ file `.env` local, không để lộ thông tin xác thực trong Git hoặc log.
-- Trở ngại: Hiện repository chưa có API `.csproj`, `Program.cs`, cấu hình database, `.gitignore` hay cấu hình runtime cho thấy ứng dụng sẽ nạp file `.env` như thế nào. Chưa xác định SQL engine và môi trường chạy/deploy. Không tự đoán các thông tin này hoặc thêm credential trước khi ứng dụng có thể sử dụng chúng.
+- Tiến độ/trở ngại: Đã thêm `.gitignore`, `.env.example`, project EF Core SQL Server, design-time factory và script PowerShell nạp biến `.env` kín cho thao tác EF. Chưa có API host thực tế, nên `.env` hiện chỉ được nạp cho các lệnh migration; không mặc định ứng dụng runtime đã nạp file này.
 
 ## Tài liệu đặc tả và quy tắc
 
@@ -64,4 +64,9 @@
 
 ## Bằng chứng kiểm tra
 
-- Chờ ghi lại chính xác các lệnh và kết quả sau khi có API có thể chạy và SQL provider.
+- Đã thêm `.gitignore` với quy tắc ignore `.env`/`.env.*` và ngoại lệ `.env.example`; `.env` local vẫn được giữ trên máy và gỡ khỏi Git index.
+- Đã tạo `.env.example` chỉ có placeholder, không chứa credential thật.
+- Đã xác nhận tên biến local là `ConnectionStrings__DefaultConnection` và loại chuỗi là SQL Server, chỉ xuất tên biến/trường, không in giá trị credential.
+- `tools/payments/ef-migrations.ps1 -Action Script` chạy thành công; kết quả và SQL script được ghi tại TASK-005.
+- `.env` đang được Git ignore và không còn trong Git index; `.env.example` là mẫu placeholder được theo dõi.
+- Chưa có API host thực tế nên chưa xác nhận cấu hình `.env` cho runtime ứng dụng; hoàn tất phần này khi tích hợp API.

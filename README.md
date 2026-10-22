@@ -104,12 +104,26 @@ Payment__WebhookSecret=<secret từ SePay>
 
 ### 5. Migration
 
-```bash
-dotnet ef migrations add AddPayments -p backend/src/ChonRieng.Infrastructure -s backend/src/ChonRieng.Api
-dotnet ef database update -p backend/src/ChonRieng.Infrastructure -s backend/src/ChonRieng.Api
+Backend hiện có project EF Core SQL Server tối thiểu để scaffold schema. Tạo migration và script SQL idempotent bằng PowerShell:
+
+```powershell
+.\tools\payments\ef-migrations.ps1 -Action Add
+.\tools\payments\ef-migrations.ps1 -Action Script
 ```
 
-Tạo bảng `PaymentTransactions`, `LedgerEntries`, `ReconciliationIssues` và thêm cột giữ chỗ cho `Seats`.
+Script nạp `ConnectionStrings__DefaultConnection` từ `.env` vào tiến trình con, không in giá trị ra terminal. .NET không tự đọc `.env`.
+
+**Lưu ý:** do repo chưa có domain/database model thật của ứng dụng, migration hiện tại dùng các entity mẫu trong `backend/src/ChonRieng.Domain/Entities/ReferenceEntities.cs`. Đây là schema khởi tạo cho database trống, gồm cả `Bills`, `Seats`, `Sessions` và `Shifts` cùng các bảng Payments. Không áp dụng migration này vào database đã có các bảng đó; trước tiên phải ghép model/migration với schema thực tế và rà soát file SQL.
+
+Chưa chạy `database update` tự động: migration bootstrap tạo toàn bộ bảng trong mô hình mẫu, nên cần xác nhận database đích là database local/dev trống trước khi áp dụng. Không chạy migration này lên database đang có dữ liệu hoặc bảng ứng dụng. Sau khi tự rà soát SQL và xác minh database đích là database trống/dev, lệnh update có các chốt xác nhận:
+
+```powershell
+.\tools\payments\ef-migrations.ps1 -Action Update `
+  -ConfirmTargetDatabase "<tên database trong .env>" `
+  -ConfirmEmptyDevelopmentDatabase
+```
+
+Script từ chối nếu thiếu xác nhận tên database, tên trong `.env` không khớp hoặc tên có dấu hiệu production/live. Người chạy vẫn phải tự xác minh database đúng là môi trường development và đang trống.
 
 ### 6. Frontend
 

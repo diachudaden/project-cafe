@@ -7,9 +7,10 @@ This backlog is intentionally small and requirement-driven. It stores the projec
 | ID | Status | Title | Notes |
 | --- | --- | --- | --- |
 | TASK-001 | Completed | Establish GitHub Copilot workflow for Cafe CR | Creates the repository-level rules, prompts, and task structure.
-| TASK-002 | Planned | Integrate payment module with the actual app domain and persistence layer | Depends on the spec and the repo’s real entity types.
+| TASK-002 | Bị chặn | Tích hợp module thanh toán với domain và persistence thực tế | Đã tạo bootstrap persistence bằng entity tham khảo; còn cần domain/API và schema thực để thay thế; xem [TASK-002](./TASK-002-integration.md).
 | TASK-003 | Planned | Verify end-to-end payment behavior and reporting flows | Requires runtime validation with test data or a live environment.
-| TASK-004 | Bị chặn | Cấu hình thông tin SQL local qua file `.env` được Git bỏ qua | Phụ thuộc TASK-002; gỡ chặn khi có API project, SQL provider và cấu hình runtime thực tế.
+| TASK-004 | Đang làm | Cấu hình thông tin SQL local qua file `.env` được Git bỏ qua | `.env` được ignore, mẫu và script EF đã thêm; tích hợp runtime API thật còn phụ thuộc TASK-002.
+| TASK-005 | Bị chặn | Tích hợp EF Core và tạo, kiểm tra, áp dụng migration Payments | Đã scaffold migration/bootstrap và SQL script; chỉ áp dụng sau khi xác nhận database trống/dev và schema mẫu phù hợp; xem [TASK-005](./TASK-005-payments-migration.md).
 
 ## Working rules
 
