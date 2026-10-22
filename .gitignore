@@ -1,0 +1,44 @@
+# Local environment files may contain credentials.
+.env
+.env.*
+!.env.example
+
+# .NET build, test, and publish outputs.
+**/bin/
+**/obj/
+**/TestResults/
+**/publish/
+**/artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+# Frontend package and build outputs.
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/.nuxt/
+**/.output/
+**/.turbo/
+**/.cache/
+**/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE and editor-local state.
+.idea/
+*.swp
+*.swo
+*~
+
+# Operating system and diagnostic files.
+.DS_Store
+Thumbs.db
+*.stackdump
+*.dmp
+*.log
