@@ -60,6 +60,7 @@
 - EF Core nhận đúng DbContext và SQL provider từ ứng dụng thật.
 - Migration `AddPayments` được tạo và rà soát; hiện là migration khởi tạo schema bootstrap theo entity tham khảo, không phải migration gia tăng cho database đã tồn tại.
 - Backend build và các kiểm tra liên quan chạy thành công.
+- API host hiện có thể dùng làm startup project cho lệnh EF khi cần; vẫn cần kết nối đúng design-time factory/configuration.
 - Migration được áp dụng thành công lên đúng database không production đã xác nhận, hoặc task vẫn ghi rõ bị chặn trước bước này.
 - Không có credential trong source, migration, task, log hoặc Git.
 
@@ -75,6 +76,6 @@
 - Đã kiểm tra chốt an toàn: gọi `-Action Update` khi thiếu xác nhận bị chặn trước khi chạy EF.
 - Đã thêm project test xUnit và kiểm thử mapping EF Core cho bảng payment và row-version của Seat; `dotnet test backend/tests/ChonRieng.UnitTests/ChonRieng.UnitTests.csproj --filter "FullyQualifiedName~Payments"`: 61/61 test thành công.
 - Đã build `CafeCR.slnx` thành công. Restore ban đầu báo advisory cho `System.Security.Cryptography.Pkcs`; đã nâng lên bản vá 9.0.21. Kiểm tra `dotnet list ... package --vulnerable --include-transitive` không còn package có advisory; build sau cập nhật thành công, 0 warning và 0 error.
-- Chưa áp dụng migration và chưa kết nối tới database: migration hiện tạo cả các bảng domain mẫu, nên cần xác nhận database đích trống/dev và phù hợp trước khi ghi schema.
+- Chưa áp dụng migration và chưa kết nối tới database: migration hiện tạo cả các bảng domain mẫu, nên cần xác nhận database đích trống/dev và phù hợp trước khi ghi schema. Credential SQL đã bị chia sẻ; chỉ tiếp tục sau khi credential được xoay vòng và schema đích được xác nhận.
 - Phát hiện `.env` đang được Git theo dõi. Đã thêm quy tắc ignore cho `.env` và `.env.*` (ngoại lệ `.env.example`), đồng thời gỡ `.env` khỏi Git index bằng `git rm --cached`; file local được giữ nguyên. Việc bỏ theo dõi này đang ở trạng thái staged, chưa commit.
 - Không ghi credential vào log/file; chỉ đọc biến cần thiết vào process environment khi scaffold, không kết nối database.

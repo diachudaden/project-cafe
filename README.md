@@ -27,19 +27,20 @@ frontend/apps/pos/src/features/payments/      ← hộp thoại QR, âm báo, x�
 tools/payments/send-fake-webhook.mjs          ← gửi webhook giả có chữ ký đúng để test local
 ```
 
-## Đã kiểm tra tới đâu
+## Trạng thái hiện tại
 
 | Phần | Trạng thái |
 | --- | --- |
-| Domain, Application, Api | Build sạch trên **.NET 10**, bật warnings-as-errors, chạy với entity mẫu trong `docs/payments/reference` |
-| Unit test | **59/59 pass** (mã thanh toán, HMAC, khớp bill, chống trùng, thiếu/dư tiền, xếp chỗ, nhả ghế, sổ thu chi, báo cáo theo kỳ, đối soát) |
-| Webhook end-to-end | Chạy API thật + `send-fake-webhook.mjs`: chữ ký sai → 401; gửi 3 lần cùng id → 1 dòng sổ; khách xoá mã → cần xử lý |
-| Frontend | `tsc --strict` sạch với React 19, TanStack Query 5, @microsoft/signalr 8 |
-| **Infrastructure (EF Core)** | **Chưa build được ở đây** (môi trường không tải được gói EF). Đây là tầng duy nhất cần bạn/AI tool build và sửa khi nối vào `AppDbContext` thật |
+| Backend/API | `dotnet build CafeCR.slnx --no-restore` thành công trên .NET 10, 0 warning và 0 error |
+| Unit test Payments | 61/61 pass |
+| API/Swagger | Smoke test local: Swagger UI HTTP 200, OpenAPI 3.0.1, 11 routes; endpoint payment không có JWT trả 401 |
+| EF Core/migration | Infrastructure build được; migration bootstrap đã scaffold nhưng **chưa áp dụng** lên database |
+| Domain/schema | Entity hiện tại là mẫu bootstrap; chưa xác nhận khớp domain hoặc schema production |
+| Jobs | Chưa bật recurring jobs vì chưa cấu hình Hangfire storage |
 
-## Nối vào dự án — 7 bước
+## Tích hợp vào domain/backend thực tế — 7 bước
 
-> Cách nhanh: chép thư mục vào repo rồi dán nội dung `docs/payments/PROMPT.md` cho Claude Code hoặc Cursor. Nó sẽ làm các bước dưới.
+Repo hiện có backend bootstrap và API host để chạy thử; các bước dưới đây vẫn cần hoàn tất trước khi xem đây là tích hợp production. Không áp dụng migration hiện tại lên database đang có dữ liệu.
 
 ### 1. Cho entity hiện có implement interface
 
@@ -62,7 +63,9 @@ dotnet add backend/src/ChonRieng.Infrastructure package Microsoft.Extensions.Opt
 
 Code dùng `ImplicitUsings` (mặc định của template .NET) và `Nullable` bật.
 
-### 3. Program.cs
+### 3. API host và `Program.cs`
+
+API host hiện đã đăng ký `AppDbContext`, authentication JWT, Swagger trong Development, SignalR và module Payments. Khi ghép vào API/domain thực tế, hợp nhất đăng ký và route với cấu hình hiện có thay vì tạo host trùng lặp:
 
 ```csharp
 using ChonRieng.Api.Payments;
@@ -73,7 +76,7 @@ app.MapPaymentEndpoints();
 app.UsePaymentJobs();   // đặt sau khi Hangfire đã cấu hình
 ```
 
-`PosHub.OnConnectedAsync` phải cho connection vào group `branch-{id}` và `managers` — mẫu trong `SignalRPaymentNotifier.cs`.
+Recurring jobs hiện chưa được bật vì chưa có Hangfire storage. `PosHub.OnConnectedAsync` phải cho connection vào group `branch-{id}` và `managers` — mẫu trong `SignalRPaymentNotifier.cs`. Đối chiếu role, claims và identity provider trước khi triển khai.
 
 ### 4. Cấu hình
 
@@ -170,7 +173,26 @@ function PosShell() {
 dotnet test backend/tests/ChonRieng.UnitTests --filter "FullyQualifiedName~Payments"
 ```
 
-Test project cần `xunit`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk` (thường đã có) và tham chiếu tới `ChonRieng.Application`.
+## Chạy API và Swagger local
+
+1. Đổi SQL password nếu credential từng được chia sẻ, rồi cập nhật `.env` local. Không commit file này.
+2. Chạy từ PowerShell tại repo root:
+
+   ```powershell
+   .\tools\payments\run-api.ps1
+   ```
+
+3. Mở `http://localhost:8080/swagger`.
+
+Swagger chỉ bật trong môi trường `Development`. API yêu cầu `ConnectionStrings__DefaultConnection`; script nạp biến đó từ `.env` vào tiến trình API mà không in giá trị. .NET không tự nạp `.env`.
+
+Các giá trị Payment trong `appsettings.Development.json` chỉ là placeholder để khởi động Swagger; cần cấu hình thông tin ngân hàng và `Payment__WebhookSecret` trước khi thử thanh toán. JWT auth dùng signing key ngẫu nhiên theo tiến trình trong Development nếu chưa cấu hình, nên không có token đăng nhập hợp lệ giữa các lần chạy. Các endpoint yêu cầu authorization vẫn trả 401 cho request không có token hợp lệ.
+
+Ngoài Development, phải cấu hình `Authentication__Issuer`, `Authentication__Audience` và `Authentication__SigningKey` dài ít nhất 32 byte bằng secret manager/environment của môi trường. Chưa cấu hình Hangfire storage nên recurring payment jobs chưa được bật. API có thể khởi động và phục vụ Swagger mà không kết nối database ngay lúc startup; chỉ thao tác persistence mới mở kết nối.
+
+Project API và entity hiện là bootstrap theo module thanh toán, chưa đại diện cho domain production. Đối chiếu schema và identity provider thật trước khi triển khai hoặc áp dụng migration lên database hiện hữu.
+
+Nếu chép module sang repo khác, test project cần `xunit`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk` và tham chiếu tới các project tương ứng.
 
 ## Những điểm dễ sai
 

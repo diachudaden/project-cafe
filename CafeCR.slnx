@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/backend/" />
   <Folder Name="/backend/src/">
+    <Project Path="backend/src/ChonRieng.Api/ChonRieng.Api.csproj" />
     <Project Path="backend/src/ChonRieng.Application/ChonRieng.Application.csproj" />
     <Project Path="backend/src/ChonRieng.Domain/ChonRieng.Domain.csproj" />
     <Project Path="backend/src/ChonRieng.Infrastructure/ChonRieng.Infrastructure.csproj" />
