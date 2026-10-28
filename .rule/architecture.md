@@ -15,6 +15,5 @@
 
 ## Change constraints
 
-- Do not bypass the payment workflow described in [../docs/payments/SPEC.md](../docs/payments/SPEC.md).
 - Do not mix business rules into frontend presentation components unless the existing code already does so.
 - Do not introduce a new framework or storage pattern without a clear need and team approval.

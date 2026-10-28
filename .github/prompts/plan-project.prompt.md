@@ -9,7 +9,7 @@ Review the current repository state and the relevant requirements before proposi
 
 Required steps:
 
-1. Read [../../spec.md](../../spec.md), [../../docs/payments/SPEC.md](../../docs/payments/SPEC.md), and the relevant task file in [.task/](../../.task).
+1. Read [../../spec.md](../../spec.md) and the relevant task file in [.task/](../../.task).
 2. Inspect the affected modules, tests, and interfaces before proposing any design change.
 3. Identify module boundaries, risks, and unclear requirements.
 4. Break the work into small, independently verifiable tasks.

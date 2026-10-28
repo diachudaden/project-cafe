@@ -9,10 +9,9 @@ Use the project specification and task backlog as the source of truth for implem
 Before making changes, read:
 
 1. [../spec.md](../spec.md)
-2. [../docs/payments/SPEC.md](../docs/payments/SPEC.md)
-3. The relevant task file in [.task/](../.task)
-4. The relevant rule file in [.rule/](../.rule)
-5. The affected implementation files and existing tests
+2. The relevant task file in [.task/](../.task)
+3. The relevant rule file in [.rule/](../.rule)
+4. The affected implementation files and existing tests
 
 ## Working rules
 
@@ -27,8 +26,6 @@ Before making changes, read:
 
 ## Repository conventions
 
-- Payment and business rules live in [../docs/payments/SPEC.md](../docs/payments/SPEC.md).
-- Cursor and Claude-specific project rules are already present in the repo; keep their intent aligned with this workflow.
 - The task and rule directories are intentionally explicit, because Copilot does not automatically load arbitrary custom files by convention.
 - Path-specific instructions in [.github/instructions/](instructions) should be used for backend, frontend, and tests.
 

@@ -1,13 +1,12 @@
 # TASK-001: Establish GitHub Copilot workflow for Cafe CR
 
 - Status: Completed
-- Goal: Create a maintainable, task-driven GitHub Copilot workflow that matches the repo’s existing payment module and project conventions.
-- Rationale: The repository already contains project-specific product and payment rules, but it lacked an explicit Copilot workflow, task backlog, and repository rules. The workflow should make future implementation predictable and reviewable.
+- Goal: Create a maintainable, task-driven GitHub Copilot workflow that matches the repository’s project conventions.
+- Rationale: The repository needed an explicit Copilot workflow, task backlog, and repository rules to make future implementation predictable and reviewable.
 
 ## Specification references
 
 - [../spec.md](../spec.md)
-- [../docs/payments/SPEC.md](../docs/payments/SPEC.md)
 - [../README.md](../README.md)
 
 ## Rule references
@@ -31,7 +30,7 @@
 
 ## Explicit exclusions
 
-- Do not replace existing payment or project documentation.
+- Do not replace existing project documentation.
 - Do not add unnecessary GitHub automation or speculative task files not tied to the repo.
 - Do not duplicate the full business specification across many instruction files.
 
@@ -41,7 +40,7 @@
 - Relevant instructions and prompts are organized under [.github/](../.github).
 - The task workflow is stored in [.task/](../.task) and references real project requirements.
 - The rule set in [.rule/](../.rule) exists and describes real architecture and constraints.
-- The workflow references actual repository structure and spec files instead of placeholders.
+- The workflow references actual repository structure and specification files instead of placeholders.
 
 ## Verification
 

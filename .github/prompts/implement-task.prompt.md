@@ -7,7 +7,7 @@ description: "Implement one task while keeping within the project rules, task sc
 
 Before editing code:
 
-1. Read the relevant product requirement in [../../spec.md](../../spec.md) and [../../docs/payments/SPEC.md](../../docs/payments/SPEC.md).
+1. Read the relevant product requirements in [../../spec.md](../../spec.md).
 2. Read the active task file in [.task/](../../.task) and the relevant rule files in [.rule/](../../.rule).
 3. Inspect the affected implementation and its tests.
 4. Present a short plan for the task before making non-trivial edits.

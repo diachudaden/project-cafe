@@ -9,4 +9,5 @@
   <Folder Name="/backend/tests/">
     <Project Path="backend/tests/ChonRieng.UnitTests/ChonRieng.UnitTests.csproj" />
   </Folder>
+  <Project Path="ChonRieng.IntegrationTests/ChonRieng.IntegrationTests.csproj" />
 </Solution>
