@@ -1,6 +1,8 @@
 # Cafe CR API
 
-This repository currently contains a minimal .NET 10 API scaffold. The Payments feature, its persistence model and migration, POS UI, tests, and supporting documentation have been removed.
+This repository contains a minimal .NET 10 API scaffold and a Code First EF Core schema for the 22 business entities in the Cafe CR project reference. The removed VietQR/SePay payment gateway module is not part of this schema.
+
+The schema uses ASP.NET Core Identity with Guid keys. Identity adds six supporting tables (`AspNetRoles`, `AspNetRoleClaims`, `AspNetUserClaims`, `AspNetUserLogins`, `AspNetUserRoles`, and `AspNetUserTokens`) in addition to the 22 business tables. Its user table is named `Users`.
 
 ## Run locally
 
@@ -31,4 +33,17 @@ docker compose up
 
 Then open `http://localhost:18080/swagger`.
 
-The API is a scaffold and does not currently define business endpoints or connect to a database. Define product requirements before adding domain behavior or persistence.
+The API is a scaffold and does not currently define business endpoints or connect to a database at runtime. Domain entities and persistence mappings exist, but business workflows and endpoints still need requirements and implementation.
+
+## EF Core schema
+
+The Infrastructure project owns `AppDbContext`, SQL Server mappings, and the initial migration. The API does not apply migrations automatically. Configure a connection to a disposable SQL Server before using EF tools:
+
+```powershell
+$env:ConnectionStrings__DefaultConnection = "<disposable SQL Server connection string>"
+dotnet tool restore
+dotnet ef database update --project backend/src/ChonRieng.Infrastructure --startup-project backend/src/ChonRieng.Api
+Remove-Item Env:ConnectionStrings__DefaultConnection
+```
+
+Review the initial migration and generated SQL under `backend/src/ChonRieng.Infrastructure/Persistence/Migrations` before applying it anywhere persistent. Audit log, reporting views/aggregates, and business workflows remain out of scope.

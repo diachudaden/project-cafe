@@ -2,7 +2,7 @@
 
 ## Current scope
 
-The repository currently provides a minimal .NET 10 API scaffold with Swagger/OpenAPI. No business domain, database model, authentication provider, or production endpoints have been defined.
+The repository currently provides a minimal .NET 10 API scaffold with Swagger/OpenAPI and an EF Core Code First schema for the 22 business entities in the Cafe CR project reference. The schema uses ASP.NET Core Identity with Guid keys and SQL Server mappings. Business workflows, authentication endpoints/JWT configuration, seed data, and automatic migration-on-startup have not been implemented.
 
 ## Source of truth
 
@@ -18,3 +18,5 @@ The repository currently provides a minimal .NET 10 API scaffold with Swagger/Op
 3. Keep secrets and environment-specific values out of source control.
 4. Add focused tests for behavior changes.
 5. Verify changes with the smallest relevant build or test command and report the actual result.
+
+The payment gateway feature has been removed. `PaymentMethod` is only a simulated tender type on `Bill`; this project does not define gateway integrations or webhooks.

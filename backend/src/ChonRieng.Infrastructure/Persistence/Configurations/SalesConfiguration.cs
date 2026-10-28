@@ -1,0 +1,93 @@
+using ChonRieng.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace ChonRieng.Infrastructure.Persistence.Configurations;
+
+internal sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
+{
+    public void Configure(EntityTypeBuilder<Session> builder)
+    {
+        builder.ToTable("Sessions");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Status).HasConversion<byte>();
+        builder.HasIndex(x => new { x.SeatId, x.Status });
+        builder.HasOne(x => x.Seat)
+            .WithMany(x => x.Sessions)
+            .HasForeignKey(x => x.SeatId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Customer)
+            .WithMany(x => x.Sessions)
+            .HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.PricePlan)
+            .WithMany(x => x.Sessions)
+            .HasForeignKey(x => x.PricePlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class SessionExtensionConfiguration : IEntityTypeConfiguration<SessionExtension>
+{
+    public void Configure(EntityTypeBuilder<SessionExtension> builder)
+    {
+        builder.ToTable("SessionExtensions");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Price).HasColumnType("decimal(12,0)");
+        builder.HasIndex(x => x.SessionId);
+        builder.HasOne(x => x.Session)
+            .WithMany(x => x.Extensions)
+            .HasForeignKey(x => x.SessionId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
+{
+    public void Configure(EntityTypeBuilder<Bill> builder)
+    {
+        builder.ToTable("Bills");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Code).HasMaxLength(8).IsRequired();
+        builder.Property(x => x.Total).HasColumnType("decimal(12,0)");
+        builder.Property(x => x.PaymentMethod).HasConversion<byte>();
+        builder.HasIndex(x => x.Code).IsUnique();
+        builder.HasIndex(x => x.ClaimedByCustomerId);
+        builder.HasIndex(x => x.SessionId).IsUnique();
+        builder.HasOne(x => x.Branch)
+            .WithMany()
+            .HasForeignKey(x => x.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Shift)
+            .WithMany(x => x.Bills)
+            .HasForeignKey(x => x.ShiftId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Session)
+            .WithOne(x => x.Bill)
+            .HasForeignKey<Bill>(x => x.SessionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.ClaimedByCustomer)
+            .WithMany(x => x.ClaimedBills)
+            .HasForeignKey(x => x.ClaimedByCustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class PointTransactionConfiguration : IEntityTypeConfiguration<PointTransaction>
+{
+    public void Configure(EntityTypeBuilder<PointTransaction> builder)
+    {
+        builder.ToTable("PointTransactions");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Reason).HasMaxLength(200).IsRequired();
+        builder.HasIndex(x => x.CustomerId);
+        builder.HasOne(x => x.Customer)
+            .WithMany(x => x.PointTransactions)
+            .HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Bill)
+            .WithMany(x => x.PointTransactions)
+            .HasForeignKey(x => x.BillId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}

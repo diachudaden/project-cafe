@@ -1,0 +1,19 @@
+using ChonRieng.Domain.Common;
+
+namespace ChonRieng.Domain.Entities;
+
+public sealed class Session : Entity
+{
+    public Guid SeatId { get; set; }
+    public Guid? CustomerId { get; set; }
+    public Guid PricePlanId { get; set; }
+    public DateTimeOffset StartAt { get; set; }
+    public DateTimeOffset EndAt { get; set; }
+    public SessionStatus Status { get; set; } = SessionStatus.Active;
+
+    public Seat Seat { get; set; } = null!;
+    public Customer? Customer { get; set; }
+    public PricePlan PricePlan { get; set; } = null!;
+    public ICollection<SessionExtension> Extensions { get; } = new List<SessionExtension>();
+    public Bill? Bill { get; set; }
+}
