@@ -7,6 +7,7 @@ This backlog is intentionally small and requirement-driven. It stores the projec
 | ID | Status | Title | Notes |
 | --- | --- | --- | --- |
 | TASK-001 | Completed | Establish GitHub Copilot workflow for Cafe CR | Creates the repository-level rules, prompts, and task structure.
+| TASK-002 | Planned | Create the Cafe CR domain schema with EF Core Code First | Define and review schema decisions before implementation; generate but do not apply the initial migration. See [TASK-002](./TASK-002-code-first-domain-schema.md).
 
 ## Working rules
 
