@@ -1,0 +1,22 @@
+{
+  "name": "chonrieng-frontend",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/admin",
+    "apps/pos",
+    "apps/customer"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace=@chonrieng/admin",
+    "dev:pos": "npm run dev --workspace=@chonrieng/pos",
+    "dev:customer": "npm run dev --workspace=@chonrieng/customer",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5"
+  }
+}

@@ -1,6 +1,6 @@
 # TASK-004: Tạo frontend workspace
 
-- Trạng thái: Chờ xử lý
+- Trạng thái: Hoàn thành
 - Mục tiêu: Thiết lập workspace Vite, React và TypeScript có thể duy trì, gồm các ứng dụng `admin`, `pos` và `customer`.
 - Lý do: Thư mục `frontend` hiện chưa có workspace hoặc ứng dụng nào có thể chạy.
 
@@ -50,4 +50,13 @@
 
 ## Ghi chú triển khai
 
-Giữ workspace trong thư mục `frontend` hiện có và sử dụng cấu trúc `apps/`, `packages/`. Chọn công cụ workspace đơn giản nhất đáp ứng được các ứng dụng và package dùng chung cần thiết.
+Đã thiết lập npm workspaces gồm ba app `@chonrieng/admin`, `@chonrieng/pos`, `@chonrieng/customer`, dùng Vite, React, TypeScript và React Router. Mỗi app có route `/` và trang không tìm thấy riêng; chưa thêm màn hình nghiệp vụ hoặc hành vi đăng nhập.
+
+URL backend được cấu hình bằng `VITE_API_BASE_URL`; mỗi app có `.env.example` với URL local mặc định. README frontend giải thích cách tạo `.env.local` và cảnh báo không đưa secrets vào biến `VITE_*`.
+
+## Bằng chứng xác minh
+
+- Tại `frontend`: `npm install` — thành công, 0 lỗ hổng được npm audit báo cáo.
+- Tại `frontend`: `npm run typecheck` — cả ba workspace đều đạt.
+- Tại `frontend`: `npm run build` — cả ba app đều build production thành công.
+- Khởi động `npm run dev:admin`, `npm run dev:pos`, `npm run dev:customer`; gọi HTTP tới `127.0.0.1:5173`, `:5174`, `:5175` — cả ba trả về HTTP 200. Các dev server đã được dừng sau khi xác minh.
