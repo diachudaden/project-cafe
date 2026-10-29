@@ -1,53 +1,53 @@
-# TASK-001: Establish GitHub Copilot workflow for Cafe CR
+# TASK-001: Thiết lập quy trình làm việc GitHub Copilot cho Cafe CR
 
-- Status: Completed
-- Goal: Create a maintainable, task-driven GitHub Copilot workflow that matches the repository’s project conventions.
-- Rationale: The repository needed an explicit Copilot workflow, task backlog, and repository rules to make future implementation predictable and reviewable.
+- Trạng thái: Hoàn thành
+- Mục tiêu: Xây dựng quy trình làm việc GitHub Copilot có thể duy trì và phù hợp với quy ước của repository.
+- Lý do: Repository cần có hướng dẫn Copilot, backlog công việc và quy tắc dự án rõ ràng để các công việc triển khai sau này nhất quán, dễ xem xét.
 
-## Specification references
+## Tài liệu đặc tả
 
 - [../spec.md](../spec.md)
 - [../README.md](../README.md)
 
-## Rule references
+## Tài liệu quy tắc
 
-- [.rule/architecture.md](../.rule/architecture.md)
-- [.rule/coding-style.md](../.rule/coding-style.md)
-- [.rule/business-rules.md](../.rule/business-rules.md)
-- [.rule/security.md](../.rule/security.md)
-- [.rule/testing.md](../.rule/testing.md)
+- [../.rule/architecture.md](../.rule/architecture.md)
+- [../.rule/coding-style.md](../.rule/coding-style.md)
+- [../.rule/business-rules.md](../.rule/business-rules.md)
+- [../.rule/security.md](../.rule/security.md)
+- [../.rule/testing.md](../.rule/testing.md)
 
-## Dependencies
+## Phụ thuộc
 
-- None
+- Không có
 
-## Scope
+## Phạm vi
 
-- Add repository-wide Copilot instructions.
-- Add path-specific instruction files for backend, frontend, and tests.
-- Add reusable prompt files for planning, implementation, review, and verification.
-- Add a minimal task backlog and rule set that maps to the current project.
+- Thêm hướng dẫn Copilot áp dụng trên toàn repository.
+- Thêm các tệp hướng dẫn theo đường dẫn cho backend, frontend và tests.
+- Thêm các tệp prompt có thể tái sử dụng cho việc lập kế hoạch, triển khai, xem xét và xác minh.
+- Thêm backlog công việc tối thiểu và bộ quy tắc phù hợp với dự án hiện tại.
 
-## Explicit exclusions
+## Ngoài phạm vi
 
-- Do not replace existing project documentation.
-- Do not add unnecessary GitHub automation or speculative task files not tied to the repo.
-- Do not duplicate the full business specification across many instruction files.
+- Không thay thế tài liệu dự án hiện có.
+- Không thêm tự động hóa GitHub không cần thiết hoặc task giả định, không gắn với repository.
+- Không sao chép toàn bộ đặc tả nghiệp vụ vào nhiều tệp hướng dẫn.
 
-## Acceptance criteria
+## Tiêu chí chấp nhận
 
-- The repo has a clear repository-level instruction file for Copilot.
-- Relevant instructions and prompts are organized under [.github/](../.github).
-- The task workflow is stored in [.task/](../.task) and references real project requirements.
-- The rule set in [.rule/](../.rule) exists and describes real architecture and constraints.
-- The workflow references actual repository structure and specification files instead of placeholders.
+- Repository có tệp hướng dẫn Copilot ở cấp repository rõ ràng.
+- Các hướng dẫn và prompt liên quan được tổ chức dưới [.github/](../.github).
+- Quy trình task được lưu trong [.task/](../.task) và tham chiếu các yêu cầu thực tế của dự án.
+- Bộ quy tắc trong [.rule/](../.rule) tồn tại và mô tả đúng kiến trúc cùng các ràng buộc hiện hành.
+- Quy trình tham chiếu cấu trúc repository và các tệp đặc tả thực tế, không dùng nội dung giữ chỗ.
 
-## Verification
+## Xác minh
 
-- Validate the working tree and file layout.
-- Check for repository-level duplication issues and missing references.
-- Confirm the files are in the intended structure and reference actual project content.
+- Kiểm tra working tree và cấu trúc tệp.
+- Kiểm tra repository không bị trùng lặp tài liệu và không thiếu liên kết tham chiếu.
+- Xác nhận các tệp nằm đúng vị trí và tham chiếu nội dung dự án hiện có.
 
-## Implementation notes
+## Ghi chú triển khai
 
-This setup intentionally uses the repo’s actual docs and module structure instead of inventing a new, unsupported workflow. The repository does not currently include a live GitHub Actions or agent directory, so the maintainable solution is the supported Copilot instruction/prompt pattern plus explicit task and rule references.
+Thiết lập này sử dụng tài liệu và cấu trúc thực tế của repository thay vì tạo ra quy trình mới không được hỗ trợ. Repository hiện không có GitHub Actions hoặc thư mục agent đang hoạt động, vì vậy giải pháp phù hợp là sử dụng mẫu instruction/prompt được hỗ trợ của Copilot cùng các tham chiếu task và quy tắc rõ ràng.
