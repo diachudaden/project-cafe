@@ -37,13 +37,19 @@ The API is a scaffold and does not currently define business endpoints or connec
 
 ## EF Core schema
 
-The Infrastructure project owns `AppDbContext`, SQL Server mappings, and the initial migration. The API does not apply migrations automatically. Configure a connection to a disposable SQL Server before using EF tools:
+The Infrastructure project owns `AppDbContext`, SQL Server mappings, and the initial migration. The API does not apply migrations automatically. For host-side EF tools, copy `.env.example` to `.env` if needed and put your SQL Server connection string in `ConnectionStrings__DefaultConnection`. Keep `.env` local; it is ignored by Git.
 
-```powershell
-$env:ConnectionStrings__DefaultConnection = "<disposable SQL Server connection string>"
+In Bash, load the local file into the environment before running EF tools:
+
+```bash
+set -a
+source .env
+set +a
 dotnet tool restore
-dotnet ef database update --project backend/src/ChonRieng.Infrastructure --startup-project backend/src/ChonRieng.Api
-Remove-Item Env:ConnectionStrings__DefaultConnection
+dotnet ef database update \
+  --project backend/src/ChonRieng.Infrastructure \
+  --startup-project backend/src/ChonRieng.Api
+unset ConnectionStrings__DefaultConnection
 ```
 
-Review the initial migration and generated SQL under `backend/src/ChonRieng.Infrastructure/Persistence/Migrations` before applying it anywhere persistent. Audit log, reporting views/aggregates, and business workflows remain out of scope.
+Only run the update when the connection targets a disposable database you intend to initialize. Review the initial migration and generated SQL under `backend/src/ChonRieng.Infrastructure/Persistence/Migrations` before applying it anywhere persistent. Compose does not yet include a database service, and `docker compose up --build` does not apply migrations. Audit log, reporting views/aggregates, and business workflows remain out of scope.
