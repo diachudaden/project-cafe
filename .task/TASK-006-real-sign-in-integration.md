@@ -1,6 +1,6 @@
 # TASK-006: Tích hợp đăng nhập thật vào các ứng dụng
 
-- Trạng thái: Chờ xử lý
+- Trạng thái: Hoàn thành
 - Mục tiêu: Kết nối trải nghiệm đăng nhập dùng chung trong cả ba ứng dụng với API xác thực backend thật.
 - Lý do: Tiêu chí hoàn thành của dự án yêu cầu đăng nhập gọi API thật, kể cả khi màn hình nghiệp vụ vẫn dùng dữ liệu giả.
 
@@ -54,4 +54,20 @@
 
 ## Ghi chú triển khai
 
-Sử dụng UI dùng chung cho phần trình bày, nhưng đặt các lệnh gọi API và điều hướng riêng của ứng dụng ở đúng layer auth/application.
+Đã triển khai:
+
+- Thêm `@chonrieng/ui` form đăng nhập React Hook Form + Zod, có validation, trạng thái đang gửi, lỗi chung và lỗi field từ ProblemDetails.
+- Thêm `@chonrieng/auth` dùng chung cho request login/refresh/logout/me, parse hợp đồng phản hồi, ánh xạ lỗi, quản lý access token trong React memory state và bảo vệ route.
+- Cả ba app cấu hình `client` riêng, route `/login`, trang chính sau đăng nhập và nút đăng xuất. Khi khởi động/tải lại, app refresh qua cookie rồi xác nhận hồ sơ qua `/me`.
+- Customer Profile dùng dữ liệu `/me` thật; dashboard Admin giới hạn `BranchManager` theo `branchIds`. Dữ liệu nghiệp vụ mẫu vẫn nằm trong các service feature hiện có.
+- Không lưu token/mật khẩu vào browser storage; không thêm thông tin đăng nhập vào source, không thêm Orval, OTP, PIN hay đăng ký.
+
+**Bằng chứng xác minh**
+
+- `Set-Location .\frontend; npm install` — thành công; Zod được nâng lên bản đã vá, `npm audit` không phát hiện lỗ hổng.
+- `Set-Location .\frontend; npm run typecheck` — thành công cho `@chonrieng/auth`, Admin, POS và Customer.
+- `Set-Location .\frontend; npm test` — 20 test đạt: shared UI (5), auth (10), Admin (3), POS (1), Customer (1).
+- `Set-Location .\frontend; npm run build` — cả ba app production build thành công.
+- `Set-Location .\frontend; npm audit` — 0 vulnerabilities.
+- Kiểm tra tích hợp HTTP với backend thực chạy bằng SQLite tạm và khóa/mật khẩu seed ngẫu nhiên chỉ trong môi trường tiến trình: cả `admin`, `pos`, `customer` đều login 200, `/me` 200, refresh 200 và logout 204; CORS trả đúng origin và credentials. Dữ liệu tạm được dọn sau kiểm tra.
+- `git diff --check` — thành công sau khi cập nhật mã và tài liệu.

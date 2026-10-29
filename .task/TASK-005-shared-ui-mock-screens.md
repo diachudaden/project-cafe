@@ -1,6 +1,6 @@
 # TASK-005: Xây dựng UI dùng chung và màn hình với dữ liệu giả
 
-- Trạng thái: Chờ xử lý
+- Trạng thái: Hoàn thành
 - Mục tiêu: Triển khai các màn hình ban đầu đã duyệt bằng UI có thể tái sử dụng và dữ liệu nghiệp vụ giả được cô lập rõ ràng.
 - Lý do: Có thể phát triển màn hình nghiệp vụ trước khi API tương ứng tồn tại, đồng thời giữ khả năng thay thế dữ liệu mà không phải viết lại toàn bộ UI.
 
@@ -53,4 +53,16 @@
 
 ## Ghi chú triển khai
 
-Task này chỉ xử lý dữ liệu giả cho màn hình nghiệp vụ. Xác thực vẫn phải gọi backend thật và được xử lý trong TASK-003, TASK-006.
+Đã thêm package `@chonrieng/ui` với bố cục, tiêu đề, thẻ chỉ số, trạng thái loading/rỗng/lỗi, nhãn dữ liệu mẫu và component hiển thị tính năng chưa khả dụng.
+
+Đã triển khai dashboard/lọc chi nhánh và danh sách chỉ đọc cho Admin; sơ đồ ghế và check-in cập nhật state cục bộ cho POS; danh sách quán, tab quét bill, điểm mẫu và trang hồ sơ chưa kết nối tài khoản cho Customer. Dữ liệu nghiệp vụ được đọc qua service theo feature; component không import trực tiếp các mảng mock. Không thêm luồng xác thực giả.
+
+## Bằng chứng xác minh
+
+- `npm run typecheck` tại `frontend` — cả ba app đạt.
+- `npm test` tại `frontend` — 6 test trong package UI và ba app đều đạt.
+- `npm run build` tại `frontend` — production build cả ba app thành công.
+- Browser: dashboard Admin hiển thị số liệu; chọn chi nhánh Nguyễn Trãi cập nhật dashboard thành công.
+- Browser: POS mở check-in cho ghế trống; xác nhận chỉ cập nhật state mẫu tại trang.
+- Browser: Customer hiển thị danh sách quán; điều hướng tab Điểm hiển thị điểm mẫu.
+- Các thay đổi không gửi dữ liệu nghiệp vụ đến API.

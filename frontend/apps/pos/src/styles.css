@@ -1,51 +1,455 @@
-:root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #2b2118;
-  background: #fbf7f2;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.pos-app {
+  background:
+    radial-gradient(ellipse at 92% 10%, rgb(211 154 99 / 12%), transparent 30%),
+    #fbf7f2;
 }
 
-* {
-  box-sizing: border-box;
+.pos-header {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px max(20px, calc((100% - 1180px) / 2));
+  border-bottom: 1px solid #e7ddd1;
+  background: rgb(255 255 255 / 84%);
 }
 
-body {
-  min-width: 320px;
-  min-height: 100vh;
-  margin: 0;
+.pos-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: inherit;
+  text-decoration: none;
 }
 
-a {
+.pos-brand__mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #fff;
+  background: #8a5a32;
+  font-weight: 850;
+}
+
+.pos-brand strong,
+.pos-brand small {
+  display: block;
+}
+
+.pos-brand small {
+  margin-top: 3px;
   color: #8a5a32;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
-.workspace {
-  width: min(100% - 32px, 720px);
-  margin: 12vh auto 0;
-  padding: 32px;
+.pos-header-context {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #6d5947;
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.pos-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pos-header-actions .cr-sign-out {
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+}
+
+.pos-header-context i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #c4a27e;
+}
+
+.pos-page-content {
+  width: min(100% - 32px, 1060px);
+}
+
+.pos-shift-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 32px;
+  padding: 17px 20px;
   border: 1px solid #e7ddd1;
-  border-radius: 20px;
+  border-radius: 18px;
   background: #fff;
-  box-shadow: 0 16px 48px rgb(43 33 24 / 8%);
+  box-shadow: 0 8px 24px rgb(43 33 24 / 4%);
 }
 
-.workspace__eyebrow {
+.pos-shift-card > div {
+  display: grid;
+  gap: 6px;
+}
+
+.pos-shift-card > div + div {
+  text-align: right;
+}
+
+.pos-shift-card strong {
+  font-size: 0.95rem;
+}
+
+.pos-eyebrow {
+  margin: 0;
   color: #8a5a32;
-  font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.workspace__config {
-  margin-top: 24px;
-  color: #7a6a5b;
-  font-size: 0.9rem;
+.pos-seat-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  margin: -5px 0 24px;
+  color: #65584b;
+  font-size: 0.8rem;
 }
 
-code {
-  overflow-wrap: anywhere;
+.pos-seat-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pos-seat-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.pos-seat-legend .is-empty {
+  background: #52a878;
+}
+
+.pos-seat-legend .is-occupied {
+  background: #d3865d;
+}
+
+.pos-seat-legend .is-expiring {
+  background: #d7a348;
+}
+
+.pos-seat-legend .is-maintenance {
+  background: #9c9b9a;
+}
+
+.pos-zone {
+  margin-top: 28px;
+}
+
+.pos-zone h2 {
+  margin: 0 0 13px;
+  font-size: 1rem;
+}
+
+.pos-seat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pos-seat {
+  min-height: 122px;
+  display: grid;
+  justify-items: start;
+  align-content: space-between;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  color: #2b2118;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.pos-seat:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgb(43 33 24 / 10%);
+}
+
+.pos-seat:disabled {
+  cursor: default;
+}
+
+.pos-seat--empty {
+  border-color: #b7dfc5;
+  background: #e7f5eb;
+}
+
+.pos-seat--occupied {
+  border-color: #f0c7ad;
+  background: #fff0e7;
+}
+
+.pos-seat--expiring {
+  border-color: #f0d99f;
+  background: #fff6db;
+}
+
+.pos-seat--maintenance {
+  border-color: #d7d4d1;
+  background: #eeecea;
+  color: #77716c;
+}
+
+.pos-seat__icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #fff;
+  background: rgb(43 33 24 / 70%);
+  font-size: 0.95rem;
+}
+
+.pos-seat strong {
+  font-size: 1rem;
+}
+
+.pos-seat > span:last-of-type {
+  font-size: 0.73rem;
+  font-weight: 700;
+}
+
+.pos-seat small {
+  color: #796856;
+  font-size: 0.66rem;
+}
+
+.pos-inline-notice {
+  margin: -9px 0 20px;
+  padding: 12px 14px;
+  border: 1px solid #b7dfc5;
+  border-radius: 12px;
+  color: #25643e;
+  background: #e7f5eb;
+  font-size: 0.86rem;
+}
+
+.pos-sheet-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: 20px;
+  background: rgb(30 22 15 / 52%);
+}
+
+.pos-sheet {
+  width: min(100%, 520px);
+  padding: 14px 24px 24px;
+  border: 1px solid #e7ddd1;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 25px 80px rgb(0 0 0 / 22%);
+  animation: pos-sheet-in 180ms ease-out;
+}
+
+.pos-sheet__handle {
+  width: 42px;
+  height: 4px;
+  margin: 0 auto 20px;
+  border-radius: 99px;
+  background: #ded4ca;
+}
+
+.pos-sheet__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pos-sheet__heading h2 {
+  margin: 5px 0 0;
+  font-size: 1.35rem;
+}
+
+.pos-close-button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  color: #6d5947;
+  background: #f5f0eb;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.pos-price-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 22px 0;
+  padding: 15px 0;
+  border-top: 1px solid #f0e9e1;
+  border-bottom: 1px solid #f0e9e1;
+  color: #6d5947;
+  font-size: 0.88rem;
+}
+
+.pos-price-row strong {
+  color: #2b2118;
+}
+
+.pos-payment-options {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pos-payment-options legend {
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+
+.pos-payment-options label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #e7ddd1;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.pos-payment-options label.is-selected {
+  border-color: #aa7a50;
+  background: #fcf7f1;
+}
+
+.pos-payment-options input {
+  accent-color: #8a5a32;
+}
+
+.pos-payment-options label > span:nth-of-type(1) {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #8a5a32;
+  background: #f3e8dc;
+  font-weight: 800;
+}
+
+.pos-payment-options strong,
+.pos-payment-options small {
+  display: block;
+}
+
+.pos-payment-options small {
+  margin-top: 3px;
+  color: #7a6a5b;
+}
+
+.pos-sheet__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.pos-sheet__actions .cr-button {
+  flex: 1;
+}
+
+.pos-sheet__note {
+  margin: 13px 0 0;
+  color: #887a6b;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+@keyframes pos-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 760px) {
+  .pos-header {
+    min-height: 64px;
+    padding: 10px 16px;
+  }
+
+  .pos-header-context {
+    font-size: 0.72rem;
+  }
+
+  .pos-header-actions {
+    gap: 8px;
+  }
+
+  .pos-header-actions .cr-sign-out {
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 0.7rem;
+  }
+
+  .pos-seat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .pos-shift-card {
+    padding: 14px;
+  }
+
+  .pos-shift-card strong {
+    font-size: 0.8rem;
+  }
+
+  .pos-eyebrow {
+    font-size: 0.6rem;
+  }
+
+  .pos-seat-grid {
+    gap: 8px;
+  }
+
+  .pos-seat {
+    min-height: 112px;
+    padding: 10px;
+  }
+
+  .pos-seat-legend {
+    gap: 10px;
+    font-size: 0.72rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-sheet {
+    animation: none;
+  }
 }

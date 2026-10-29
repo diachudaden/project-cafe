@@ -1,38 +1,38 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { EmptyFeature } from "@chonrieng/ui";
+import { AuthProvider, RequireAuth } from "@chonrieng/auth";
 import { apiBaseUrl } from "./config";
+import { SignInPage } from "./features/auth/SignInPage";
+import { PosLayout } from "./features/navigation/PosLayout";
+import { SeatMapPage } from "./features/seats/SeatMapPage";
 import "./styles.css";
+import "@chonrieng/ui/styles.css";
 
-function WorkspaceHome() {
+function UnavailablePage() {
   return (
-    <main className="workspace">
-      <p className="workspace__eyebrow">Chốn Riêng · {__APP_NAME__}</p>
-      <h1>Frontend workspace đã sẵn sàng</h1>
-      <p>Đây là bộ khung ứng dụng. Các màn hình sẽ được triển khai trong những task tiếp theo.</p>
-      <p className="workspace__config">
-        API backend: <code>{apiBaseUrl}</code>
-      </p>
-    </main>
-  );
-}
-
-function NotFound() {
-  return (
-    <main className="workspace">
-      <h1>Không tìm thấy trang</h1>
-      <a href="/">Quay lại trang chính</a>
+    <main className="cr-page-content pos-page-content">
+      <EmptyFeature title="Trang này" />
     </main>
   );
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<WorkspaceHome />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider apiBaseUrl={apiBaseUrl} client="pos">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<SignInPage />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<PosLayout />}>
+              <Route index element={<Navigate to="/seats" replace />} />
+              <Route path="seats" element={<SeatMapPage />} />
+              <Route path="*" element={<UnavailablePage />} />
+            </Route>
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   </StrictMode>,
 );

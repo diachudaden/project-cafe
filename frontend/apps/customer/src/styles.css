@@ -1,51 +1,364 @@
-:root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #2b2118;
-  background: #fbf7f2;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  min-width: 320px;
+.customer-app {
   min-height: 100vh;
+  padding-bottom: 82px;
+  background:
+    radial-gradient(ellipse at 85% 4%, rgb(211 154 99 / 13%), transparent 28%),
+    #fbf7f2;
+}
+
+.customer-header {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px max(18px, calc((100% - 780px) / 2));
+  border-bottom: 1px solid #e7ddd1;
+  background: rgb(255 255 255 / 84%);
+}
+
+.customer-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.customer-brand__mark {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #fff;
+  background: #8a5a32;
+  font-weight: 850;
+}
+
+.customer-brand strong,
+.customer-brand small {
+  display: block;
+}
+
+.customer-brand small {
+  margin-top: 3px;
+  color: #8a5a32;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.customer-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.customer-preview-pill {
+  max-width: 150px;
+  overflow: hidden;
+  padding: 7px 10px;
+  border: 1px solid #ead8b2;
+  border-radius: 999px;
+  color: #79500f;
+  background: #fff5df;
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-page-content {
+  width: min(100% - 32px, 780px);
+  padding-top: 30px;
+}
+
+.customer-place-list {
+  display: grid;
+  gap: 14px;
+}
+
+.customer-place-card {
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 152px minmax(0, 1fr);
+}
+
+.customer-place-art {
+  min-height: 168px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px;
+  color: #fff;
+  background:
+    linear-gradient(145deg, rgb(43 33 24 / 5%), rgb(43 33 24 / 58%)),
+    radial-gradient(circle at 30% 20%, #d7a978, transparent 38%),
+    linear-gradient(135deg, #916f51, #45362c);
+}
+
+.customer-place-art span {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 50%);
+  border-radius: 12px;
+  background: rgb(43 33 24 / 20%);
+  font-size: 0.75rem;
+  font-weight: 800;
+  backdrop-filter: blur(6px);
+}
+
+.customer-place-art small {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgb(43 33 24 / 30%);
+  font-weight: 800;
+}
+
+.customer-place-info {
+  min-width: 0;
+  padding: 18px;
+}
+
+.customer-place-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.customer-place-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.customer-place-heading p {
+  margin: 7px 0 0;
+  color: #7a6a5b;
+  font-size: 0.79rem;
+  line-height: 1.5;
+}
+
+.customer-place-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 20px;
+  color: #65584b;
+  font-size: 0.78rem;
+}
+
+.customer-place-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.customer-place-meta i {
+  color: #8a5a32;
+  font-style: normal;
+  font-size: 1rem;
+}
+
+.customer-loyalty-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px;
+  border-radius: 22px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 90% 15%, rgb(255 255 255 / 20%), transparent 30%),
+    linear-gradient(130deg, #70472e, #a87448);
+  box-shadow: 0 18px 38px rgb(112 71 46 / 20%);
+}
+
+.customer-loyalty-card > div {
+  display: grid;
+  gap: 7px;
+}
+
+.customer-loyalty-card__label,
+.customer-loyalty-card__unit {
+  color: rgb(255 255 255 / 77%);
+  font-size: 0.8rem;
+}
+
+.customer-loyalty-card strong {
+  font-size: 3.2rem;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+.customer-loyalty-card__stamp {
+  font-size: 5rem;
+  color: rgb(255 255 255 / 22%);
+}
+
+.customer-loyalty-card .cr-badge {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  color: #70410f;
+  background: #fff1d2;
+}
+
+.customer-points-empty {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  margin-top: 18px;
+  padding: 28px;
+  text-align: center;
+}
+
+.customer-points-empty > span {
+  color: #b3875e;
+  font-size: 1.7rem;
+}
+
+.customer-points-empty h2,
+.customer-points-empty p {
   margin: 0;
 }
 
-a {
-  color: #8a5a32;
+.customer-points-empty h2 {
+  font-size: 0.95rem;
 }
 
-.workspace {
-  width: min(100% - 32px, 720px);
-  margin: 12vh auto 0;
-  padding: 32px;
-  border: 1px solid #e7ddd1;
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 16px 48px rgb(43 33 24 / 8%);
-}
-
-.workspace__eyebrow {
-  color: #8a5a32;
-  font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.workspace__config {
-  margin-top: 24px;
+.customer-points-empty p,
+.customer-profile-card p {
   color: #7a6a5b;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
 }
 
-code {
-  overflow-wrap: anywhere;
+.customer-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px;
+}
+
+.customer-profile-avatar {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #8a5a32;
+  background: #f3e8dc;
+  font-size: 1.7rem;
+  font-weight: 700;
+}
+
+.customer-profile-card h2 {
+  margin: 12px 0 0;
+  font-size: 1rem;
+}
+
+.customer-profile-card p {
+  margin: 6px 0 0;
+}
+
+.customer-loyalty-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 18px 20px;
+}
+
+.customer-loyalty-summary > div {
+  display: grid;
+  gap: 5px;
+}
+
+.customer-loyalty-summary span {
+  color: #7a6a5b;
+  font-size: 0.8rem;
+}
+
+.customer-loyalty-summary > span {
+  color: #ad7a47;
+  font-size: 1.6rem;
+}
+
+.customer-loyalty-summary strong {
+  font-size: 1rem;
+}
+
+.customer-auth-note {
+  margin: 14px 4px;
+  color: #7a6a5b;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.customer-bottom-nav {
+  position: fixed;
+  z-index: 20;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 7px max(12px, calc((100% - 780px) / 2)) max(7px, env(safe-area-inset-bottom));
+  border-top: 1px solid #e7ddd1;
+  background: rgb(255 255 255 / 95%);
+  box-shadow: 0 -8px 24px rgb(43 33 24 / 5%);
+  backdrop-filter: blur(12px);
+}
+
+.cr-bottom-link {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  border-radius: 12px;
+  color: #8a7a69;
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.cr-bottom-link > span {
+  font-size: 1.2rem;
+  line-height: 1.1;
+}
+
+.cr-bottom-link.is-active {
+  color: #8a5a32;
+  background: #fbf5ee;
+}
+
+@media (max-width: 620px) {
+  .customer-header {
+    min-height: 64px;
+  }
+
+  .customer-place-card {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-place-art {
+    min-height: 112px;
+  }
+
+  .customer-place-info {
+    padding: 15px;
+  }
+
+  .customer-place-heading {
+    flex-direction: column;
+  }
 }
