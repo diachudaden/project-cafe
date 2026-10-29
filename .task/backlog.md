@@ -7,7 +7,7 @@ Backlog này được giữ ở quy mô nhỏ, bám sát yêu cầu. Backlog ghi
 | Mã | Trạng thái | Tiêu đề | Ghi chú |
 | --- | --- | --- | --- |
 | TASK-001 | Hoàn thành | [Thiết lập quy trình làm việc GitHub Copilot cho Cafe CR](./TASK-001-setup.md) | Tạo các quy tắc, prompt và cấu trúc task ở cấp repository. |
-| TASK-002 | Chờ xử lý | [Xác định yêu cầu frontend và xác thực](./TASK-002-frontend-auth-requirements.md) | Làm rõ ranh giới dữ liệu giả, phạm vi màn hình ban đầu và hợp đồng đăng nhập thật trước khi triển khai. |
+| TASK-002 | Hoàn thành | [Xác định yêu cầu frontend và xác thực](./TASK-002-frontend-auth-requirements.md) | Phạm vi màn hình, ranh giới dữ liệu giả và hợp đồng đăng nhập thật đã ghi trong spec.md. OTP/PIN/đăng ký vẫn là điểm chặn. |
 | TASK-003 | Chờ xử lý | [Triển khai API xác thực thật](./TASK-003-real-authentication-api.md) | Bổ sung hành vi xác thực backend và hợp đồng OpenAPI sau khi yêu cầu được duyệt. Phụ thuộc TASK-002. |
 | TASK-004 | Chờ xử lý | [Tạo frontend workspace](./TASK-004-frontend-workspace.md) | Thiết lập workspace Vite, React, TypeScript và ba ứng dụng có thể chạy độc lập. |
 | TASK-005 | Chờ xử lý | [Xây dựng UI dùng chung và màn hình với dữ liệu giả](./TASK-005-shared-ui-mock-screens.md) | Triển khai các màn hình đã được duyệt bằng UI dùng chung và dữ liệu giả được cô lập rõ ràng. Phụ thuộc TASK-002 và TASK-004. |
