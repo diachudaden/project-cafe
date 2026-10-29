@@ -1,6 +1,6 @@
 # TASK-003: Triển khai API xác thực thật
 
-- Trạng thái: Chờ xử lý
+- Trạng thái: Hoàn thành
 - Mục tiêu: Cung cấp API xác thực backend thật và hợp đồng OpenAPI được tài liệu hóa cho các ứng dụng frontend.
 - Lý do: Luồng đăng nhập phải gọi backend; dữ liệu nghiệp vụ giả không áp dụng cho xác thực.
 
@@ -52,4 +52,20 @@
 
 ## Ghi chú triển khai
 
-API hiện tại chưa có endpoint xác thực. Giữ endpoint mỏng và ủy thác xử lý theo đúng kiến trúc backend hiện hành.
+Đã triển khai bốn endpoint auth theo hợp đồng trong `spec.md`: đăng nhập, refresh, đăng xuất và lấy người dùng hiện tại. Backend dùng ASP.NET Core Identity, JWT access token, refresh session lưu hash, refresh cookie HttpOnly, kiểm tra quyền theo app/role, khóa tài khoản khi đăng nhập sai nhiều lần, CORS allow-list và seed tài khoản local theo cấu hình.
+
+Thông tin JWT signing key và mật khẩu seed không còn nằm trong tệp cấu hình được commit. Local Development dùng .NET user secrets; integration tests tạo signing key và seed password ngẫu nhiên trong cấu hình runtime.
+
+OpenAPI trước đây áp dụng Bearer ở cấp toàn tài liệu, khiến cả endpoint cho phép anonymous bị mô tả như cần đăng nhập. Đã chuyển sang gắn Bearer theo metadata authorization của từng endpoint và thêm integration test xác nhận login/refresh/logout là anonymous còn `/me` yêu cầu Bearer.
+
+Integration test refresh trước đây yêu cầu access token phải khác ngay sau khi refresh; hai JWT có thể giống nhau nếu được tạo trong cùng một giây. Test đã sửa để xác minh refresh cookie thực sự được xoay vòng theo hợp đồng.
+
+Đã nâng `Microsoft.EntityFrameworkCore.Sqlite` lên `10.0.14`; phiên bản SQLitePCLRaw đi kèm không còn nằm trong dải bị cảnh báo bởi advisory GHSA-2m69-gcr7-jv3q.
+
+## Bằng chứng xác minh
+
+- `dotnet restore .\CafeCR.slnx` — thành công.
+- `dotnet test .\CafeCR.slnx --no-restore` — thành công; 16 unit tests và 15 integration tests đạt, không có test bị bỏ qua.
+- `dotnet build .\backend\src\ChonRieng.Api\ChonRieng.Api.csproj --no-restore` — thành công, 0 cảnh báo, 0 lỗi.
+- `dotnet list .\backend\src\ChonRieng.Infrastructure\ChonRieng.Infrastructure.csproj package --vulnerable --include-transitive` — không tìm thấy package có lỗ hổng.
+- Integration tests xác minh luồng login thành công/thất bại, role-app access, phone normalization, account lockout, refresh rotation, logout idempotent, `/me`, CORS credentials, cookie flags và yêu cầu Bearer theo từng endpoint OpenAPI.

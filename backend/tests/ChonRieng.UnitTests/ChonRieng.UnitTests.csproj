@@ -19,4 +19,7 @@
     <ProjectReference Include="..\..\src\ChonRieng.Domain\ChonRieng.Domain.csproj" />
     <ProjectReference Include="..\..\src\ChonRieng.Infrastructure\ChonRieng.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
 </Project>

@@ -1,6 +1,8 @@
 # Cafe CR API
 
-This repository currently contains a minimal .NET 10 API scaffold. The Payments feature, its persistence model and migration, POS UI, tests, and supporting documentation have been removed.
+.NET 10 API for Cafe CR / Chốn Riêng. This slice provides **real authentication** for the future `admin`, `pos`, and `customer` apps. Business data endpoints are not implemented yet.
+
+Product behavior: [spec.md](spec.md).
 
 ## Run locally
 
@@ -10,7 +12,36 @@ Requirements: .NET 10 SDK.
 dotnet run --project backend/src/ChonRieng.Api
 ```
 
-Open `http://localhost:5000/swagger` or the URL printed by ASP.NET Core.
+Open `http://localhost:5000/swagger` or the URL printed by ASP.NET Core (`launchSettings.json` may use other ports).
+
+Development uses SQLite (`chonrieng.db`) and seeds local users when `AuthSeed:Password` is configured. Keep the JWT signing key and seed password in .NET user secrets, environment variables, or a deployment secret store; never commit them.
+
+Configure local development secrets once:
+
+```powershell
+dotnet user-secrets set "Jwt:SigningKey" "<unique random value of at least 32 characters>" --project backend/src/ChonRieng.Api
+dotnet user-secrets set "AuthSeed:Password" "<strong local development password>" --project backend/src/ChonRieng.Api
+```
+
+Seeded Development users (use the password configured as `AuthSeed:Password`):
+
+Seeded Development users (same password from `AuthSeed:Password`):
+
+| Email | Role | App (`client`) |
+| --- | --- | --- |
+| `admin@chonrieng.local` | Admin | `admin` |
+| `manager@chonrieng.local` | BranchManager | `admin` |
+| `staff@chonrieng.local` (phone `0901234567`) | Staff | `pos` |
+| `customer@chonrieng.local` | Customer | `customer` |
+
+Auth endpoints: `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me`.
+
+## Tests
+
+```powershell
+dotnet test backend/tests/ChonRieng.UnitTests/ChonRieng.UnitTests.csproj
+dotnet test ChonRieng.IntegrationTests/ChonRieng.IntegrationTests.csproj
+```
 
 ## Build with Docker Compose
 
@@ -30,5 +61,3 @@ docker compose up
 ```
 
 Then open `http://localhost:18080/swagger`.
-
-The API is a scaffold and does not currently define business endpoints or connect to a database. Define product requirements before adding domain behavior or persistence.
