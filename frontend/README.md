@@ -12,7 +12,7 @@ Workspace cho ba ứng dụng Vite + React + TypeScript: `admin`, `pos` và `cus
 Chạy tại thư mục `frontend`:
 
 ```powershell
-npm install
+npm ci
 ```
 
 ## Cấu hình API
@@ -49,6 +49,8 @@ npm test
 npm run build
 ```
 
+Workspace frontend hiện chưa cấu hình script lint nên chưa có lệnh lint để chạy.
+
 Mỗi ứng dụng cũng có thể chạy lệnh riêng bằng npm workspace, ví dụ:
 
 ```powershell
@@ -61,6 +63,7 @@ npm run build --workspace=@chonrieng/admin
 - Khi mở hoặc tải lại app, frontend gọi refresh bằng cookie `HttpOnly`, sau đó lấy người dùng qua `/me`. Các route nghiệp vụ được bảo vệ cho đến khi phiên hợp lệ.
 - Access token chỉ được giữ trong state bộ nhớ và gửi qua header `Authorization` khi gọi `/me`; frontend không ghi access token, mật khẩu hoặc refresh cookie vào browser storage.
 - Đăng xuất gọi API logout, xóa state phiên trong bộ nhớ và quay về trang đăng nhập. OTP khách hàng, PIN POS và đăng ký công khai chưa được duyệt nên không có trong luồng này.
+- Để đăng nhập hoạt động, hãy khởi chạy API và cấu hình signing key cùng mật khẩu seed theo [README gốc](../README.md). Nếu API không khả dụng, ứng dụng hiển thị lỗi kết nối và giữ người dùng ở màn hình đăng nhập.
 
 ## Màn hình hiện có
 

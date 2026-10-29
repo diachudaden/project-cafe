@@ -23,8 +23,6 @@ dotnet user-secrets set "Jwt:SigningKey" "<unique random value of at least 32 ch
 dotnet user-secrets set "AuthSeed:Password" "<strong local development password>" --project backend/src/ChonRieng.Api
 ```
 
-Seeded Development users (use the password configured as `AuthSeed:Password`):
-
 Seeded Development users (same password from `AuthSeed:Password`):
 
 | Email | Role | App (`client`) |

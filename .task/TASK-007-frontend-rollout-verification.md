@@ -1,6 +1,6 @@
 # TASK-007: Xác minh và tài liệu hóa frontend
 
-- Trạng thái: Chờ xử lý
+- Trạng thái: Hoàn thành
 - Mục tiêu: Chứng minh cả ba ứng dụng chạy được và đăng nhập gọi API thật, sau đó ghi lại cách thiết lập cùng giới hạn của dữ liệu nghiệp vụ giả.
 - Lý do: Chỉ có thể xem dự án hoàn thành khi các ứng dụng và luồng đăng nhập thật đã được xác minh bằng kết quả thực tế mới nhất.
 
@@ -47,4 +47,19 @@
 
 ## Ghi chú triển khai
 
-Chạy các bước kiểm tra nhỏ nhất nhưng vẫn cung cấp bằng chứng cho từng tiêu chí chấp nhận; ghi rõ bước nào không thể chạy và lý do.
+### Bằng chứng xác minh
+
+- Cài sạch trong bản sao tạm độc lập với `node_modules`: `npm ci` thành công (129 packages, 0 vulnerabilities). Không chạy lệnh cài sạch trên worktree chính vì Vite của Customer đang chạy và giữ file native trong `node_modules`.
+- `npm run typecheck`: đạt cho các workspace frontend.
+- `npm test`: đạt, 20/20 test.
+- `npm run build`: đạt cho Admin, POS và Customer.
+- `npm audit`: 0 vulnerabilities.
+- Lint chưa chạy vì frontend workspace chưa cấu hình script lint.
+- E2E qua trình duyệt với backend/API tạm biệt lập: Admin đăng nhập thành công; `BranchManager` chỉ thấy chi nhánh được gán; tài khoản sai ứng dụng bị từ chối; POS đăng nhập, tải lại phiên và đăng xuất thành công; Customer đăng nhập, trang hồ sơ hiển thị dữ liệu từ `/me`, tải lại phiên và đăng xuất thành công. Các lần đăng xuất trả HTTP 204.
+- Admin ở viewport 390px vẫn hiển thị nút đăng xuất sau khi sửa CSS responsive; luồng logout trả HTTP 204.
+- Khi API không khả dụng, Customer hiển thị lỗi kết nối, vẫn ở `/login` và không lưu thông tin phiên vào browser storage.
+- Cả ba app hiển thị thông báo dữ liệu mẫu; dashboard Admin của `BranchManager` chỉ liệt kê chi nhánh thuộc `branchIds`.
+- Node trong môi trường xác minh là `23.6.0`; npm 10.9.2. npm/Vitest có cảnh báo Node 23 chưa được hỗ trợ; README nêu các phiên bản Node được hỗ trợ.
+- Backend kiểm thử, dữ liệu SQLite và mật khẩu seed dùng riêng cho lượt xác minh; không ghi credential vào tài liệu.
+
+Không thể chạy `npm ci` trực tiếp trong worktree chính do file native bị tiến trình Vite của người dùng khóa; xác minh cài sạch và các lệnh frontend được chạy trong bản sao tạm. Không dừng tiến trình Customer do người dùng sở hữu trên cổng 5175.

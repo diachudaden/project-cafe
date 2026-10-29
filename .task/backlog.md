@@ -12,7 +12,7 @@ Backlog này được giữ ở quy mô nhỏ, bám sát yêu cầu. Backlog ghi
 | TASK-004 | Hoàn thành | [Tạo frontend workspace](./TASK-004-frontend-workspace.md) | Ba app Vite/React/TypeScript đã type-check, build và được xác minh chạy trên các cổng riêng. |
 | TASK-005 | Hoàn thành | [Xây dựng UI dùng chung và màn hình với dữ liệu giả](./TASK-005-shared-ui-mock-screens.md) | Package UI, màn hình nghiệp vụ dữ liệu mẫu cho cả ba app và test tương tác đã hoàn tất. Phụ thuộc TASK-002 và TASK-004. |
 | TASK-006 | Hoàn thành | [Tích hợp đăng nhập thật vào các ứng dụng](./TASK-006-real-sign-in-integration.md) | Auth UI/service dùng chung, session refresh, `/me`, logout và bảo vệ route đã hoàn tất; backend integration đã xác minh cho cả ba client. |
-| TASK-007 | Chờ xử lý | [Xác minh và tài liệu hóa frontend](./TASK-007-frontend-rollout-verification.md) | Xác minh rollout cả ba ứng dụng và ghi lại cách thiết lập cùng giới hạn của dữ liệu giả. Phụ thuộc TASK-006. |
+| TASK-007 | Hoàn thành | [Xác minh và tài liệu hóa frontend](./TASK-007-frontend-rollout-verification.md) | Ba app đã type-check, test, build và được xác minh đăng nhập/refresh/logout với backend; hướng dẫn thiết lập và ranh giới dữ liệu mẫu đã được cập nhật. Phụ thuộc TASK-006. |
 
 ## Quy tắc quản lý task
 

@@ -252,9 +252,12 @@
     padding: 0 4px 14px;
   }
 
-  .admin-nav-caption,
-  .admin-sidebar-footer {
+  .admin-nav-caption {
     display: none;
+  }
+
+  .admin-sidebar-footer {
+    margin-top: 12px;
   }
 
   .admin-nav {
