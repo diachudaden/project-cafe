@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using ChonRieng.Api.Endpoints;
+using ChonRieng.Application.Persistence;
 using ChonRieng.Domain.Entities;
 using ChonRieng.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -13,10 +14,11 @@ public sealed class AuthService(
     UserManager<User> userManager,
     SignInManager<User> signInManager,
     AppDbContext dbContext,
+    IBranchAccessService branchAccessService,
     ITokenService tokenService,
     IOptions<JwtOptions> jwtOptions) : IAuthService
 {
-    private static readonly string[] CustomerRole = ["Customer"];
+    private static readonly string[] CustomerRole = [BusinessRoles.Customer];
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
 
     public async Task<RegistrationResult> RegisterAsync(
@@ -35,13 +37,13 @@ public sealed class AuthService(
         var createResult = await userManager.CreateAsync(user, request.Password);
         if (!createResult.Succeeded)
         {
-            return new RegistrationResult(null, ToErrorDictionary(createResult));
+            return new RegistrationResult(null, IdentityErrorFormatter.ToValidationErrors(createResult));
         }
 
-        var roleResult = await userManager.AddToRoleAsync(user, "Customer");
+        var roleResult = await userManager.AddToRoleAsync(user, BusinessRoles.Customer);
         if (!roleResult.Succeeded)
         {
-            return new RegistrationResult(null, ToErrorDictionary(roleResult));
+            return new RegistrationResult(null, IdentityErrorFormatter.ToValidationErrors(roleResult));
         }
 
         dbContext.Customers.Add(new Customer
@@ -98,6 +100,7 @@ public sealed class AuthService(
         }
 
         var roles = (await userManager.GetRolesAsync(user)).ToArray();
+        var branchIds = await GetBranchIdsAsync(user.Id, roles, cancellationToken);
         var rotatedToken = tokenService.CreateRefreshToken();
         session.RefreshTokenHash = tokenService.HashRefreshToken(rotatedToken);
         session.CreatedAt = now;
@@ -111,7 +114,7 @@ public sealed class AuthService(
             return null;
         }
 
-        return CreateTokenResponse(user, roles, rotatedToken, session.ExpiresAt.Value);
+        return CreateTokenResponse(user, roles, branchIds, rotatedToken, session.ExpiresAt.Value);
     }
 
     public async Task RevokeAsync(string refreshToken, CancellationToken cancellationToken)
@@ -161,6 +164,7 @@ public sealed class AuthService(
         var now = DateTimeOffset.UtcNow;
         var refreshToken = tokenService.CreateRefreshToken();
         var refreshExpiresAt = now.AddDays(_jwtOptions.RefreshTokenDays);
+        var branchIds = await GetBranchIdsAsync(user.Id, roles, cancellationToken);
         dbContext.UserSessions.Add(new UserSession
         {
             UserId = user.Id,
@@ -172,22 +176,34 @@ public sealed class AuthService(
         });
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return CreateTokenResponse(user, roles, refreshToken, refreshExpiresAt);
+        return CreateTokenResponse(user, roles, branchIds, refreshToken, refreshExpiresAt);
     }
 
     private AuthTokenResponse CreateTokenResponse(
         User user,
         IReadOnlyCollection<string> roles,
+        IReadOnlyCollection<Guid> branchIds,
         string refreshToken,
         DateTimeOffset refreshExpiresAt)
     {
         var accessExpiresAt = DateTimeOffset.UtcNow.AddMinutes(_jwtOptions.AccessTokenMinutes);
         return new AuthTokenResponse(
-            tokenService.CreateAccessToken(user, roles),
+            tokenService.CreateAccessToken(user, roles, branchIds),
             accessExpiresAt,
             refreshToken,
             refreshExpiresAt,
             ToUserResponse(user, roles));
+    }
+
+    private Task<IReadOnlySet<Guid>> GetBranchIdsAsync(
+        Guid userId,
+        IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken)
+    {
+        return roles.Contains(BusinessRoles.BranchManager, StringComparer.Ordinal)
+            || roles.Contains(BusinessRoles.Staff, StringComparer.Ordinal)
+            ? branchAccessService.GetAssignedBranchIdsAsync(userId, cancellationToken)
+            : Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
     }
 
     private static AuthUserResponse ToUserResponse(User user, IReadOnlyCollection<string> roles)
@@ -195,11 +211,4 @@ public sealed class AuthService(
         return new AuthUserResponse(user.Id, user.Email ?? "", user.FullName, user.PhoneNumber, roles.ToArray());
     }
 
-    private static IReadOnlyDictionary<string, string[]> ToErrorDictionary(IdentityResult result)
-    {
-        return new Dictionary<string, string[]>
-        {
-            ["Identity"] = result.Errors.Select(error => error.Description).ToArray(),
-        };
-    }
 }

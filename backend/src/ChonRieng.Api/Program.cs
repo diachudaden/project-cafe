@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 using ChonRieng.Api.Endpoints;
+using ChonRieng.Api.Authorization;
 using ChonRieng.Api.Middleware;
 using ChonRieng.Api.Services;
 using ChonRieng.Application.Persistence;
@@ -60,6 +61,9 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptio
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped(typeof(IEntityCrudService<>), typeof(EfEntityCrudService<>));
+builder.Services.AddScoped<IBranchAccessService, BranchAccessService>();
+builder.Services.AddScoped<IAuthorizationHandler, BranchScopeAuthorizationHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, CustomerOwnResourceAuthorizationHandler>();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddValidation();
@@ -86,14 +90,28 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("BranchScope", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireRole(BusinessRoles.Admin, BusinessRoles.BranchManager, BusinessRoles.Staff);
+        policy.AddRequirements(new BranchScopeRequirement());
+    });
+    options.AddPolicy("CustomerOwnResource", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.AddRequirements(new CustomerOwnResourceRequirement());
+    });
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "ChonRieng API",
+        Title = "Chốn Riêng API",
         Version = "v1",
+        Description = "Tài liệu API cho hệ thống quản lý chuỗi cà phê Chốn Riêng. Admin có quyền toàn hệ thống; BranchManager và Staff chỉ được truy cập chi nhánh có trong token; Customer chỉ được truy cập tài nguyên của chính mình. CRUD tổng quát hiện vẫn chỉ dành cho Admin.",
     });
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -102,7 +120,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter a JWT access token.",
+        Description = "Nhập access token JWT. Có thể lấy token bằng API đăng nhập.",
     });
     options.SchemaFilter<EnumAsStringSchemaFilter>();
     options.OperationFilter<AuthorizeOperationFilter>();
@@ -141,6 +159,14 @@ public sealed class AuthorizeOperationFilter : IOperationFilter
             return;
         }
 
+        var authorizationDescription = metadata.OfType<AuthorizationDescriptionMetadata>().LastOrDefault();
+        if (authorizationDescription is not null)
+        {
+            operation.Description = string.IsNullOrWhiteSpace(operation.Description)
+                ? authorizationDescription.Description
+                : $"{operation.Description}\n\n**Phân quyền:** {authorizationDescription.Description}";
+        }
+
         operation.Security ??= [];
         operation.Security.Add(new OpenApiSecurityRequirement
         {
@@ -153,6 +179,12 @@ public sealed class AuthorizeOperationFilter : IOperationFilter
                 },
             }] = Array.Empty<string>(),
         });
+        operation.Responses.TryAdd(
+            StatusCodes.Status401Unauthorized.ToString(),
+            new OpenApiResponse { Description = "Chưa đăng nhập hoặc access token không hợp lệ/hết hạn." });
+        operation.Responses.TryAdd(
+            StatusCodes.Status403Forbidden.ToString(),
+            new OpenApiResponse { Description = "Không có quyền truy cập theo vai trò hoặc phạm vi chi nhánh." });
     }
 }
 

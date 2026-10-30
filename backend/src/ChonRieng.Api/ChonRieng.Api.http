@@ -1,8 +1,11 @@
 @baseUrl = http://localhost:63842
 @adminAccessToken = replace-with-a-development-access-token
+@branchManagerAccessToken = replace-with-a-development-access-token
+@staffAccessToken = replace-with-a-development-access-token
+@customerAccessToken = replace-with-a-development-access-token
 @resourceId = 00000000-0000-7000-8000-000000000001
 
-### Register a customer
+### Đăng ký tài khoản khách hàng
 POST {{baseUrl}}/api/auth/register
 Content-Type: application/json
 
@@ -12,7 +15,7 @@ Content-Type: application/json
   "fullName": "Test Customer"
 }
 
-### Sign in
+### Đăng nhập
 POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -21,7 +24,7 @@ Content-Type: application/json
   "password": "ReplaceThis-123!"
 }
 
-### Rotate refresh token
+### Làm mới token
 POST {{baseUrl}}/api/auth/refresh
 Content-Type: application/json
 
@@ -29,7 +32,7 @@ Content-Type: application/json
   "refreshToken": "replace-with-refresh-token"
 }
 
-### Revoke refresh token
+### Thu hồi refresh token
 POST {{baseUrl}}/api/auth/logout
 Content-Type: application/json
 
@@ -37,19 +40,19 @@ Content-Type: application/json
   "refreshToken": "replace-with-refresh-token"
 }
 
-### Current account
+### Thông tin tài khoản hiện tại
 GET {{baseUrl}}/api/auth/me
 Authorization: Bearer {{adminAccessToken}}
 
-### List branches
+### Liệt kê chi nhánh (chỉ Admin)
 GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
 Authorization: Bearer {{adminAccessToken}}
 
-### Get branch
+### Lấy chi nhánh (chỉ Admin)
 GET {{baseUrl}}/api/admin/branches/{{resourceId}}
 Authorization: Bearer {{adminAccessToken}}
 
-### Create branch
+### Tạo chi nhánh (chỉ Admin)
 POST {{baseUrl}}/api/admin/branches
 Authorization: Bearer {{adminAccessToken}}
 Content-Type: application/json
@@ -66,7 +69,7 @@ Content-Type: application/json
   "isActive": true
 }
 
-### Replace branch
+### Cập nhật chi nhánh (chỉ Admin)
 PUT {{baseUrl}}/api/admin/branches/{{resourceId}}
 Authorization: Bearer {{adminAccessToken}}
 Content-Type: application/json
@@ -83,19 +86,19 @@ Content-Type: application/json
   "isActive": true
 }
 
-### Delete branch
+### Xóa chi nhánh (chỉ Admin)
 DELETE {{baseUrl}}/api/admin/branches/{{resourceId}}
 Authorization: Bearer {{adminAccessToken}}
 
-### List users
+### Liệt kê tài khoản (chỉ Admin)
 GET {{baseUrl}}/api/admin/users?page=1&pageSize=20
 Authorization: Bearer {{adminAccessToken}}
 
-### Get user
+### Lấy tài khoản (chỉ Admin)
 GET {{baseUrl}}/api/admin/users/{{resourceId}}
 Authorization: Bearer {{adminAccessToken}}
 
-### Create user
+### Tạo tài khoản khách hàng
 POST {{baseUrl}}/api/admin/users
 Authorization: Bearer {{adminAccessToken}}
 Content-Type: application/json
@@ -108,7 +111,7 @@ Content-Type: application/json
   "roles": ["Customer"]
 }
 
-### Replace user profile and roles
+### Cập nhật hồ sơ và vai trò tài khoản (chỉ Admin)
 PUT {{baseUrl}}/api/admin/users/{{resourceId}}
 Authorization: Bearer {{adminAccessToken}}
 Content-Type: application/json
@@ -120,6 +123,18 @@ Content-Type: application/json
   "roles": ["Customer"]
 }
 
-### Delete user
+### Xóa tài khoản (chỉ Admin)
 DELETE {{baseUrl}}/api/admin/users/{{resourceId}}
 Authorization: Bearer {{adminAccessToken}}
+
+### Thử dùng BranchManager gọi CRUD tổng quát (dự kiến 403 vì endpoint hiện chỉ dành cho Admin)
+GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
+Authorization: Bearer {{branchManagerAccessToken}}
+
+### Thử dùng Staff gọi CRUD tổng quát (dự kiến 403 vì endpoint hiện chỉ dành cho Admin)
+GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
+Authorization: Bearer {{staffAccessToken}}
+
+### Thử dùng Customer gọi CRUD tổng quát (dự kiến 403 vì endpoint hiện chỉ dành cho Admin)
+GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
+Authorization: Bearer {{customerAccessToken}}

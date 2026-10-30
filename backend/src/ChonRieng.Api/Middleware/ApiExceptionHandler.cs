@@ -23,8 +23,8 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         await httpContext.Response.WriteAsJsonAsync(new ProblemDetails
         {
             Status = StatusCodes.Status409Conflict,
-            Title = "Database conflict",
-            Detail = "The change conflicts with the current database state or a related record.",
+            Title = "Dữ liệu bị xung đột",
+            Detail = "Thay đổi không phù hợp với trạng thái hiện tại của dữ liệu hoặc bản ghi liên quan.",
             Instance = httpContext.Request.Path,
         }, cancellationToken);
         return true;

@@ -31,7 +31,8 @@ public sealed class TokenServiceTests
             FullName = "Test Admin",
         };
 
-        var encoded = service.CreateAccessToken(user, ["Admin"]);
+        var branchId = Guid.NewGuid();
+        var encoded = service.CreateAccessToken(user, ["Admin", "Staff"], [branchId]);
         var validation = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -49,6 +50,8 @@ public sealed class TokenServiceTests
         Assert.Equal(user.Id.ToString(), principal.FindFirstValue(ClaimTypes.NameIdentifier));
         Assert.Equal("admin@example.test", principal.FindFirstValue(ClaimTypes.Email));
         Assert.Contains(principal.Claims, claim => claim.Type == ClaimTypes.Role && claim.Value == "Admin");
+        Assert.Contains(principal.Claims, claim =>
+            claim.Type == BusinessRoles.BranchIdClaim && claim.Value == branchId.ToString());
     }
 
     [Fact]

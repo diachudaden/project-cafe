@@ -4,7 +4,10 @@ namespace ChonRieng.Api.Services;
 
 public interface ITokenService
 {
-    string CreateAccessToken(User user, IReadOnlyCollection<string> roles);
+    string CreateAccessToken(
+        User user,
+        IReadOnlyCollection<string> roles,
+        IReadOnlyCollection<Guid>? branchIds = null);
 
     string CreateRefreshToken();
 

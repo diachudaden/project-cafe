@@ -5,8 +5,6 @@ namespace ChonRieng.Api.Services;
 
 public static class RoleBootstrapper
 {
-    private static readonly string[] Roles = ["Admin", "Customer"];
-
     public static async Task InitializeAsync(
         IServiceProvider services,
         IConfiguration configuration,
@@ -15,7 +13,7 @@ public static class RoleBootstrapper
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
         var userManager = services.GetRequiredService<UserManager<User>>();
 
-        foreach (var role in Roles)
+        foreach (var role in BusinessRoles.All.Order(StringComparer.Ordinal))
         {
             if (await roleManager.RoleExistsAsync(role))
             {
@@ -62,9 +60,9 @@ public static class RoleBootstrapper
             }
         }
 
-        if (!await userManager.IsInRoleAsync(admin, "Admin"))
+        if (!await userManager.IsInRoleAsync(admin, BusinessRoles.Admin))
         {
-            var result = await userManager.AddToRoleAsync(admin, "Admin");
+            var result = await userManager.AddToRoleAsync(admin, BusinessRoles.Admin);
             if (!result.Succeeded)
             {
                 throw new InvalidOperationException(

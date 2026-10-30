@@ -8,7 +8,7 @@ public static class AuthEndpoints
     public static void MapAuthEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/auth")
-            .WithTags("Authentication");
+            .WithTags("Xác thực");
 
         group.MapPost("/register", async Task<Results<Created<AuthTokenResponse>, ValidationProblem>> (
             RegisterRequest request,
@@ -22,8 +22,8 @@ public static class AuthEndpoints
         })
             .AllowAnonymous()
             .WithName("RegisterCustomer")
-            .WithSummary("Register a customer account")
-            .WithDescription("Creates a customer account and returns an access token and refresh token.")
+            .WithSummary("Đăng ký tài khoản khách hàng")
+            .WithDescription("Tạo tài khoản khách hàng, hồ sơ khách hàng và trả về access token cùng refresh token. Tài khoản được phép đăng nhập ngay; xác minh email chưa được triển khai.")
             .ProducesValidationProblem();
 
         group.MapPost("/login", async Task<Results<Ok<AuthTokenResponse>, UnauthorizedHttpResult>> (
@@ -36,8 +36,8 @@ public static class AuthEndpoints
         })
             .AllowAnonymous()
             .WithName("Login")
-            .WithSummary("Sign in")
-            .WithDescription("Checks credentials and issues an access token and refresh token.")
+            .WithSummary("Đăng nhập")
+            .WithDescription("Kiểm tra thông tin đăng nhập và cấp access token cùng refresh token.")
             .Produces(StatusCodes.Status401Unauthorized);
 
         group.MapPost("/refresh", async Task<Results<Ok<AuthTokenResponse>, UnauthorizedHttpResult>> (
@@ -50,8 +50,8 @@ public static class AuthEndpoints
         })
             .AllowAnonymous()
             .WithName("RefreshTokens")
-            .WithSummary("Rotate refresh token")
-            .WithDescription("Consumes a valid refresh token and returns a newly rotated token pair.")
+            .WithSummary("Làm mới token")
+            .WithDescription("Sử dụng refresh token còn hiệu lực để cấp cặp token mới. Vai trò và phạm vi chi nhánh trong access token mới được đọc lại từ dữ liệu hiện tại.")
             .Produces(StatusCodes.Status401Unauthorized);
 
         group.MapPost("/logout", async Task<NoContent> (
@@ -64,8 +64,8 @@ public static class AuthEndpoints
         })
             .AllowAnonymous()
             .WithName("Logout")
-            .WithSummary("Revoke a refresh token")
-            .WithDescription("Revokes the submitted refresh token. Repeated requests are safe.")
+            .WithSummary("Đăng xuất và thu hồi refresh token")
+            .WithDescription("Thu hồi refresh token được gửi. Gọi lặp lại là an toàn; access token hiện tại vẫn dùng được đến khi hết hạn.")
             .Produces(StatusCodes.Status204NoContent);
 
         group.MapGet("/me", async Task<Results<Ok<AuthUserResponse>, NotFound>> (
@@ -78,7 +78,7 @@ public static class AuthEndpoints
         })
             .RequireAuthorization()
             .WithName("GetCurrentUser")
-            .WithSummary("Get the current account")
-            .WithDescription("Returns safe profile information for the authenticated account.");
+            .WithSummary("Lấy thông tin tài khoản hiện tại")
+            .WithDescription("Trả về thông tin an toàn và vai trò hiện tại của tài khoản đã đăng nhập.");
     }
 }

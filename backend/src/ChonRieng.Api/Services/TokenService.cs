@@ -12,7 +12,10 @@ public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
 {
     private readonly JwtOptions _options = options.Value;
 
-    public string CreateAccessToken(User user, IReadOnlyCollection<string> roles)
+    public string CreateAccessToken(
+        User user,
+        IReadOnlyCollection<string> roles,
+        IReadOnlyCollection<Guid>? branchIds = null)
     {
         var now = DateTimeOffset.UtcNow;
         var claims = new List<Claim>
@@ -23,6 +26,8 @@ public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        claims.AddRange((branchIds ?? Array.Empty<Guid>())
+            .Select(branchId => new Claim(BusinessRoles.BranchIdClaim, branchId.ToString())));
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey)),

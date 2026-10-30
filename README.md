@@ -58,7 +58,11 @@ Open the Swagger UI at the URL printed by ASP.NET Core plus `/swagger` (the curr
 - `GET /api/auth/me` returns the authenticated account's safe profile.
 - Access tokens last 15 minutes by default; refresh tokens last 7 days by default.
 - Email verification is not implemented because no email-delivery service exists. Immediate sign-in is allowed for this prototype; add verification before public production use.
-- Only the `Admin` role can access `/api/admin/*`. The first Admin account is provisioned from the environment settings on API startup; existing accounts are not reset if those settings change.
+- Supported roles are `Admin`, `BranchManager`, `Staff`, and `Customer`; an account may have multiple roles. Only `Admin` can access the current generic `/api/admin/*` CRUD.
+- Branch-scoped feature endpoints must use the `BranchScope` policy and filter queries with the branch IDs in the signed access token. Those IDs come from `EmployeeBranch`; `IsHome` does not change authorization. Customer-owned endpoints must use the `CustomerOwnResource` policy with route `userId` or `customerId`.
+- Role and branch scope claims are snapshots. A role/branch change does not update an already-issued access token; it remains effective until its 15-minute expiry. Refreshing re-reads current roles and branch assignments.
+- Assigning `BranchManager` or `Staff` does not grant generic CRUD or automatically create an employee profile/branch assignment. An Admin must provision the employee and its `EmployeeBranch` rows separately.
+- The first Admin account is provisioned from environment settings on API startup; existing accounts are not reset if those settings change.
 - Admin routes provide paginated CRUD for business resources and safe user management. Lists default to 50 records and accept `page` and `pageSize` (maximum 100). Identity tables and refresh-token sessions are not exposed as generic CRUD resources. Password, employee PIN, and refresh-token hashes are never returned.
 - This is a technical CRUD baseline, not feature workflows. Admin CRUD can change transactional records directly; add feature-specific validation and authorization before opening those operations to other roles.
 

@@ -15,7 +15,8 @@ The repository currently provides a .NET 10 API with Swagger/OpenAPI, an EF Core
 
 - Authentication uses JWT bearer access tokens and rotating refresh tokens.
 - Customer self-registration is allowed and creates a customer profile. Email verification is deferred until an email-delivery service exists; the baseline therefore permits immediate sign-in and is not sufficient by itself for a public production deployment.
-- The `Admin` role alone can use business-resource management endpoints. The `Customer` role is assigned on self-registration. No business role matrix or branch-scoped authorization is defined yet.
+- Supported roles are `Admin`, `BranchManager`, `Staff`, and `Customer`; a user may hold multiple roles. Existing generic CRUD remains Admin-only. BranchManager/Staff access is scoped to branch IDs in signed JWT `branch_id` claims populated from `EmployeeBranch`; Customer access to customer-owned resources is self-only. Feature-specific permissions remain to be defined in their tasks.
+- Role and branch claims are snapshots: existing access tokens remain effective until their 15-minute expiry; refresh uses current roles and branch assignments.
 - Business-resource management uses explicit request/response DTOs. Identity framework tables and refresh-token session records are never exposed as generic CRUD resources. Password hashes, employee PIN hashes, and refresh-token hashes are never returned by API responses.
 - The first administrator is provisioned from environment configuration. Secrets remain outside source control.
 - EF migrations are applied deliberately with EF tooling; the API does not migrate the database automatically at startup.

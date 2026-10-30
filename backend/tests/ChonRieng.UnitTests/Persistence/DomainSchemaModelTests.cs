@@ -1,4 +1,5 @@
 using ChonRieng.Domain.Entities;
+using ChonRieng.Application.Persistence;
 using ChonRieng.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -128,6 +129,21 @@ public sealed class DomainSchemaModelTests
         Assert.Contains("CREATE TABLE [Users]", sql, StringComparison.Ordinal);
         Assert.DoesNotContain("PaymentTransactions", sql, StringComparison.Ordinal);
         Assert.DoesNotContain("LedgerEntries", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Branch_scope_query_filters_related_entities_without_connecting_to_a_database()
+    {
+        using var db = CreateContext();
+        var branchId = Guid.CreateVersion7();
+
+        var query = BranchAccessScope.ForBranches(new HashSet<Guid> { branchId })
+            .Apply(db.Seats.AsNoTracking(), seat => seat.Zone.BranchId);
+        var sql = query.ToQueryString();
+
+        Assert.Contains("INNER JOIN [Zones]", sql, StringComparison.Ordinal);
+        Assert.Contains("BranchId", sql, StringComparison.Ordinal);
+        Assert.Contains(branchId.ToString(), sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

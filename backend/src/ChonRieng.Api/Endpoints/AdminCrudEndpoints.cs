@@ -1,3 +1,4 @@
+using ChonRieng.Api.Authorization;
 using ChonRieng.Api.Services;
 using ChonRieng.Domain.Entities;
 using ChonRieng.Infrastructure.Persistence;
@@ -15,8 +16,12 @@ public static class AdminCrudEndpoints
     public static void MapAdminCrudEndpoints(this WebApplication app)
     {
         var admin = app.MapGroup("/api/admin")
-            .WithTags("Administrator")
-            .RequireAuthorization(policy => policy.RequireRole("Admin"));
+            .WithTags("Quản trị")
+            .RequireAuthorization(policy => policy.RequireRole(BusinessRoles.Admin))
+            .WithDescription(
+                "Các API trong nhóm này hiện chỉ dành cho tài khoản có vai trò Admin và có phạm vi toàn hệ thống. CRUD tổng quát chưa được mở cho BranchManager, Staff hoặc Customer.")
+            .WithMetadata(new AuthorizationDescriptionMetadata(
+                "Chỉ vai trò Admin được sử dụng các API quản trị tổng quát; quyền áp dụng trên toàn hệ thống."));
 
         admin.MapGroup("/branches").MapCrud<Branch, CreateBranchRequest, UpdateBranchRequest, BranchResponse>(
             "Branches",
@@ -200,7 +205,7 @@ public static class AdminCrudEndpoints
     private static void MapAdminUserEndpoints(RouteGroupBuilder admin)
     {
         var users = admin.MapGroup("/users")
-            .WithTags("Administrator users");
+            .WithTags("Quản lý tài khoản");
 
         users.MapGet("/", async (
             int? page,
@@ -214,16 +219,16 @@ public static class AdminCrudEndpoints
             {
                 return Results.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid pagination",
-                    detail: "Page must be positive and pageSize must be between 1 and 100.");
+                    title: "Tham số phân trang không hợp lệ",
+                    detail: "page phải lớn hơn 0 và pageSize phải nằm trong khoảng từ 1 đến 100.");
             }
 
             if (currentPage > int.MaxValue / currentPageSize)
             {
                 return Results.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
-                    title: "Invalid pagination",
-                    detail: "The requested page is too large.");
+                    title: "Tham số phân trang không hợp lệ",
+                    detail: "Số trang yêu cầu vượt quá giới hạn hỗ trợ.");
             }
 
             var pageUsers = await userManager.Users
@@ -236,8 +241,8 @@ public static class AdminCrudEndpoints
             return Results.Ok(new PageResponse<AdminUserResponse>(currentPage, currentPageSize, pageUsers));
         })
             .WithName("ListUsers")
-            .WithSummary("List users")
-            .WithDescription("Returns a bounded page of users without credential or Identity security fields.")
+            .WithSummary("Liệt kê tài khoản")
+            .WithDescription("Trả về danh sách tài khoản có phân trang; không bao gồm mật khẩu, mã băm hoặc trường bảo mật của Identity.")
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest);
 
         users.MapGet("/{id:guid}", async Task<Results<Ok<AdminUserDetailResponse>, NotFound>> (
@@ -257,7 +262,8 @@ public static class AdminCrudEndpoints
             return TypedResults.Ok(new AdminUserDetailResponse(user.Id, user.Email ?? "", user.FullName, user.PhoneNumber, user.LockoutEnd, roles));
         })
             .WithName("GetUser")
-            .WithSummary("Get user by ID")
+            .WithSummary("Lấy tài khoản theo mã")
+            .WithDescription("Trả về hồ sơ an toàn và danh sách vai trò. Chỉ Admin được truy cập.")
             .Produces(StatusCodes.Status404NotFound);
 
         users.MapPost("/", async Task<Results<Created<AdminUserDetailResponse>, ValidationProblem>> (
@@ -266,11 +272,11 @@ public static class AdminCrudEndpoints
             AppDbContext dbContext,
             CancellationToken cancellationToken) =>
         {
-            if (request.Roles.Any(role => role is not ("Admin" or "Customer")))
+            if (request.Roles.Any(role => !BusinessRoles.All.Contains(role)))
             {
                 return TypedResults.ValidationProblem(new Dictionary<string, string[]>
                 {
-                    ["Roles"] = ["Only the Admin and Customer roles are currently available."],
+                    ["Roles"] = ["Vai trò không hợp lệ. Các vai trò được hỗ trợ: Admin, BranchManager, Staff, Customer."],
                 });
             }
 
@@ -285,16 +291,16 @@ public static class AdminCrudEndpoints
             var createResult = await userManager.CreateAsync(user, request.Password);
             if (!createResult.Succeeded)
             {
-                return TypedResults.ValidationProblem(IdentityErrors(createResult));
+                return TypedResults.ValidationProblem(IdentityErrorFormatter.ToValidationErrors(createResult).ToDictionary());
             }
 
             var roleResult = await userManager.AddToRolesAsync(user, request.Roles.Distinct(StringComparer.Ordinal));
             if (!roleResult.Succeeded)
             {
-                return TypedResults.ValidationProblem(IdentityErrors(roleResult));
+                return TypedResults.ValidationProblem(IdentityErrorFormatter.ToValidationErrors(roleResult).ToDictionary());
             }
 
-            if (request.Roles.Contains("Customer", StringComparer.Ordinal))
+            if (request.Roles.Contains(BusinessRoles.Customer, StringComparer.Ordinal))
             {
                 dbContext.Customers.Add(new Customer { UserId = user.Id, Tier = "" });
                 await dbContext.SaveChangesAsync(cancellationToken);
@@ -305,8 +311,8 @@ public static class AdminCrudEndpoints
             return TypedResults.Created($"/api/admin/users/{user.Id}", detail);
         })
             .WithName("CreateUser")
-            .WithSummary("Create a user")
-            .WithDescription("Creates an account and assigns only currently supported roles.")
+            .WithSummary("Tạo tài khoản")
+            .WithDescription("Tạo tài khoản và gán một hoặc nhiều vai trò được hỗ trợ: Admin, BranchManager, Staff, Customer. Chỉ Admin được thao tác.")
             .ProducesValidationProblem();
 
         users.MapPut("/{id:guid}", async Task<Results<Ok<AdminUserDetailResponse>, NotFound, ValidationProblem, Conflict<ProblemDetails>>> (
@@ -317,11 +323,11 @@ public static class AdminCrudEndpoints
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
         {
-            if (request.Roles.Any(role => role is not ("Admin" or "Customer")))
+            if (request.Roles.Any(role => !BusinessRoles.All.Contains(role)))
             {
                 return TypedResults.ValidationProblem(new Dictionary<string, string[]>
                 {
-                    ["Roles"] = ["Only the Admin and Customer roles are currently available."],
+                    ["Roles"] = ["Vai trò không hợp lệ. Các vai trò được hỗ trợ: Admin, BranchManager, Staff, Customer."],
                 });
             }
 
@@ -337,14 +343,14 @@ public static class AdminCrudEndpoints
             var currentRoles = await userManager.GetRolesAsync(user);
             if (Guid.TryParse(actorId, out var currentUserId)
                 && currentUserId == id
-                && currentRoles.Contains("Admin", StringComparer.Ordinal)
-                && !newRoles.Contains("Admin", StringComparer.Ordinal))
+                && currentRoles.Contains(BusinessRoles.Admin, StringComparer.Ordinal)
+                && !newRoles.Contains(BusinessRoles.Admin, StringComparer.Ordinal))
             {
                 return TypedResults.Conflict(new ProblemDetails
                 {
                     Status = StatusCodes.Status409Conflict,
-                    Title = "Cannot remove your own administrator role",
-                    Detail = "Another administrator must change this account's role.",
+                    Title = "Không thể tự gỡ vai trò quản trị",
+                    Detail = "Hãy dùng một tài khoản Admin khác để thay đổi vai trò của tài khoản này.",
                 });
             }
 
@@ -356,22 +362,22 @@ public static class AdminCrudEndpoints
             var updateResult = await userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
             {
-                return TypedResults.ValidationProblem(IdentityErrors(updateResult));
+                return TypedResults.ValidationProblem(IdentityErrorFormatter.ToValidationErrors(updateResult).ToDictionary());
             }
 
             var removeResult = await userManager.RemoveFromRolesAsync(user, currentRoles);
             if (!removeResult.Succeeded)
             {
-                return TypedResults.ValidationProblem(IdentityErrors(removeResult));
+                return TypedResults.ValidationProblem(IdentityErrorFormatter.ToValidationErrors(removeResult).ToDictionary());
             }
 
             var addResult = await userManager.AddToRolesAsync(user, newRoles);
             if (!addResult.Succeeded)
             {
-                return TypedResults.ValidationProblem(IdentityErrors(addResult));
+                return TypedResults.ValidationProblem(IdentityErrorFormatter.ToValidationErrors(addResult).ToDictionary());
             }
 
-            if (newRoles.Contains("Customer", StringComparer.Ordinal)
+            if (newRoles.Contains(BusinessRoles.Customer, StringComparer.Ordinal)
                 && !await dbContext.Customers.AnyAsync(customer => customer.UserId == user.Id, cancellationToken))
             {
                 dbContext.Customers.Add(new Customer { UserId = user.Id, Tier = "" });
@@ -382,7 +388,8 @@ public static class AdminCrudEndpoints
             return TypedResults.Ok(new AdminUserDetailResponse(user.Id, user.Email ?? "", user.FullName, user.PhoneNumber, user.LockoutEnd, newRoles));
         })
             .WithName("UpdateUser")
-            .WithSummary("Update a user")
+            .WithSummary("Cập nhật tài khoản")
+            .WithDescription("Cập nhật hồ sơ và toàn bộ danh sách vai trò. Tài khoản có nhiều vai trò phải được cấp quyền theo chính sách cụ thể của từng endpoint.")
             .Produces(StatusCodes.Status404NotFound)
             .ProducesValidationProblem();
 
@@ -399,8 +406,8 @@ public static class AdminCrudEndpoints
                 return TypedResults.Conflict(new ProblemDetails
                 {
                     Status = StatusCodes.Status409Conflict,
-                    Title = "Cannot delete the current account",
-                    Detail = "Sign in with another administrator account to delete this user.",
+                    Title = "Không thể xóa tài khoản đang đăng nhập",
+                    Detail = "Hãy đăng nhập bằng một tài khoản Admin khác để xóa tài khoản này.",
                 });
             }
 
@@ -419,21 +426,15 @@ public static class AdminCrudEndpoints
             return TypedResults.Conflict(new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
-                Title = "User cannot be deleted",
-                Detail = "The user is associated with records that prevent deletion.",
+                Title = "Không thể xóa tài khoản",
+                Detail = "Tài khoản đang liên kết với dữ liệu khác nên không thể xóa.",
             });
         })
             .WithName("DeleteUser")
-            .WithSummary("Delete a user")
+            .WithSummary("Xóa tài khoản")
+            .WithDescription("Chỉ Admin được thao tác. Không thể tự xóa tài khoản đang đăng nhập; lỗi liên kết dữ liệu trả về 409.")
             .Produces(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
-    private static Dictionary<string, string[]> IdentityErrors(IdentityResult result)
-    {
-        return new Dictionary<string, string[]>
-        {
-            ["Identity"] = result.Errors.Select(error => error.Description).ToArray(),
-        };
-    }
 }
