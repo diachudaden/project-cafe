@@ -801,10 +801,14 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<bool>("IsPos")
                         .HasColumnType("bit");
 
                     b.Property<string>("RefreshTokenHash")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");

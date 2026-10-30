@@ -50,7 +50,7 @@ internal sealed class UserSessionConfiguration : IEntityTypeConfiguration<UserSe
         builder.ToTable("UserSessions");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.DeviceId).HasMaxLength(200).IsRequired();
-        builder.Property(x => x.RefreshTokenHash).HasMaxLength(256).IsRequired();
+        builder.Property(x => x.RefreshTokenHash).HasMaxLength(256).IsRequired().IsConcurrencyToken();
         builder.HasIndex(x => new { x.UserId, x.IsPos })
             .IsUnique()
             .HasFilter("[RevokedAt] IS NULL AND [IsPos] = 1");

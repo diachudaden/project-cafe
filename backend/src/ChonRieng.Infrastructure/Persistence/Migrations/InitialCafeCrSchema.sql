@@ -895,3 +895,24 @@ END;
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261029170327_AddRefreshTokenExpiry'
+)
+BEGIN
+    ALTER TABLE [UserSessions] ADD [ExpiresAt] datetimeoffset NULL;
+END;
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261029170327_AddRefreshTokenExpiry'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261029170327_AddRefreshTokenExpiry', N'10.0.5');
+END;
+
+COMMIT;
+GO
+

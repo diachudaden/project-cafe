@@ -10,6 +10,7 @@ public sealed class UserSession : Entity
     public Guid? BranchId { get; set; }
     public string RefreshTokenHash { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
     public DateTimeOffset? RevokedAt { get; set; }
 
     public User User { get; set; } = null!;

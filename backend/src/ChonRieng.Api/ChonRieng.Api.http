@@ -1,0 +1,125 @@
+@baseUrl = http://localhost:63842
+@adminAccessToken = replace-with-a-development-access-token
+@resourceId = 00000000-0000-7000-8000-000000000001
+
+### Register a customer
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "customer@example.test",
+  "password": "ReplaceThis-123!",
+  "fullName": "Test Customer"
+}
+
+### Sign in
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.test",
+  "password": "ReplaceThis-123!"
+}
+
+### Rotate refresh token
+POST {{baseUrl}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "replace-with-refresh-token"
+}
+
+### Revoke refresh token
+POST {{baseUrl}}/api/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "replace-with-refresh-token"
+}
+
+### Current account
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{adminAccessToken}}
+
+### List branches
+GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
+Authorization: Bearer {{adminAccessToken}}
+
+### Get branch
+GET {{baseUrl}}/api/admin/branches/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+
+### Create branch
+POST {{baseUrl}}/api/admin/branches
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "name": "Example branch",
+  "address": "Example address",
+  "latitude": null,
+  "longitude": null,
+  "is24h": true,
+  "openTime": "00:00:00",
+  "closeTime": "00:00:00",
+  "phone": null,
+  "isActive": true
+}
+
+### Replace branch
+PUT {{baseUrl}}/api/admin/branches/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "name": "Updated branch",
+  "address": "Updated address",
+  "latitude": null,
+  "longitude": null,
+  "is24h": true,
+  "openTime": "00:00:00",
+  "closeTime": "00:00:00",
+  "phone": null,
+  "isActive": true
+}
+
+### Delete branch
+DELETE {{baseUrl}}/api/admin/branches/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+
+### List users
+GET {{baseUrl}}/api/admin/users?page=1&pageSize=20
+Authorization: Bearer {{adminAccessToken}}
+
+### Get user
+GET {{baseUrl}}/api/admin/users/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+
+### Create user
+POST {{baseUrl}}/api/admin/users
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "new-customer@example.test",
+  "password": "ReplaceThis-123!",
+  "fullName": "New Customer",
+  "phoneNumber": null,
+  "roles": ["Customer"]
+}
+
+### Replace user profile and roles
+PUT {{baseUrl}}/api/admin/users/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "new-customer@example.test",
+  "fullName": "Updated Customer",
+  "phoneNumber": null,
+  "roles": ["Customer"]
+}
+
+### Delete user
+DELETE {{baseUrl}}/api/admin/users/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}

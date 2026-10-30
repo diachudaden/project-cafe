@@ -15,6 +15,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\ChonRieng.Api\ChonRieng.Api.csproj" />
     <ProjectReference Include="..\..\src\ChonRieng.Application\ChonRieng.Application.csproj" />
     <ProjectReference Include="..\..\src\ChonRieng.Domain\ChonRieng.Domain.csproj" />
     <ProjectReference Include="..\..\src\ChonRieng.Infrastructure\ChonRieng.Infrastructure.csproj" />

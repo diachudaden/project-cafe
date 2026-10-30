@@ -108,6 +108,8 @@ public sealed class DomainSchemaModelTests
         var userSession = db.Model.FindEntityType(typeof(UserSession))!;
         Assert.Contains(userSession.GetIndexes(), index =>
             index.IsUnique && index.GetFilter() == "[RevokedAt] IS NULL AND [IsPos] = 1");
+        Assert.True(userSession.FindProperty(nameof(UserSession.RefreshTokenHash))!.IsConcurrencyToken);
+        Assert.True(userSession.FindProperty(nameof(UserSession.ExpiresAt))!.IsNullable);
 
         var shift = db.Model.FindEntityType(typeof(Shift))!;
         Assert.True(shift.FindProperty(nameof(Shift.RowVersion))!.IsConcurrencyToken);
@@ -129,13 +131,14 @@ public sealed class DomainSchemaModelTests
     }
 
     [Fact]
-    public void Initial_schema_migration_is_discoverable()
+    public void Schema_migrations_are_discoverable_in_order()
     {
         using var db = CreateContext();
 
         var migrations = db.Database.GetMigrations().ToArray();
 
-        Assert.Single(migrations);
+        Assert.Equal(2, migrations.Length);
         Assert.EndsWith("_InitialCafeCrSchema", migrations[0], StringComparison.Ordinal);
+        Assert.EndsWith("_AddRefreshTokenExpiry", migrations[1], StringComparison.Ordinal);
     }
 }
