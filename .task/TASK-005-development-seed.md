@@ -1,6 +1,6 @@
 # TASK-005: Add repeatable development seed data
 
-- Status: Planned
+- Status: Completed
 - Goal: Give developers and testers a safe, predictable dataset for exercising the API without manually creating every prerequisite record.
 
 ## User value
@@ -32,8 +32,8 @@ A developer can initialize an isolated local database with documented test accou
 
 ## Decisions required before implementation
 
-- Confirm which sample branches, price plans, staff assignments, and test roles best support the first demos.
-- Confirm whether a disposable local SQL Server database is available for reset-based test runs.
+- Approved: two clearly marked synthetic branches (A/B), one zone and two available seats per branch, demo-only 240-minute price plans, BranchManager and Staff accounts assigned only to branch A, and one Customer account. The existing environment-provisioned Admin is the Admin test account.
+- Approved: a disposable local SQL Server database is available for any manual clean-database run. Automated tests use an isolated EF Core in-memory database and never touch it.
 
 Use clearly labeled synthetic records if no real sample values are specified; do not imply they represent approved business pricing.
 
@@ -54,4 +54,16 @@ Use clearly labeled synthetic records if no real sample values are specified; do
 
 ## Verification
 
-Record the seed command, test database/environment, results, and reset procedure when implemented.
+- Added the explicit `--seed-development-data` command. It fails unless `ASPNETCORE_ENVIRONMENT` is `Development` or `Testing`; normal API startup never invokes the business-data seeder.
+- The command requires an existing migrated database, the configured bootstrap Admin, and local `DevelopmentSeed__Password`. It does not migrate or reset the database.
+- Stable lookup uses marked branch/zone/seat/price-plan names and reserved `.invalid` demo emails. The seeder only inserts missing records; it does not overwrite existing records. Conflicting demo-account identity data causes an explicit error.
+- Seeded records include two branches, two zones, four available seats, two clearly labeled sample price plans (1,000 VND / 240 minutes, 250 VND extension), BranchManager and Staff identities scoped only to branch A, and a Customer identity/profile.
+- Admin is the account from `BootstrapAdmin__Email`; no extra admin password is stored in the repository. Demo account passwords come from ignored local `DevelopmentSeed__Password`.
+- Employee PIN hashes use random, discarded values; no PIN is seeded or documented. Shifts, sessions, occupied seats, and transactional records are deferred until their feature workflows exist.
+- Updated `.env.example`, Compose environment forwarding, README host/container run instructions, and Vietnamese `.http` login scenarios. No Swagger operation was added because seeding is a local CLI command, not an API endpoint.
+- `dotnet test backend/tests/ChonRieng.UnitTests/ChonRieng.UnitTests.csproj --filter FullyQualifiedName~DevelopmentDataSeederTests`: passed 3 tests with an isolated EF Core in-memory database.
+- `dotnet build CafeCR.slnx`: succeeded with 0 warnings and 0 errors.
+- `dotnet test CafeCR.slnx --no-build`: passed 21 tests (1 integration and 20 unit tests).
+- `git diff --check`: passed.
+- `ASPNETCORE_ENVIRONMENT=Production dotnet run --project backend/src/ChonRieng.Api --no-build --no-launch-profile -- --seed-development-data`: rejected by the environment guard before database access, as expected.
+- Manual SQL Server seed execution: not run; a disposable local SQL Server is available to the developer. No local or shared database was modified.

@@ -17,6 +17,11 @@ using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
+var seedDevelopmentData = DevelopmentSeedCommand.IsRequested(args);
+if (seedDevelopmentData)
+{
+    DevelopmentSeedCommand.EnsureAllowed(builder.Environment);
+}
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -133,6 +138,22 @@ await using (var scope = app.Services.CreateAsyncScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
         .CreateLogger("RoleBootstrapper");
     await RoleBootstrapper.InitializeAsync(scope.ServiceProvider, app.Configuration, logger);
+
+    if (seedDevelopmentData)
+    {
+        var seedLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("DevelopmentDataSeeder");
+        await DevelopmentDataSeeder.SeedAsync(
+            scope.ServiceProvider,
+            app.Configuration,
+            seedLogger,
+            app.Lifetime.ApplicationStopping);
+    }
+}
+
+if (seedDevelopmentData)
+{
+    return;
 }
 
 app.UseExceptionHandler();

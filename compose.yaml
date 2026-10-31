@@ -15,5 +15,6 @@ services:
       BootstrapAdmin__Email: ${BootstrapAdmin__Email:-}
       BootstrapAdmin__Password: ${BootstrapAdmin__Password:-}
       BootstrapAdmin__FullName: ${BootstrapAdmin__FullName:-Administrator}
+      DevelopmentSeed__Password: ${DevelopmentSeed__Password:-}
     ports:
       - "${API_PORT:-8080}:8080"

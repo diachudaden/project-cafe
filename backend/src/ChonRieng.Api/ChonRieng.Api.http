@@ -5,6 +5,42 @@
 @customerAccessToken = replace-with-a-development-access-token
 @resourceId = 00000000-0000-7000-8000-000000000001
 
+### Đăng nhập tài khoản Admin đã cấu hình trong BootstrapAdmin__Email
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "replace-with-BootstrapAdmin__Email-from-local-env",
+  "password": "replace-with-BootstrapAdmin__Password-from-local-env"
+}
+
+### Đăng nhập BranchManager dữ liệu mẫu (chạy seed Development trước; chỉ có quyền chi nhánh A ở các API áp dụng BranchScope)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager.demo@cafecr.invalid",
+  "password": "replace-with-DevelopmentSeed__Password-from-local-env"
+}
+
+### Đăng nhập Staff dữ liệu mẫu (chạy seed Development trước; chỉ có quyền chi nhánh A ở các API áp dụng BranchScope)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "staff.demo@cafecr.invalid",
+  "password": "replace-with-DevelopmentSeed__Password-from-local-env"
+}
+
+### Đăng nhập Customer dữ liệu mẫu (chạy seed Development trước; chỉ truy cập dữ liệu của chính tài khoản)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "customer.demo@cafecr.invalid",
+  "password": "replace-with-DevelopmentSeed__Password-from-local-env"
+}
+
 ### Đăng ký tài khoản khách hàng
 POST {{baseUrl}}/api/auth/register
 Content-Type: application/json
@@ -44,7 +80,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/auth/me
 Authorization: Bearer {{adminAccessToken}}
 
-### Liệt kê chi nhánh (chỉ Admin)
+### Liệt kê chi nhánh (chỉ Admin; sau seed sẽ thấy 2 chi nhánh [DEMO DATA])
 GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
 Authorization: Bearer {{adminAccessToken}}
 

@@ -17,6 +17,7 @@ Edit `.env` and set:
 - `ConnectionStrings__DefaultConnection` to the intended SQL Server database.
 - `Jwt__SigningKey` to a random secret of at least 32 UTF-8 bytes. Generate one with `openssl rand -base64 48`.
 - `BootstrapAdmin__Email` and `BootstrapAdmin__Password` for the first administrator. Use a strong password (at least 12 characters with uppercase, lowercase, a digit, and a symbol).
+- `DevelopmentSeed__Password` for the demo manager, staff, and customer accounts. This is used only by the explicit development seed command and should be a strong local-only password.
 
 The API does not read `.env` by itself when run on the host. Load it in Bash from the repository root before starting the API or running EF commands:
 
@@ -38,6 +39,34 @@ dotnet ef database update \
 ```
 
 The current migration adds refresh-token expiry to `UserSessions`. Review migration files under `backend/src/ChonRieng.Infrastructure/Persistence/Migrations` and confirm the target database before updating it. Do not apply migrations to shared or production databases without review and a backup.
+
+## Optional development seed
+
+The seed command inserts demo data only when explicitly requested. It is allowed only in the `Development` or `Testing` environment; normal API startup never seeds demo records. It does not apply migrations, delete records, or reset the database. First apply the reviewed migrations to an isolated local database and configure the bootstrap Admin and `DevelopmentSeed__Password` in the ignored root `.env`.
+
+From the repository root, load `.env` and run:
+
+```bash
+set -a
+source .env
+set +a
+ASPNETCORE_ENVIRONMENT=Development dotnet run \
+  --project backend/src/ChonRieng.Api \
+  -- --seed-development-data
+```
+
+For the API container configured by Compose, run `docker compose run --rm api --seed-development-data` after setting the same local `.env` values and confirming the configured database is the intended isolated Development database.
+
+The command is idempotent and uses marked names/emails as stable lookup keys. It creates two demo branches (`[DEMO DATA] Chốn Riêng - Chi nhánh A/B`), one zone and two available seats per branch, and clearly marked sample price plans. The sample price is `1,000` VND per 240-minute plan with a `250` VND extension price; these values are synthetic and are not approved business pricing. It also creates:
+
+| Account | Email | Role and scope |
+| --- | --- | --- |
+| Demo manager | `manager.demo@cafecr.invalid` | `BranchManager`, branch A only |
+| Demo staff | `staff.demo@cafecr.invalid` | `Staff`, branch A only |
+| Demo customer | `customer.demo@cafecr.invalid` | `Customer`, own profile |
+| Admin | Value of `BootstrapAdmin__Email` | `Admin`, configured separately |
+
+The three demo accounts use `DevelopmentSeed__Password`; the bootstrap Admin keeps its separately configured password. The seed does not create shifts, sessions, occupied seats, or transactions because those workflow scenarios belong to later tasks. To start over, point the command at a newly created disposable database; the command intentionally provides no destructive reset option.
 
 ## Run the API locally
 

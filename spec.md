@@ -19,6 +19,7 @@ The repository currently provides a .NET 10 API with Swagger/OpenAPI, an EF Core
 - Role and branch claims are snapshots: existing access tokens remain effective until their 15-minute expiry; refresh uses current roles and branch assignments.
 - Business-resource management uses explicit request/response DTOs. Identity framework tables and refresh-token session records are never exposed as generic CRUD resources. Password hashes, employee PIN hashes, and refresh-token hashes are never returned by API responses.
 - The first administrator is provisioned from environment configuration. Secrets remain outside source control.
+- Development demo data is inserted only by the explicit seed command in Development/Testing; normal startup never seeds or resets business data.
 - EF migrations are applied deliberately with EF tooling; the API does not migrate the database automatically at startup.
 
 ## Requirements for future work
