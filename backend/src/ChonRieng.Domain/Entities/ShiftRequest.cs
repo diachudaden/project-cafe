@@ -12,6 +12,7 @@ public sealed class ShiftRequest : Entity
     public string Status { get; set; } = "";
     public Guid? ReviewedByEmployeeId { get; set; }
     public DateTimeOffset? ReviewedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 
     public Shift Shift { get; set; } = null!;
     public Employee RequesterEmployee { get; set; } = null!;

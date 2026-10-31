@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using ChonRieng.Api.Endpoints;
+using ChonRieng.Api.Features.Sales;
 using ChonRieng.Application.Persistence;
 using ChonRieng.Domain.Entities;
 using ChonRieng.Infrastructure.Persistence;
@@ -49,7 +50,8 @@ public sealed class AuthService(
         dbContext.Customers.Add(new Customer
         {
             UserId = user.Id,
-            Tier = "",
+            Tier = Loyalty.Bronze,
+            MemberCode = Loyalty.NewMemberCode(),
         });
         await dbContext.SaveChangesAsync(cancellationToken);
         var tokens = await CreateTokenResponseAsync(user, CustomerRole, request.DeviceId, cancellationToken);
@@ -152,7 +154,8 @@ public sealed class AuthService(
         }
 
         var roles = (await userManager.GetRolesAsync(user)).ToArray();
-        return ToUserResponse(user, roles);
+        var branchIds = await GetBranchIdsAsync(user.Id, roles, cancellationToken);
+        return ToUserResponse(user, roles, branchIds);
     }
 
     private async Task<AuthTokenResponse> CreateTokenResponseAsync(
@@ -192,7 +195,7 @@ public sealed class AuthService(
             accessExpiresAt,
             refreshToken,
             refreshExpiresAt,
-            ToUserResponse(user, roles));
+            ToUserResponse(user, roles, branchIds));
     }
 
     private Task<IReadOnlySet<Guid>> GetBranchIdsAsync(
@@ -206,9 +209,12 @@ public sealed class AuthService(
             : Task.FromResult<IReadOnlySet<Guid>>(new HashSet<Guid>());
     }
 
-    private static AuthUserResponse ToUserResponse(User user, IReadOnlyCollection<string> roles)
+    private static AuthUserResponse ToUserResponse(
+        User user,
+        IReadOnlyCollection<string> roles,
+        IReadOnlyCollection<Guid> branchIds)
     {
-        return new AuthUserResponse(user.Id, user.Email ?? "", user.FullName, user.PhoneNumber, roles.ToArray());
+        return new AuthUserResponse(user.Id, user.Email ?? "", user.FullName, user.PhoneNumber, roles.ToArray(), branchIds.ToArray());
     }
 
 }

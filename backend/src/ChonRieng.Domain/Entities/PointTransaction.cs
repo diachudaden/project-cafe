@@ -8,6 +8,7 @@ public sealed class PointTransaction : Entity
     public Guid? BillId { get; set; }
     public int Points { get; set; }
     public string Reason { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
 
     public Customer Customer { get; set; } = null!;
     public Bill? Bill { get; set; }

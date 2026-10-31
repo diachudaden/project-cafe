@@ -31,6 +31,12 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Approved")
                         .HasColumnType("bit");
 
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset?>("CheckInAt")
                         .HasColumnType("datetimeoffset");
 
@@ -107,12 +113,16 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<Guid?>("ClaimedByCustomerId")
+                        .IsConcurrencyToken()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(8)
                         .HasColumnType("nvarchar(8)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<byte>("PaymentMethod")
                         .HasColumnType("tinyint");
@@ -128,8 +138,6 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BranchId");
-
                     b.HasIndex("ClaimedByCustomerId");
 
                     b.HasIndex("Code")
@@ -139,6 +147,8 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("ShiftId");
+
+                    b.HasIndex("BranchId", "CreatedAt");
 
                     b.ToTable("Bills", (string)null);
                 });
@@ -196,6 +206,10 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("MemberCode")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
                     b.Property<int>("Points")
                         .HasColumnType("int");
 
@@ -211,6 +225,10 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("MemberCode")
+                        .IsUnique()
+                        .HasFilter("[MemberCode] IS NOT NULL");
 
                     b.HasIndex("UserId")
                         .IsUnique();
@@ -292,7 +310,10 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
-                    b.Property<Guid>("CreatedByEmployeeId")
+                    b.Property<Guid?>("CreatedByEmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("Date")
@@ -302,9 +323,16 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<Guid?>("ReversesExpenseId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedByEmployeeId");
+
+                    b.HasIndex("ReversesExpenseId")
+                        .IsUnique()
+                        .HasFilter("[ReversesExpenseId] IS NOT NULL");
 
                     b.HasIndex("BranchId", "Date");
 
@@ -321,6 +349,9 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Link")
                         .HasMaxLength(500)
@@ -343,6 +374,8 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAt");
 
                     b.HasIndex("UserId", "ReadAt");
 
@@ -402,6 +435,9 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("BillId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uniqueidentifier");
 
@@ -417,7 +453,7 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BillId");
 
-                    b.HasIndex("CustomerId");
+                    b.HasIndex("CustomerId", "CreatedAt");
 
                     b.ToTable("PointTransactions", (string)null);
                 });
@@ -492,6 +528,9 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<Guid?>("CustomerId")
                         .HasColumnType("uniqueidentifier");
 
@@ -515,6 +554,11 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("PricePlanId");
+
+                    b.HasIndex("SeatId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Sessions_SeatId_Active")
+                        .HasFilter("[Status] = 1");
 
                     b.HasIndex("SeatId", "Status");
 
@@ -598,8 +642,16 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("DeclineReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<Guid>("EmployeeId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OverrideReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTimeOffset?>("RespondedAt")
                         .HasColumnType("datetimeoffset");
@@ -646,8 +698,24 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("ShiftId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
 
@@ -664,6 +732,9 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Reason")
                         .IsRequired()
@@ -702,6 +773,8 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.HasIndex("ShiftId");
 
                     b.HasIndex("TargetEmployeeId");
+
+                    b.HasIndex("Status", "ShiftId");
 
                     b.ToTable("ShiftRequests", (string)null);
                 });
@@ -1101,8 +1174,7 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.HasOne("ChonRieng.Domain.Entities.Employee", "CreatedByEmployee")
                         .WithMany()
                         .HasForeignKey("CreatedByEmployeeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Branch");
 

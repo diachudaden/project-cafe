@@ -26,6 +26,10 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.HasIndex(x => x.UserId).IsUnique();
         builder.Property(x => x.Tier).HasMaxLength(40).IsRequired();
         builder.Property(x => x.TotalSpent).HasColumnType("decimal(12,0)");
+        builder.Property(x => x.MemberCode).HasMaxLength(16);
+        builder.HasIndex(x => x.MemberCode)
+            .IsUnique()
+            .HasFilter("[MemberCode] IS NOT NULL");
     }
 }
 

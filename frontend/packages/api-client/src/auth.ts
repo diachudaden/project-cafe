@@ -9,6 +9,8 @@ export interface AuthUser {
   fullName: string;
   phoneNumber: string | null;
   roles: Role[];
+  /** Branches assigned to a BranchManager/Staff; empty for Admin and Customer. */
+  branchIds: string[];
 }
 
 /** Mirrors AuthTokenResponse. */
@@ -20,6 +22,14 @@ export interface AuthTokens {
   user: AuthUser;
 }
 
+export interface RegisterInput {
+  email: string;
+  password: string;
+  fullName: string;
+  phoneNumber?: string | null;
+  deviceId?: string;
+}
+
 export interface LoginInput {
   email: string;
   password: string;
@@ -29,6 +39,7 @@ export interface LoginInput {
 export function createAuthApi(http: Http) {
   return {
     login: (input: LoginInput) => http.request<AuthTokens>("POST", "/api/auth/login", input),
+    register: (input: RegisterInput) => http.request<AuthTokens>("POST", "/api/auth/register", input),
     refresh: (refreshToken: string) => http.request<AuthTokens>("POST", "/api/auth/refresh", { refreshToken }),
     logout: (refreshToken: string) => http.request<void>("POST", "/api/auth/logout", { refreshToken }),
     me: () => http.request<AuthUser>("GET", "/api/auth/me"),
@@ -75,6 +86,12 @@ export class AuthSession {
 
   async login(input: LoginInput): Promise<AuthUser> {
     const tokens = await this.authApi.login(input);
+    this.apply(tokens);
+    return tokens.user;
+  }
+
+  async register(input: RegisterInput): Promise<AuthUser> {
+    const tokens = await this.authApi.register(input);
     this.apply(tokens);
     return tokens.user;
   }

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Alert, Button, Card, Form, Input, Typography } from "antd";
 import { ApiError, type LoginInput } from "@cafecr/api-client";
-import { isAdmin, useAuth } from "./AuthProvider";
+import { hasRole } from "@cafecr/ui";
+import { useAuth } from "../api";
 
 export function LoginPage() {
   const { state, login, logout } = useAuth();
@@ -12,7 +13,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const from = (location.state as { from?: string } | null)?.from ?? "/";
 
-  if (state.status === "signedIn" && isAdmin(state.user)) {
+  if (state.status === "signedIn" && hasRole(state.user, "Admin", "BranchManager")) {
     return <Navigate to={from} replace />;
   }
 
@@ -21,9 +22,9 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const user = await login({ ...values, deviceId: "admin-web" });
-      if (!isAdmin(user)) {
+      if (!hasRole(user, "Admin", "BranchManager")) {
         await logout();
-        setError("Tài khoản này không có vai trò Admin.");
+        setError("Tài khoản này không phải Admin hoặc Quản lý chi nhánh.");
         return;
       }
       navigate(from, { replace: true });
@@ -45,7 +46,7 @@ export function LoginPage() {
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f5f0eb", padding: 16 }}>
       <Card style={{ width: "100%", maxWidth: 380 }}>
         <Typography.Title level={3} style={{ marginTop: 0 }}>
-          Chốn Riêng — Quản trị
+          Chốn Riêng — Web Quản lý
         </Typography.Title>
         {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
         <Form<LoginInput> layout="vertical" onFinish={onFinish} requiredMark={false}>

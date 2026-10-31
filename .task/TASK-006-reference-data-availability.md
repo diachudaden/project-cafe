@@ -1,6 +1,6 @@
 # TASK-006: Manage branches, pricing, and seat availability
 
-- Status: Planned
+- Status: Completed (API + frontend; real-database verification pending)
 - Goal: Let authorized staff maintain cafe reference data and let customers discover available seats and applicable plans.
 
 ## User value
@@ -57,3 +57,16 @@ Staff can configure branches, seating areas, seats, and price plans; a customer 
 ## Verification
 
 Record tests, build, OpenAPI review, and any migration/database status when implemented.
+
+## Implementation
+
+Implemented on branch `Finish_Roles_Configuration` (2026-10-31) using the approved defaults in [../docs/proposals/roles/05-decisions.md](../docs/proposals/roles/05-decisions.md). Schema changes are in migration `RoleWorkflows` (not yet applied to any shared database).
+
+- Public `GET /api/branches` (distance sort, open-now, free seats per type), `/availability`, `/price-plans`; branch-scoped `/floor` with derived seat state (Available/Occupied/EndingSoon ≤ 15 min/Overdue/Maintenance).
+- Manager/Admin zone, seat, maintenance and price-plan management; chain-wide plans Admin-only.
+- Decisions: branch plan overrides a chain plan with the same duration; validity window `ValidFrom ≤ now < ValidTo`; no day/night/weekend pricing yet (D4). Occupancy is derived from active sessions; `Seat.Status` stores only Available/Maintenance.
+
+## Verification results
+
+- `dotnet test CafeCR.slnx`: 64 unit tests (rules, calculators, workflow services on EF in-memory, SQL Server translation of feature queries via a command interceptor) and 7 HTTP integration tests (real API pipeline with JWT, policies, rate limiting, Swagger and the demo seed on an in-memory database) passed; `dotnet build CafeCR.slnx`: 0 warnings, 0 errors.
+- Not yet run: `dotnet ef database update` and the seed against a real SQL Server (Docker was unavailable in the implementation session).

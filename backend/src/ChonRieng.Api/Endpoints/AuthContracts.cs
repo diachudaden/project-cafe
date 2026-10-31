@@ -55,7 +55,8 @@ public sealed record AuthUserResponse(
     [property: Description("Email đăng nhập.")] string Email,
     [property: Description("Họ tên hiển thị.")] string FullName,
     [property: Description("Số điện thoại nếu đã cung cấp.")] string? PhoneNumber,
-    [property: Description("Các vai trò hiện được gán cho tài khoản.")] IReadOnlyList<string> Roles);
+    [property: Description("Các vai trò hiện được gán cho tài khoản.")] IReadOnlyList<string> Roles,
+    [property: Description("Các chi nhánh được gán (BranchManager/Staff); rỗng với Admin và Customer.")] IReadOnlyList<Guid> BranchIds);
 
 /// <summary>Access token và refresh token được cấp sau khi xác thực.</summary>
 public sealed record AuthTokenResponse(

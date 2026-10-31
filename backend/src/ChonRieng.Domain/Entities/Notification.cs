@@ -10,6 +10,7 @@ public sealed class Notification : Entity
     public string Body { get; set; } = "";
     public string? Link { get; set; }
     public DateTimeOffset? ReadAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 
     public User User { get; set; } = null!;
 }

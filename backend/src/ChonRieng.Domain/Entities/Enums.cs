@@ -54,3 +54,11 @@ public enum ShiftRequestType : byte
     Leave = 2,
     Drop = 3,
 }
+
+public enum ClosingStatus : byte
+{
+    Draft = 1,
+    Submitted = 2,
+    Approved = 3,
+    Rejected = 4,
+}

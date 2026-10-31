@@ -4,6 +4,8 @@ import react from "@vitejs/plugin-react";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
+    // Served by nginx under /admin/ (see frontend/nginx.conf).
+    base: "/admin/",
     plugins: [react()],
     server: {
       port: 5173,

@@ -38,7 +38,7 @@ dotnet ef database update \
   --startup-project backend/src/ChonRieng.Api
 ```
 
-The current migration adds refresh-token expiry to `UserSessions`. Review migration files under `backend/src/ChonRieng.Infrastructure/Persistence/Migrations` and confirm the target database before updating it. Do not apply migrations to shared or production databases without review and a backup.
+The latest migration, `RoleWorkflows`, adds the columns and indexes used by the role workflows (one active session per seat, bill/point timestamps, member codes, closing review, expense reversals, attendance approval). Review migration files under `backend/src/ChonRieng.Infrastructure/Persistence/Migrations` and confirm the target database before updating it. Do not apply migrations to shared or production databases without review and a backup.
 
 ## Optional development seed
 
@@ -57,16 +57,20 @@ ASPNETCORE_ENVIRONMENT=Development dotnet run \
 
 For the API container configured by Compose, run `docker compose run --rm api --seed-development-data` after setting the same local `.env` values and confirming the configured database is the intended isolated Development database.
 
-The command is idempotent and uses marked names/emails as stable lookup keys. It creates two demo branches (`[DEMO DATA] Chốn Riêng - Chi nhánh A/B`), one zone and two available seats per branch, and clearly marked sample price plans. The sample price is `1,000` VND per 240-minute plan with a `250` VND extension price; these values are synthetic and are not approved business pricing. It also creates:
+The command is idempotent and uses marked names/emails as stable lookup keys; it only inserts missing records and never changes non-seed data. Demo prices are synthetic (`45.000đ` per 4 hours, `40.000đ` extension; branch C `40.000đ`/`35.000đ`) and are not approved business pricing.
 
-| Account | Email | Role and scope |
+It creates five branches `[DEMO DATA] Chốn Riêng - Chi nhánh A–E` (C and D open 24/7, ~48 seats, a few in maintenance) and these accounts, all using `DevelopmentSeed__Password`:
+
+| Accounts | Emails | Role and scope |
 | --- | --- | --- |
-| Demo manager | `manager.demo@cafecr.invalid` | `BranchManager`, branch A only |
-| Demo staff | `staff.demo@cafecr.invalid` | `Staff`, branch A only |
-| Demo customer | `customer.demo@cafecr.invalid` | `Customer`, own profile |
-| Admin | Value of `BootstrapAdmin__Email` | `Admin`, configured separately |
+| 3 admins | `admin01…03.demo@cafecr.invalid` | `Admin`, whole chain |
+| 10 branch managers | `manager01…10.demo@cafecr.invalid` | `BranchManager`; 01–02 branch A, 03–04 B, 05–06 C, 07–08 D, 09–10 E; manager10 also A |
+| 20 staff (POS) | `staff01…20.demo@cafecr.invalid` | `Staff`; 01–04 A, 05–08 B, 09–12 C, 13–16 D, 17–20 E; staff04 also B, staff08 also C |
+| 20 customers | `customer01…20.demo@cafecr.invalid` | `Customer`; member codes `CRDEMO01…20` |
+| TASK-005 accounts | `manager.demo`, `staff.demo`, `customer.demo` `@cafecr.invalid` | unchanged (branch A) |
+| Bootstrap admin | Value of `BootstrapAdmin__Email` | `Admin`, configured separately |
 
-The three demo accounts use `DevelopmentSeed__Password`; the bootstrap Admin keeps its separately configured password. The seed does not create shifts, sessions, occupied seats, or transactions because those workflow scenarios belong to later tasks. To start over, point the command at a newly created disposable database; the command intentionally provides no destructive reset option.
+On the first run (when the demo branches have no shifts) it also writes consistent history from the first day of last month to 7 days ahead: published shifts with accepted assignments, attendance (some late, a few missed), sessions and bills, member claims and points, shift closings (some with differences, recent ones awaiting review), expenses with one reversal, last month's payroll (finalized for A–C, draft for D–E), availability, pending leave/swap requests and notifications. Currently running shifts start with the assigned staff checked in and a few active sessions (one ending soon, one overdue). Later runs only add missing upcoming shifts, so the POS demo keeps working on later days. The TASK-005 `1.000đ` demo plans are closed so the chain plan applies. To start over, point the command at a newly created disposable database; there is no destructive reset option.
 
 ## Run the API locally
 
@@ -97,7 +101,7 @@ Open the Swagger UI at the URL printed by ASP.NET Core plus `/swagger` (the curr
 
 ## Docker Compose
 
-Compose runs two services; it does not provision a SQL Server container. Settings come from the root `.env`; the connection string must identify a SQL Server reachable from inside the API container. Configure and apply migrations before starting:
+Compose runs two services (`api` and `web`); it does not provision a SQL Server container. Settings come from the root `.env`; the connection string must identify a SQL Server reachable from inside the API container. Configure and apply migrations before starting:
 
 ```bash
 docker compose up --build -d
@@ -105,7 +109,10 @@ docker compose up --build -d
 
 | Service | Address | Notes |
 | --- | --- | --- |
-| `admin` (nginx) | `http://localhost` | Public entry point. Serves the admin web app and proxies `/api/*` to the API container, so the browser needs no CORS. |
+| `web` (nginx) | `http://localhost/` | Web Khách (customers, mobile-first). |
+| | `http://localhost/admin/` | Web Quản lý (Admin, BranchManager). |
+| | `http://localhost/pos/` | POS Nhân viên (Staff; tablet). |
+| | `http://localhost/api/*` | Proxied to the API container, so the browser needs no CORS. |
 | `api` | `http://127.0.0.1:8080` | Bound to localhost only; Swagger UI at `/swagger`. |
 
 Optional `.env` settings: `WEB_PORT` (default `80`), `API_PORT` (default `8080`), `ASPNETCORE_ENVIRONMENT` (default `Development`; use `Production` on a server to reduce logging).

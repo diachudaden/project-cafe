@@ -1,7 +1,7 @@
 # Proposal: complete the Admin, BranchManager, Staff and Customer roles
 
 - Date: 2026-10-31
-- Status: **Draft for review** — nothing in here is implemented yet
+- Status: **Implemented** (2026-10-31) with the recommended defaults; see TASK-006…010 and TASK-012 for what was built and what is deferred
 - Branch: `Finish_Roles_Configuration` (from `development`)
 - Sources: [spec.md](../../../spec.md), [project reference](../../payments/reference/project.md), [.task/TASK-006…010](../../../.task/), current code
 

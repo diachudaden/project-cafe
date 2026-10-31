@@ -1,6 +1,6 @@
 # TASK-007: Implement the POS session lifecycle
 
-- Status: Planned
+- Status: Completed (API + frontend; real-database verification pending)
 - Goal: Let authorized staff start a customer session, extend it, and check it out while keeping seat, session, and bill state consistent.
 
 ## User value
@@ -64,3 +64,16 @@ These are product decisions; do not infer them from the schema defaults or gener
 ## Verification
 
 Record commands, results, OpenAPI review, and any required unapplied migrations when implemented.
+
+## Implementation
+
+Implemented on branch `Finish_Roles_Configuration` (2026-10-31) using the approved defaults in [../docs/proposals/roles/05-decisions.md](../docs/proposals/roles/05-decisions.md). Schema changes are in migration `RoleWorkflows` (not yet applied to any shared database).
+
+- `POST /api/sessions` (check-in), `/{id}/extend`, `/{id}/close`, active sessions per branch, bill lookup, member lookup.
+- Decisions: payment at check-in creates the bill (D5); walk-ins allowed (D6); extension adds the plan duration from the scheduled end and the extend price to the same bill; overdue sessions shown red, closed as `Expired` (D7). Staff must be checked in to a shift at the branch; Admin/Manager use the branch's running shift.
+- A filtered unique index allows one `Active` session per seat; generic admin CRUD for sessions/bills is read-only.
+
+## Verification results
+
+- `dotnet test CafeCR.slnx`: 64 unit tests (rules, calculators, workflow services on EF in-memory, SQL Server translation of feature queries via a command interceptor) and 7 HTTP integration tests (real API pipeline with JWT, policies, rate limiting, Swagger and the demo seed on an in-memory database) passed; `dotnet build CafeCR.slnx`: 0 warnings, 0 errors.
+- Not yet run: `dotnet ef database update` and the seed against a real SQL Server (Docker was unavailable in the implementation session).

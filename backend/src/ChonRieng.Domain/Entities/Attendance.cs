@@ -10,6 +10,8 @@ public sealed class Attendance : Entity
     public DateTimeOffset? CheckOutAt { get; set; }
     public string Method { get; set; } = "";
     public bool Approved { get; set; }
+    public Guid? ApprovedByUserId { get; set; }
+    public DateTimeOffset? ApprovedAt { get; set; }
 
     public Employee Employee { get; set; } = null!;
     public Shift Shift { get; set; } = null!;

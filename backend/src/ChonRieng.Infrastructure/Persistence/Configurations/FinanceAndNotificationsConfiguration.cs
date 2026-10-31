@@ -21,7 +21,11 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         builder.HasOne(x => x.CreatedByEmployee)
             .WithMany()
             .HasForeignKey(x => x.CreatedByEmployeeId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.ReversesExpenseId)
+            .IsUnique()
+            .HasFilter("[ReversesExpenseId] IS NOT NULL");
     }
 }
 
@@ -36,6 +40,7 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
         builder.Property(x => x.Body).HasMaxLength(2000).IsRequired();
         builder.Property(x => x.Link).HasMaxLength(500);
         builder.HasIndex(x => new { x.UserId, x.ReadAt });
+        builder.HasIndex(x => new { x.UserId, x.CreatedAt });
         builder.HasOne(x => x.User)
             .WithMany()
             .HasForeignKey(x => x.UserId)

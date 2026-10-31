@@ -29,6 +29,8 @@ internal sealed class ShiftAssignmentConfiguration : IEntityTypeConfiguration<Sh
         builder.ToTable("ShiftAssignments");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Status).HasConversion<byte>();
+        builder.Property(x => x.DeclineReason).HasMaxLength(500);
+        builder.Property(x => x.OverrideReason).HasMaxLength(500);
         builder.HasIndex(x => new { x.ShiftId, x.EmployeeId }).IsUnique();
         builder.HasIndex(x => x.EmployeeId);
         builder.HasOne(x => x.Shift)
@@ -73,6 +75,8 @@ internal sealed class ShiftClosingConfiguration : IEntityTypeConfiguration<Shift
         builder.Property(x => x.Difference).HasColumnType("decimal(12,0)");
         builder.Property(x => x.Note).HasMaxLength(1000);
         builder.Property(x => x.Denominations).HasColumnType("nvarchar(max)").IsRequired();
+        builder.Property(x => x.Status).HasConversion<byte>();
+        builder.Property(x => x.ReviewNote).HasMaxLength(1000);
         builder.HasOne(x => x.Shift)
             .WithOne(x => x.Closing)
             .HasForeignKey<ShiftClosing>(x => x.ShiftId)
@@ -93,6 +97,7 @@ internal sealed class ShiftRequestConfiguration : IEntityTypeConfiguration<Shift
         builder.Property(x => x.Type).HasConversion<byte>();
         builder.Property(x => x.Reason).HasMaxLength(1000).IsRequired();
         builder.Property(x => x.Status).HasMaxLength(32).IsRequired();
+        builder.HasIndex(x => new { x.Status, x.ShiftId });
         builder.HasOne(x => x.Shift)
             .WithMany()
             .HasForeignKey(x => x.ShiftId)

@@ -12,6 +12,11 @@ internal sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Status).HasConversion<byte>();
         builder.HasIndex(x => new { x.SeatId, x.Status });
+        // At most one active session per seat; protects against two POS tablets selling the same seat.
+        builder.HasIndex(x => x.SeatId)
+            .IsUnique()
+            .HasFilter("[Status] = 1")
+            .HasDatabaseName("IX_Sessions_SeatId_Active");
         builder.HasOne(x => x.Seat)
             .WithMany(x => x.Sessions)
             .HasForeignKey(x => x.SeatId)
@@ -53,6 +58,9 @@ internal sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
         builder.Property(x => x.PaymentMethod).HasConversion<byte>();
         builder.HasIndex(x => x.Code).IsUnique();
         builder.HasIndex(x => x.ClaimedByCustomerId);
+        builder.HasIndex(x => new { x.BranchId, x.CreatedAt });
+        // A concurrent second claim fails instead of awarding points twice.
+        builder.Property(x => x.ClaimedByCustomerId).IsConcurrencyToken();
         builder.HasIndex(x => x.SessionId).IsUnique();
         builder.HasOne(x => x.Branch)
             .WithMany()
@@ -80,7 +88,7 @@ internal sealed class PointTransactionConfiguration : IEntityTypeConfiguration<P
         builder.ToTable("PointTransactions");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Reason).HasMaxLength(200).IsRequired();
-        builder.HasIndex(x => x.CustomerId);
+        builder.HasIndex(x => new { x.CustomerId, x.CreatedAt });
         builder.HasOne(x => x.Customer)
             .WithMany(x => x.PointTransactions)
             .HasForeignKey(x => x.CustomerId)

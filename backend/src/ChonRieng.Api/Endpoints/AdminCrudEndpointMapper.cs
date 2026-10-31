@@ -23,59 +23,7 @@ public static class AdminCrudEndpointMapper
         where TCreate : class
         where TUpdate : class
     {
-        group.MapGet("/", async Task<Results<Ok<PageResponse<TResponse>>, BadRequest<ProblemDetails>>> (
-            [Description("Số trang, bắt đầu từ 1; mặc định là 1.")]
-            int? page,
-            [Description("Số bản ghi mỗi trang, từ 1 đến 100; mặc định là 50.")]
-            int? pageSize,
-            IEntityCrudService<TEntity> service,
-            CancellationToken cancellationToken) =>
-        {
-            if (page is < 1 || pageSize is < 1 or > 100)
-            {
-                return TypedResults.BadRequest(new ProblemDetails
-                {
-                    Status = StatusCodes.Status400BadRequest,
-                    Title = "Tham số phân trang không hợp lệ",
-                    Detail = "page phải lớn hơn 0 và pageSize phải nằm trong khoảng từ 1 đến 100.",
-                });
-            }
-
-            var currentPage = page ?? 1;
-            var currentPageSize = pageSize ?? 50;
-            if (currentPage > int.MaxValue / currentPageSize)
-            {
-                return TypedResults.BadRequest(new ProblemDetails
-                {
-                    Status = StatusCodes.Status400BadRequest,
-                    Title = "Tham số phân trang không hợp lệ",
-                    Detail = "Số trang yêu cầu vượt quá giới hạn hỗ trợ.",
-                });
-            }
-
-            var entities = await service.ListAsync(currentPage, currentPageSize, cancellationToken);
-            return TypedResults.Ok(new PageResponse<TResponse>(
-                currentPage,
-                currentPageSize,
-                entities.Select(response).ToArray()));
-        })
-            .WithName($"List{route}")
-            .WithSummary($"Liệt kê {GetVietnameseResourceName(route)}")
-            .WithDescription($"Trả về một trang dữ liệu {GetVietnameseResourceName(route)}. Chỉ tài khoản Admin được sử dụng API quản trị tổng quát này.")
-            .ProducesValidationProblem();
-
-        group.MapGet("/{id:guid}", async Task<Results<Ok<TResponse>, NotFound>> (
-            Guid id,
-            IEntityCrudService<TEntity> service,
-            CancellationToken cancellationToken) =>
-        {
-            var entity = await service.FindAsync(id, cancellationToken);
-            return entity is null ? TypedResults.NotFound() : TypedResults.Ok(response(entity));
-        })
-            .WithName($"Get{route}")
-            .WithSummary($"Lấy {GetVietnameseResourceName(route)} theo mã")
-            .WithDescription("Chỉ tài khoản Admin có quyền truy cập toàn hệ thống. Trả về 404 nếu không tìm thấy bản ghi.")
-            .Produces(StatusCodes.Status404NotFound);
+        group.MapReads(route, response);
 
         group.MapPost("/", async (
             HttpContext httpContext,
@@ -158,6 +106,81 @@ public static class AdminCrudEndpointMapper
             .Produces(StatusCodes.Status409Conflict);
 
         return group;
+    }
+
+    /// <summary>
+    /// List/get only. Used for workflow tables (sessions, bills, closings…) whose writes must go
+    /// through the feature APIs so related records stay consistent.
+    /// </summary>
+    public static RouteGroupBuilder MapReadOnlyCrud<TEntity, TResponse>(
+        this RouteGroupBuilder group,
+        string route,
+        Func<TEntity, TResponse> response)
+        where TEntity : class
+    {
+        group.MapReads(route, response);
+        return group;
+    }
+
+    private static void MapReads<TEntity, TResponse>(
+        this RouteGroupBuilder group,
+        string route,
+        Func<TEntity, TResponse> response)
+        where TEntity : class
+    {
+        group.MapGet("/", async Task<Results<Ok<PageResponse<TResponse>>, BadRequest<ProblemDetails>>> (
+            [Description("Số trang, bắt đầu từ 1; mặc định là 1.")]
+            int? page,
+            [Description("Số bản ghi mỗi trang, từ 1 đến 100; mặc định là 50.")]
+            int? pageSize,
+            IEntityCrudService<TEntity> service,
+            CancellationToken cancellationToken) =>
+        {
+            if (page is < 1 || pageSize is < 1 or > 100)
+            {
+                return TypedResults.BadRequest(new ProblemDetails
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Title = "Tham số phân trang không hợp lệ",
+                    Detail = "page phải lớn hơn 0 và pageSize phải nằm trong khoảng từ 1 đến 100.",
+                });
+            }
+
+            var currentPage = page ?? 1;
+            var currentPageSize = pageSize ?? 50;
+            if (currentPage > int.MaxValue / currentPageSize)
+            {
+                return TypedResults.BadRequest(new ProblemDetails
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Title = "Tham số phân trang không hợp lệ",
+                    Detail = "Số trang yêu cầu vượt quá giới hạn hỗ trợ.",
+                });
+            }
+
+            var entities = await service.ListAsync(currentPage, currentPageSize, cancellationToken);
+            return TypedResults.Ok(new PageResponse<TResponse>(
+                currentPage,
+                currentPageSize,
+                entities.Select(response).ToArray()));
+        })
+            .WithName($"List{route}")
+            .WithSummary($"Liệt kê {GetVietnameseResourceName(route)}")
+            .WithDescription($"Trả về một trang dữ liệu {GetVietnameseResourceName(route)}. Chỉ tài khoản Admin được sử dụng API quản trị tổng quát này.")
+            .ProducesValidationProblem();
+
+        group.MapGet("/{id:guid}", async Task<Results<Ok<TResponse>, NotFound>> (
+            Guid id,
+            IEntityCrudService<TEntity> service,
+            CancellationToken cancellationToken) =>
+        {
+            var entity = await service.FindAsync(id, cancellationToken);
+            return entity is null ? TypedResults.NotFound() : TypedResults.Ok(response(entity));
+        })
+            .WithName($"Get{route}")
+            .WithSummary($"Lấy {GetVietnameseResourceName(route)} theo mã")
+            .WithDescription("Chỉ tài khoản Admin có quyền truy cập toàn hệ thống. Trả về 404 nếu không tìm thấy bản ghi.")
+            .Produces(StatusCodes.Status404NotFound);
     }
 
     private static async Task<TRequest?> ReadRequestAsync<TRequest>(

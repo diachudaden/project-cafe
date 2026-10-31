@@ -2,7 +2,7 @@
 
 ## Current scope
 
-The repository currently provides a .NET 10 API with Swagger/OpenAPI, an EF Core Code First schema for the 22 business entities in the Cafe CR project reference, and a baseline authentication and administrator API. The schema uses ASP.NET Core Identity with Guid keys and SQL Server mappings. Feature workflows and automatic migration-on-startup are not implemented.
+The repository provides a .NET 10 API with Swagger/OpenAPI, an EF Core Code First schema for the 22 Cafe CR business entities, authentication, Admin CRUD, and the role workflows for Admin, BranchManager, Staff and Customer (TASK-006…010): reference data and availability, POS sessions and bills, loyalty points, shifts and attendance, shift closing, expenses, payroll, reports and notifications. Three React apps consume it: Web Quản lý (`/admin`), POS (`/pos`) and Web Khách (`/`). Automatic migration-on-startup is not implemented. Business rules are in [.rule/business-rules.md](.rule/business-rules.md).
 
 ## Source of truth
 
