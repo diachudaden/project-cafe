@@ -5,8 +5,9 @@ services:
     build:
       context: .
       dockerfile: backend/src/ChonRieng.Api/Dockerfile
+    restart: unless-stopped
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__DefaultConnection: ${ConnectionStrings__DefaultConnection:-}
       Jwt__SigningKey: ${Jwt__SigningKey:-}
@@ -16,5 +17,17 @@ services:
       BootstrapAdmin__Password: ${BootstrapAdmin__Password:-}
       BootstrapAdmin__FullName: ${BootstrapAdmin__FullName:-Administrator}
       DevelopmentSeed__Password: ${DevelopmentSeed__Password:-}
+    # Bound to localhost only: the public entry point is the admin (nginx) service.
+    # Swagger stays reachable from this machine (or an SSH tunnel on EC2).
     ports:
-      - "${API_PORT:-8080}:8080"
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+
+  admin:
+    build:
+      context: ./frontend
+      dockerfile: apps/admin/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-80}:80"

@@ -97,12 +97,17 @@ Open the Swagger UI at the URL printed by ASP.NET Core plus `/swagger` (the curr
 
 ## Docker Compose
 
-Compose currently runs only the API; it does not provision a SQL Server container. It passes the database and authentication settings from the root `.env` into the API container. The connection string must identify a SQL Server reachable from inside that container. Configure and apply migrations before starting:
+Compose runs two services; it does not provision a SQL Server container. Settings come from the root `.env`; the connection string must identify a SQL Server reachable from inside the API container. Configure and apply migrations before starting:
 
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
-The API is available at `http://localhost:8080`; Swagger UI is at `/swagger`. If port 8080 is already in use, set `API_PORT` in `.env`, for example `API_PORT=18080`.
+| Service | Address | Notes |
+| --- | --- | --- |
+| `admin` (nginx) | `http://localhost` | Public entry point. Serves the admin web app and proxies `/api/*` to the API container, so the browser needs no CORS. |
+| `api` | `http://127.0.0.1:8080` | Bound to localhost only; Swagger UI at `/swagger`. |
 
-The project does not migrate the database automatically during `docker compose up`.
+Optional `.env` settings: `WEB_PORT` (default `80`), `API_PORT` (default `8080`), `ASPNETCORE_ENVIRONMENT` (default `Development`; use `Production` on a server to reduce logging).
+
+The project does not migrate the database automatically during `docker compose up`. Useful commands: `docker compose logs -f api`, `docker compose down`.

@@ -16,6 +16,7 @@ This backlog tracks requirement-driven implementation tasks. Feature tasks inclu
 | TASK-008 | Planned | Implement billing and customer points | Session bills, claiming, and points; depends on TASK-007. See [TASK-008](./TASK-008-billing-customer-points.md).
 | TASK-009 | Planned | Implement workforce scheduling and attendance | Branch-scoped staff assignments, shifts, requests, and attendance; depends on TASK-004 and TASK-005. See [TASK-009](./TASK-009-workforce-scheduling-attendance.md).
 | TASK-010 | Planned | Implement shift closing and payroll | Cash reconciliation, expenses, payroll, and approvals; depends on TASK-008 and TASK-009. See [TASK-010](./TASK-010-shift-closing-finance.md).
+| TASK-011 | Completed | Admin web app on the existing API | React/Vite/Ant Design Admin app with real sign-in and CRUD for branches, zones, seats, price plans, and users; no backend changes. See [TASK-011](./TASK-011-admin-frontend.md).
 
 ## Working rules
 
