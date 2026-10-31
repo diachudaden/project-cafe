@@ -111,3 +111,10 @@ docker compose up --build -d
 Optional `.env` settings: `WEB_PORT` (default `80`), `API_PORT` (default `8080`), `ASPNETCORE_ENVIRONMENT` (default `Development`; use `Production` on a server to reduce logging).
 
 The project does not migrate the database automatically during `docker compose up`. Useful commands: `docker compose logs -f api`, `docker compose down`.
+
+
+
+## Admin Account
+BootstrapAdmin__Email=`admin@example.test`
+BootstrapAdmin__Password=`Local-Only-Admin-2026!`
+BootstrapAdmin__FullName=`Local Administrator`
