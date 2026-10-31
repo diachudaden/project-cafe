@@ -58,7 +58,8 @@ public sealed class DevelopmentDataSeederTests
         var secondRunCounts = await GetCountsAsync(dbContext);
 
         Assert.Equal(firstRunCounts, secondRunCounts);
-        Assert.Equal((3, 2, 4, 2, 2, 2, 1, 4), secondRunCounts);
+        // Users: bootstrap admin + 3 named demo accounts + 5 admins + 10 staff + 20 customers.
+        Assert.Equal((3, 2, 4, 2, 12, 12, 21, 39), secondRunCounts);
 
         var unrelatedBranch = await dbContext.Branches.SingleAsync(item => item.Name == "Unrelated Cafe");
         Assert.Equal("Keep this record", unrelatedBranch.Address);
@@ -90,6 +91,20 @@ public sealed class DevelopmentDataSeederTests
 
         var customerProfile = await dbContext.Customers.SingleAsync(item => item.UserId == customer.Id);
         Assert.Equal("DEMO", customerProfile.Tier);
+
+        Assert.Equal(6, (await userManager.GetUsersInRoleAsync(BusinessRoles.Admin)).Count);
+        Assert.Equal(11, (await userManager.GetUsersInRoleAsync(BusinessRoles.Staff)).Count);
+        Assert.Equal(21, (await userManager.GetUsersInRoleAsync(BusinessRoles.Customer)).Count);
+
+        var bulkStaffBranches = await dbContext.EmployeeBranches
+            .Where(item => item.Employee.User.Email!.StartsWith("staff") && item.Employee.User.Email != "staff.demo@cafecr.invalid")
+            .GroupBy(item => item.BranchId)
+            .Select(group => new { BranchId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(item => item.BranchId, item => item.Count);
+        Assert.Equal(5, bulkStaffBranches[branchA.Id]);
+
+        var customer20 = await dbContext.Users.SingleAsync(item => item.Email == "customer20.demo@cafecr.invalid");
+        Assert.True(await dbContext.Customers.AnyAsync(item => item.UserId == customer20.Id));
 
         Assert.All(
             await dbContext.Seats.ToArrayAsync(),

@@ -17,7 +17,7 @@ Edit `.env` and set:
 - `ConnectionStrings__DefaultConnection` to the intended SQL Server database.
 - `Jwt__SigningKey` to a random secret of at least 32 UTF-8 bytes. Generate one with `openssl rand -base64 48`.
 - `BootstrapAdmin__Email` and `BootstrapAdmin__Password` for the first administrator. Use a strong password (at least 12 characters with uppercase, lowercase, a digit, and a symbol).
-- `DevelopmentSeed__Password` for the demo manager, staff, and customer accounts. This is used only by the explicit development seed command and should be a strong local-only password.
+- `DevelopmentSeed__Password` for all demo accounts (manager, admins, staff, customers). This is used only by the explicit development seed command and should be a strong local-only password.
 
 The API does not read `.env` by itself when run on the host. Load it in Bash from the repository root before starting the API or running EF commands:
 
@@ -65,8 +65,11 @@ The command is idempotent and uses marked names/emails as stable lookup keys. It
 | Demo staff | `staff.demo@cafecr.invalid` | `Staff`, branch A only |
 | Demo customer | `customer.demo@cafecr.invalid` | `Customer`, own profile |
 | Admin | Value of `BootstrapAdmin__Email` | `Admin`, configured separately |
+| Demo admins (5) | `admin01.demo@cafecr.invalid` … `admin05.demo@cafecr.invalid` | `Admin` |
+| Demo POS staff (10) | `staff01.demo@cafecr.invalid` … `staff10.demo@cafecr.invalid` | `Staff`; 01–05 branch A, 06–10 branch B |
+| Demo customers (20) | `customer01.demo@cafecr.invalid` … `customer20.demo@cafecr.invalid` | `Customer`, own profile |
 
-The three demo accounts use `DevelopmentSeed__Password`; the bootstrap Admin keeps its separately configured password. The seed does not create shifts, sessions, occupied seats, or transactions because those workflow scenarios belong to later tasks. To start over, point the command at a newly created disposable database; the command intentionally provides no destructive reset option.
+All demo accounts use `DevelopmentSeed__Password`; the bootstrap Admin keeps its separately configured password. The seed does not create shifts, sessions, occupied seats, or transactions because those workflow scenarios belong to later tasks. To start over, point the command at a newly created disposable database; the command intentionally provides no destructive reset option.
 
 ## Run the API locally
 
@@ -111,3 +114,10 @@ docker compose up --build -d
 Optional `.env` settings: `WEB_PORT` (default `80`), `API_PORT` (default `8080`), `ASPNETCORE_ENVIRONMENT` (default `Development`; use `Production` on a server to reduce logging).
 
 The project does not migrate the database automatically during `docker compose up`. Useful commands: `docker compose logs -f api`, `docker compose down`.
+
+
+
+## Admin Account
+BootstrapAdmin__Email='admin@example.test'
+BootstrapAdmin__Password='Local-Only-Admin-2026!'
+BootstrapAdmin__FullName='Local Administrator'

@@ -15,6 +15,28 @@ public static class DevelopmentDataSeeder
     private const string StaffEmail = "staff.demo@cafecr.invalid";
     private const string CustomerEmail = "customer.demo@cafecr.invalid";
 
+    // Bulk demo accounts: {prefix}{NN}.demo@cafecr.invalid, e.g. staff07.demo@cafecr.invalid.
+    // Names are synthetic and used, with the [DEMO DATA] marker, as the stable non-seed conflict check.
+    private static readonly string[] DemoAdminNames =
+    [
+        "Trần Minh Quân", "Lê Thu Hà", "Phạm Đức Anh", "Hoàng Ngọc Mai", "Vũ Quốc Bảo",
+    ];
+
+    // Staff 01-05 are assigned to branch A, 06-10 to branch B.
+    private static readonly string[] DemoStaffNames =
+    [
+        "Nguyễn Văn An", "Trần Thị Bình", "Lê Hoàng Cường", "Phạm Thị Dung", "Đỗ Minh Đức",
+        "Bùi Thị Giang", "Đặng Văn Hải", "Ngô Thị Hương", "Dương Quang Khải", "Lý Thị Lan",
+    ];
+
+    private static readonly string[] DemoCustomerNames =
+    [
+        "Nguyễn Hoài Nam", "Trần Bảo Ngọc", "Lê Gia Huy", "Phạm Khánh Linh", "Hoàng Tuấn Kiệt",
+        "Vũ Phương Thảo", "Đỗ Thành Long", "Bùi Thanh Trúc", "Đặng Hữu Phước", "Ngô Mỹ Duyên",
+        "Dương Minh Khoa", "Lý Hồng Nhung", "Hồ Đăng Khoa", "Mai Anh Thư", "Trịnh Công Sơn",
+        "Phan Ngọc Hân", "Võ Nhật Minh", "Tạ Thu Trang", "Lâm Gia Bảo", "Châu Kim Ngân",
+    ];
+
     public static async Task SeedAsync(
         IServiceProvider services,
         IConfiguration configuration,
@@ -86,6 +108,40 @@ public static class DevelopmentDataSeeder
         await EnsureEmployeeBranchAsync(dbContext, staffEmployee.Id, branchA.Id, cancellationToken);
         await EnsureCustomerAsync(dbContext, customer, cancellationToken);
 
+        for (var i = 0; i < DemoAdminNames.Length; i++)
+        {
+            await EnsureSeedUserAsync(
+                userManager,
+                DemoEmail("admin", i),
+                $"[DEMO DATA] {DemoAdminNames[i]}",
+                BusinessRoles.Admin,
+                password);
+        }
+
+        for (var i = 0; i < DemoStaffNames.Length; i++)
+        {
+            var staffUser = await EnsureSeedUserAsync(
+                userManager,
+                DemoEmail("staff", i),
+                $"[DEMO DATA] {DemoStaffNames[i]}",
+                BusinessRoles.Staff,
+                password);
+            var staffMember = await EnsureEmployeeAsync(dbContext, userManager, staffUser, cancellationToken);
+            var homeBranch = i < DemoStaffNames.Length / 2 ? branchA : branchB;
+            await EnsureEmployeeBranchAsync(dbContext, staffMember.Id, homeBranch.Id, cancellationToken);
+        }
+
+        for (var i = 0; i < DemoCustomerNames.Length; i++)
+        {
+            var customerUser = await EnsureSeedUserAsync(
+                userManager,
+                DemoEmail("customer", i),
+                $"[DEMO DATA] {DemoCustomerNames[i]}",
+                BusinessRoles.Customer,
+                password);
+            await EnsureCustomerAsync(dbContext, customerUser, cancellationToken);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null)
         {
@@ -93,13 +149,19 @@ public static class DevelopmentDataSeeder
         }
 
         logger.LogInformation(
-            "Development seed completed. Demo branches: {BranchA}, {BranchB}. Demo accounts: {ManagerEmail}, {StaffEmail}, {CustomerEmail}.",
+            "Development seed completed. Demo branches: {BranchA}, {BranchB}. Demo accounts: {ManagerEmail}, {StaffEmail}, {CustomerEmail}, plus {AdminCount} admin, {StaffCount} staff and {CustomerCount} customer accounts.",
             BranchAName,
             BranchBName,
             ManagerEmail,
             StaffEmail,
-            CustomerEmail);
+            CustomerEmail,
+            DemoAdminNames.Length,
+            DemoStaffNames.Length,
+            DemoCustomerNames.Length);
     }
+
+    private static string DemoEmail(string prefix, int index) =>
+        $"{prefix}{index + 1:00}.demo@cafecr.invalid";
 
     private static async Task<Branch> EnsureBranchAsync(
         AppDbContext dbContext,
