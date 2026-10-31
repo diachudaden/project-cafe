@@ -17,6 +17,7 @@ services:
       BootstrapAdmin__Password: ${BootstrapAdmin__Password:-}
       BootstrapAdmin__FullName: ${BootstrapAdmin__FullName:-Administrator}
       DevelopmentSeed__Password: ${DevelopmentSeed__Password:-}
+      DevelopmentSeed__HistoryFrom: ${DevelopmentSeed__HistoryFrom:-}
     # Bound to localhost only: the public entry point is the web (nginx) service.
     # Swagger stays reachable from this machine (or an SSH tunnel on EC2).
     ports:

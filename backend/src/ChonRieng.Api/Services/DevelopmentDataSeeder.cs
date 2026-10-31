@@ -15,6 +15,7 @@ namespace ChonRieng.Api.Services;
 public static class DevelopmentDataSeeder
 {
     private const string SeedPasswordKey = "DevelopmentSeed:Password";
+    private const string HistoryFromKey = "DevelopmentSeed:HistoryFrom";
     private const string BranchAName = "[DEMO DATA] Chốn Riêng - Chi nhánh A";
     private const string BranchBName = "[DEMO DATA] Chốn Riêng - Chi nhánh B";
     private const string ManagerEmail = "manager.demo@cafecr.invalid";
@@ -90,6 +91,16 @@ public static class DevelopmentDataSeeder
         var dbContext = services.GetRequiredService<AppDbContext>();
         var userManager = services.GetRequiredService<UserManager<User>>();
         var clock = services.GetService<TimeProvider>() ?? TimeProvider.System;
+        DateOnly? historyFrom = null;
+        if (configuration[HistoryFromKey] is { Length: > 0 } historyFromValue)
+        {
+            if (!DateOnly.TryParseExact(historyFromValue, "yyyy-MM-dd", out var parsed) || parsed > DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime))
+            {
+                throw new InvalidOperationException("DevelopmentSeed__HistoryFrom must be a past date in yyyy-MM-dd format, e.g. 2026-09-01.");
+            }
+
+            historyFrom = parsed;
+        }
         var admin = await userManager.FindByEmailAsync(bootstrapAdminEmail);
         if (admin is null || !await userManager.IsInRoleAsync(admin, BusinessRoles.Admin))
         {
@@ -156,7 +167,7 @@ public static class DevelopmentDataSeeder
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        var created = await DevelopmentHistorySeeder.SeedAsync(dbContext, branches, managers, staffMembers, customers, now, cancellationToken);
+        var created = await DevelopmentHistorySeeder.SeedAsync(dbContext, branches, managers, staffMembers, customers, now, historyFrom, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null)
         {

@@ -195,6 +195,7 @@ public sealed class DevelopmentDataSeederTests
         if (includeSeedPassword)
         {
             values["DevelopmentSeed:Password"] = SeedPassword;
+            values["DevelopmentSeed:HistoryFrom"] = DateTime.UtcNow.AddDays(-75).ToString("yyyy-MM-dd");
         }
 
         return new ConfigurationBuilder()
@@ -205,6 +206,9 @@ public sealed class DevelopmentDataSeederTests
     private static async Task AssertHistoryIsConsistentAsync(AppDbContext dbContext)
     {
         Assert.True(await dbContext.Shifts.CountAsync() > 300);
+        // DevelopmentSeed:HistoryFrom (75 days back in the test configuration) sets where history starts.
+        var firstShift = await dbContext.Shifts.MinAsync(item => item.Date);
+        Assert.True(firstShift <= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-74)));
         Assert.True(await dbContext.Bills.CountAsync() > 300);
 
         // One active session per seat, and every bill belongs to a shift someone checked in to.

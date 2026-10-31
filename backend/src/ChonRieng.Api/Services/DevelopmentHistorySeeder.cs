@@ -30,13 +30,15 @@ internal static class DevelopmentHistorySeeder
         IReadOnlyList<(Employee Employee, int Branch)> staff,
         IReadOnlyList<Customer> customers,
         DateTimeOffset now,
+        DateOnly? historyFrom,
         CancellationToken ct)
     {
         var rng = new Random(20261031);
         var today = DateOnly.FromDateTime(now.ToVietnam().DateTime);
         var branchIds = branches.Select(b => b.Id).ToList();
         var firstRun = !await db.Shifts.AnyAsync(s => branchIds.Contains(s.BranchId), ct);
-        var from = firstRun ? VietnamTime.MonthStart(today).AddMonths(-1) : today;
+        // Default: first day of last month; DevelopmentSeed__HistoryFrom pins it (e.g. 2026-09-01 for a review demo).
+        var from = firstRun ? historyFrom ?? VietnamTime.MonthStart(today).AddMonths(-1) : today;
         var to = today.AddDays(7);
 
         var existing = (await db.Shifts.Where(s => branchIds.Contains(s.BranchId) && s.Date >= from && s.Date <= to)
@@ -189,7 +191,12 @@ internal static class DevelopmentHistorySeeder
         }
 
         AddExpenses(db, rng, branches, managers, from, today);
-        AddPayroll(db, worked, staff, VietnamTime.MonthStart(today).AddMonths(-1));
+        // Payroll for every full month in the history; the latest one stays draft for D–E so it can be finalized live.
+        var lastFullMonth = VietnamTime.MonthStart(today).AddMonths(-1);
+        for (var month = VietnamTime.MonthStart(from); month <= lastFullMonth; month = month.AddMonths(1))
+        {
+            AddPayroll(db, worked, staff, month, month == lastFullMonth);
+        }
         await AddAvailabilityAsync(db, staff, ct);
         AddRequestsAndNotifications(db, upcoming, worked, managerUserIds, today, now);
 
@@ -389,8 +396,8 @@ internal static class DevelopmentHistorySeeder
         }
     }
 
-    /// <summary>Last month's payroll from approved attendance: finalized for A–C, draft for D–E.</summary>
-    private static void AddPayroll(AppDbContext db, IReadOnlyList<WorkedShift> worked, IReadOnlyList<(Employee Employee, int Branch)> staff, DateOnly month)
+    /// <summary>One month's payroll from approved attendance; in the latest month D–E stay draft.</summary>
+    private static void AddPayroll(AppDbContext db, IReadOnlyList<WorkedShift> worked, IReadOnlyList<(Employee Employee, int Branch)> staff, DateOnly month, bool latest)
     {
         var next = month.AddMonths(1);
         for (var index = 0; index < staff.Count; index++)
@@ -414,7 +421,7 @@ internal static class DevelopmentHistorySeeder
                 Allowance = PayrollCalculator.Vnd(lines.Sum(l => l.NightHours) * employee.NightAllowance),
                 Bonus = index % 5 == 0 ? 200_000m : 0,
                 Deduction = index % 7 == 3 ? 50_000m : 0,
-                Status = branch <= 2 ? PayrollStatuses.Finalized : PayrollStatuses.Draft,
+                Status = !latest || branch <= 2 ? PayrollStatuses.Finalized : PayrollStatuses.Draft,
             };
             payroll.NetAmount = payroll.BaseAmount + payroll.Allowance + payroll.Bonus - payroll.Deduction;
             db.Payrolls.Add(payroll);
