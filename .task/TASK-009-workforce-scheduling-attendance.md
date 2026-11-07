@@ -1,6 +1,6 @@
 # TASK-009: Implement workforce scheduling and attendance
 
-- Status: Planned
+- Status: Completed (API + frontend; real-database verification pending)
 - Goal: Let authorized managers schedule staff and let assigned employees respond to shifts and record attendance.
 
 ## User value
@@ -60,3 +60,16 @@ Managers can create and staff branch shifts; employees can view and respond to a
 ## Verification
 
 Record the final conflict rules, test/build results, OpenAPI review, and unapplied migrations when implemented.
+
+## Implementation
+
+Implemented on branch `Finish_Roles_Configuration` (2026-10-31) using the approved defaults in [../docs/proposals/roles/05-decisions.md](../docs/proposals/roles/05-decisions.md). Schema changes are in migration `RoleWorkflows` (not yet applied to any shared database).
+
+- Shifts (create/edit with RowVersion, delete, publish week, copy week), assignments (validate dry-run, assign with optional override reason, accept, decline with reason, unassign), open shifts and claim, attendance check-in/out and review/approval, shift requests (swap/leave/drop, approve/reject/cancel), availability, scheduling assistant, employee rate/branch management.
+- Rules as `IShiftRule` classes run by `ShiftConflictChecker`: overlap (block), assigned branch (block), approved leave (block), 8 h rest (block, overridable with reason), 60 min cross-branch travel (block), 48 h/week (warning). 409 responses include `violations`.
+- Decisions: check-in opens 15 minutes before start; > 10 minutes late is flagged; attendance is a button in the POS (D3, no QR yet). Managers manage Staff only (D16).
+
+## Verification results
+
+- `dotnet test CafeCR.slnx`: 64 unit tests (rules, calculators, workflow services on EF in-memory, SQL Server translation of feature queries via a command interceptor) and 7 HTTP integration tests (real API pipeline with JWT, policies, rate limiting, Swagger and the demo seed on an in-memory database) passed; `dotnet build CafeCR.slnx`: 0 warnings, 0 errors.
+- Not yet run: `dotnet ef database update` and the seed against a real SQL Server (Docker was unavailable in the implementation session).

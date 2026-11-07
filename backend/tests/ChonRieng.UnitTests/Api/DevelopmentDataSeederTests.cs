@@ -58,7 +58,9 @@ public sealed class DevelopmentDataSeederTests
         var secondRunCounts = await GetCountsAsync(dbContext);
 
         Assert.Equal(firstRunCounts, secondRunCounts);
-        Assert.Equal((3, 2, 4, 2, 2, 2, 1, 4), secondRunCounts);
+        // Branches: 1 unrelated + A–E. Plans: chain + branch C + expired branch D.
+        // Users: bootstrap + 3 named demo + 3 admin + 10 manager + 20 staff + 20 customer.
+        Assert.Equal((6, 11, 48, 3, 32, 35, 21, 57), secondRunCounts);
 
         var unrelatedBranch = await dbContext.Branches.SingleAsync(item => item.Name == "Unrelated Cafe");
         Assert.Equal("Keep this record", unrelatedBranch.Address);
@@ -91,12 +93,18 @@ public sealed class DevelopmentDataSeederTests
         var customerProfile = await dbContext.Customers.SingleAsync(item => item.UserId == customer.Id);
         Assert.Equal("DEMO", customerProfile.Tier);
 
+        Assert.Equal(4, (await userManager.GetUsersInRoleAsync(BusinessRoles.Admin)).Count);
+        Assert.Equal(11, (await userManager.GetUsersInRoleAsync(BusinessRoles.BranchManager)).Count);
+        Assert.Equal(21, (await userManager.GetUsersInRoleAsync(BusinessRoles.Staff)).Count);
+        Assert.Equal(21, (await userManager.GetUsersInRoleAsync(BusinessRoles.Customer)).Count);
+
+        // The TASK-005 1.000đ plans are closed so the 45.000đ chain plan applies.
         Assert.All(
-            await dbContext.Seats.ToArrayAsync(),
-            seat => Assert.Equal(SeatStatus.Available, seat.Status));
-        Assert.All(
-            await dbContext.PricePlans.Where(item => item.Name.StartsWith("[DEMO ONLY]")).ToArrayAsync(),
-            plan => Assert.Equal(1000m, plan.Price));
+            await dbContext.PricePlans.Where(item => item.Name.StartsWith("[DEMO ONLY] Gói 240")).ToArrayAsync(),
+            plan => Assert.NotNull(plan.ValidTo));
+        Assert.Equal(45_000m, (await dbContext.PricePlans.SingleAsync(item => item.BranchId == null)).Price);
+
+        await AssertHistoryIsConsistentAsync(dbContext);
 
         var managerEmployeeId = await dbContext.Employees
             .Where(item => item.UserId == manager.Id)
@@ -187,11 +195,51 @@ public sealed class DevelopmentDataSeederTests
         if (includeSeedPassword)
         {
             values["DevelopmentSeed:Password"] = SeedPassword;
+            values["DevelopmentSeed:HistoryFrom"] = DateTime.UtcNow.AddDays(-75).ToString("yyyy-MM-dd");
         }
 
         return new ConfigurationBuilder()
             .AddInMemoryCollection(values)
             .Build();
+    }
+
+    private static async Task AssertHistoryIsConsistentAsync(AppDbContext dbContext)
+    {
+        Assert.True(await dbContext.Shifts.CountAsync() > 300);
+        // DevelopmentSeed:HistoryFrom (75 days back in the test configuration) sets where history starts.
+        var firstShift = await dbContext.Shifts.MinAsync(item => item.Date);
+        Assert.True(firstShift <= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-74)));
+        Assert.True(await dbContext.Bills.CountAsync() > 300);
+
+        // One active session per seat, and every bill belongs to a shift someone checked in to.
+        Assert.Equal(
+            await dbContext.Sessions.CountAsync(item => item.Status == SessionStatus.Active),
+            await dbContext.Sessions.Where(item => item.Status == SessionStatus.Active).Select(item => item.SeatId).Distinct().CountAsync());
+        Assert.False(await dbContext.Bills.AnyAsync(bill => !dbContext.Attendances.Any(a => a.ShiftId == bill.ShiftId)));
+
+        // No employee holds overlapping shifts.
+        var slots = await dbContext.ShiftAssignments
+            .Where(item => item.Status != ShiftAssignmentStatus.Declined)
+            .Select(item => new { item.EmployeeId, item.Shift.StartAt, item.Shift.EndAt })
+            .ToListAsync();
+        foreach (var group in slots.GroupBy(item => item.EmployeeId))
+        {
+            var ordered = group.OrderBy(item => item.StartAt).ToList();
+            for (var i = 1; i < ordered.Count; i++)
+            {
+                Assert.True(ordered[i].StartAt >= ordered[i - 1].EndAt.AddHours(8));
+            }
+        }
+
+        // Customer balances equal their point transactions.
+        foreach (var customer in await dbContext.Customers.ToListAsync())
+        {
+            var points = await dbContext.PointTransactions.Where(item => item.CustomerId == customer.Id).SumAsync(item => item.Points);
+            Assert.Equal(points, customer.Points);
+            Assert.Equal(
+                await dbContext.Bills.Where(item => item.ClaimedByCustomerId == customer.Id).SumAsync(item => item.Total),
+                customer.TotalSpent);
+        }
     }
 
     private static async Task<(int Branches, int Zones, int Seats, int PricePlans, int Employees, int EmployeeBranches, int Customers, int Users)>

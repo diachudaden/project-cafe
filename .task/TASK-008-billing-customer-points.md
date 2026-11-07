@@ -1,6 +1,6 @@
 # TASK-008: Implement billing and customer points
 
-- Status: Planned
+- Status: Completed (API + frontend; real-database verification pending)
 - Goal: Produce a consistent bill for a session and let customers claim it and receive the approved points outcome.
 
 ## User value
@@ -61,3 +61,15 @@ No real payment processor, QR verification, gateway webhook, or financial ledger
 ## Verification
 
 Record actual calculation rules, tests, OpenAPI review, and any migration status when implemented.
+
+## Implementation
+
+Implemented on branch `Finish_Roles_Configuration` (2026-10-31) using the approved defaults in [../docs/proposals/roles/05-decisions.md](../docs/proposals/roles/05-decisions.md). Schema changes are in migration `RoleWorkflows` (not yet applied to any shared database).
+
+- Bill code: 8 characters without 0/O/1/I, unique. Customer `POST /api/me/bills/claim` (once, within 7 days, `ClaimedByCustomerId` concurrency token, 10 attempts/minute per user), `GET /api/me/points|bills|session`.
+- Decisions (D8): 1.000đ = 1 point (floor); tier by total spent: Bronze < 500.000đ ≤ Silver < 2.000.000đ ≤ Gold. Members identified at check-in get points automatically, including for extensions. Point redemption deferred (D9).
+
+## Verification results
+
+- `dotnet test CafeCR.slnx`: 64 unit tests (rules, calculators, workflow services on EF in-memory, SQL Server translation of feature queries via a command interceptor) and 7 HTTP integration tests (real API pipeline with JWT, policies, rate limiting, Swagger and the demo seed on an in-memory database) passed; `dotnet build CafeCR.slnx`: 0 warnings, 0 errors.
+- Not yet run: `dotnet ef database update` and the seed against a real SQL Server (Docker was unavailable in the implementation session).

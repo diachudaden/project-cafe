@@ -10,6 +10,7 @@ public sealed class Session : Entity
     public DateTimeOffset StartAt { get; set; }
     public DateTimeOffset EndAt { get; set; }
     public SessionStatus Status { get; set; } = SessionStatus.Active;
+    public DateTimeOffset? ClosedAt { get; set; }
 
     public Seat Seat { get; set; } = null!;
     public Customer? Customer { get; set; }

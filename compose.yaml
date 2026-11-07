@@ -17,15 +17,17 @@ services:
       BootstrapAdmin__Password: ${BootstrapAdmin__Password:-}
       BootstrapAdmin__FullName: ${BootstrapAdmin__FullName:-Administrator}
       DevelopmentSeed__Password: ${DevelopmentSeed__Password:-}
-    # Bound to localhost only: the public entry point is the admin (nginx) service.
+      DevelopmentSeed__HistoryFrom: ${DevelopmentSeed__HistoryFrom:-}
+    # Bound to localhost only: the public entry point is the web (nginx) service.
     # Swagger stays reachable from this machine (or an SSH tunnel on EC2).
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
 
-  admin:
+  # nginx: customer web at /, Web Quản lý at /admin, POS at /pos, API proxied at /api.
+  web:
     build:
       context: ./frontend
-      dockerfile: apps/admin/Dockerfile
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       - api

@@ -2,31 +2,35 @@
 
 npm workspaces:
 
-| Path | Purpose |
-| --- | --- |
-| `apps/admin` | Admin web app (React + Vite + Ant Design). Sign-in and management of branches, zones, seats, price plans, and user accounts. |
-| `packages/api-client` | Typed client for the .NET API: auth session, token refresh, admin CRUD resources. Reuse it for future POS/customer apps. |
+| Path | URL (nginx) | Users |
+| --- | --- | --- |
+| `apps/customer` | `/` | Customers (mobile-first): find a branch, claim bills, points, member code |
+| `apps/admin` | `/admin/` | Admin (whole chain) and BranchManager (assigned branches): schedule, approvals, finance, reports, setup |
+| `apps/pos` | `/pos/` | Staff (tablet): join shift, seat map and check-in, closing wizard, my schedule and payroll |
+| `packages/api-client` | — | Typed client for every API route; auth session with single-flight token refresh |
+| `packages/ui` | — | VND/time formatting (UTC+7), Vietnamese labels, shared auth provider |
 
 ## Run locally
 
-1. Start the API on `http://localhost:63842` (see the root [README](../README.md)).
+1. Start the API on `http://localhost:63842` (see the root [README](../README.md)), with migrations applied and the demo seed loaded.
 2. From this folder:
 
 ```bash
 npm install
-npm run dev:admin
+npm run dev:admin     # http://localhost:5173/admin/
+npm run dev:pos       # http://localhost:5174/pos/
+npm run dev:customer  # http://localhost:5175/
 ```
 
-Open `http://localhost:5173` and sign in with an account that has the `Admin` role (e.g. the bootstrap admin from `.env`).
+Each dev server proxies `/api` to the API (set `API_PROXY_TARGET`, e.g. `http://localhost:8080` for the Docker API). In Docker, `frontend/Dockerfile` builds all three apps into one nginx image (`frontend/nginx.conf`).
 
-The dev server proxies `/api` to the API, so no CORS setup is needed. Set `API_PROXY_TARGET` to use another API address.
+Demo accounts are listed in the root README (`admin01`, `manager01`, `staff01`, `customer01` `.demo@cafecr.invalid`, password from `DevelopmentSeed__Password`).
 
 ## Auth behaviour
 
-- Uses the existing `/api/auth/*` contract: login by email + password.
-- Access token is kept in memory only; the refresh token is kept in `sessionStorage` so a reload keeps the session within the tab.
-- On a 401 the client refreshes once and retries. Concurrent refreshes share one request because the API rotates (revokes) a refresh token on use.
-- Non-Admin accounts are refused by the admin app.
+- Login by email + password against `/api/auth/*`. Each app keeps its own session: access token in memory, refresh token in `sessionStorage`.
+- On a 401 the client refreshes once and retries; concurrent refreshes share one request because the API rotates refresh tokens.
+- Apps refuse accounts without the right role (Admin/BranchManager for `/admin`, Staff/BranchManager for `/pos`, Customer for `/`).
 
 ## Checks
 

@@ -1,4 +1,6 @@
 using ChonRieng.Api.Authorization;
+using System.Security.Cryptography;
+using ChonRieng.Api.Features.Sales;
 using ChonRieng.Api.Services;
 using ChonRieng.Domain.Entities;
 using ChonRieng.Infrastructure.Persistence;
@@ -122,54 +124,33 @@ public static class AdminCrudEndpoints
             entity => new AttendanceResponse(entity.Id, entity.EmployeeId, entity.ShiftId, entity.CheckInAt, entity.CheckOutAt, entity.Method, entity.Approved),
             entity => entity.Id);
 
-        admin.MapGroup("/shift-closings").MapCrud<ShiftClosing, CreateShiftClosingRequest, UpdateShiftClosingRequest, ShiftClosingResponse>(
+        admin.MapGroup("/shift-closings").MapReadOnlyCrud<ShiftClosing, ShiftClosingResponse>(
             "ShiftClosings",
-            request => new ShiftClosing { ShiftId = request.ShiftId, ClosedByEmployeeId = request.ClosedByEmployeeId, ExpectedCash = request.ExpectedCash, CountedCash = request.CountedCash, Difference = request.Difference, Note = request.Note, Denominations = request.Denominations },
-            (entity, request) => { entity.ShiftId = request.ShiftId; entity.ClosedByEmployeeId = request.ClosedByEmployeeId; entity.ExpectedCash = request.ExpectedCash; entity.CountedCash = request.CountedCash; entity.Difference = request.Difference; entity.Note = request.Note; entity.Denominations = request.Denominations; },
-            entity => new ShiftClosingResponse(entity.Id, entity.ShiftId, entity.ClosedByEmployeeId, entity.ExpectedCash, entity.CountedCash, entity.Difference, entity.Note, entity.Denominations),
-            entity => entity.Id);
+            entity => new ShiftClosingResponse(entity.Id, entity.ShiftId, entity.ClosedByEmployeeId, entity.ExpectedCash, entity.CountedCash, entity.Difference, entity.Note, entity.Denominations));
 
-        admin.MapGroup("/sessions").MapCrud<Session, CreateSessionRequest, UpdateSessionRequest, SessionResponse>(
+        admin.MapGroup("/sessions").MapReadOnlyCrud<Session, SessionResponse>(
             "Sessions",
-            request => new Session { SeatId = request.SeatId, CustomerId = request.CustomerId, PricePlanId = request.PricePlanId, StartAt = request.StartAt, EndAt = request.EndAt, Status = request.Status },
-            (entity, request) => { entity.SeatId = request.SeatId; entity.CustomerId = request.CustomerId; entity.PricePlanId = request.PricePlanId; entity.StartAt = request.StartAt; entity.EndAt = request.EndAt; entity.Status = request.Status; },
-            entity => new SessionResponse(entity.Id, entity.SeatId, entity.CustomerId, entity.PricePlanId, entity.StartAt, entity.EndAt, entity.Status),
-            entity => entity.Id);
+            entity => new SessionResponse(entity.Id, entity.SeatId, entity.CustomerId, entity.PricePlanId, entity.StartAt, entity.EndAt, entity.Status));
 
-        admin.MapGroup("/session-extensions").MapCrud<SessionExtension, CreateSessionExtensionRequest, UpdateSessionExtensionRequest, SessionExtensionResponse>(
+        admin.MapGroup("/session-extensions").MapReadOnlyCrud<SessionExtension, SessionExtensionResponse>(
             "SessionExtensions",
-            request => new SessionExtension { SessionId = request.SessionId, AddedMinutes = request.AddedMinutes, Price = request.Price, CreatedAt = request.CreatedAt },
-            (entity, request) => { entity.SessionId = request.SessionId; entity.AddedMinutes = request.AddedMinutes; entity.Price = request.Price; entity.CreatedAt = request.CreatedAt; },
-            entity => new SessionExtensionResponse(entity.Id, entity.SessionId, entity.AddedMinutes, entity.Price, entity.CreatedAt),
-            entity => entity.Id);
+            entity => new SessionExtensionResponse(entity.Id, entity.SessionId, entity.AddedMinutes, entity.Price, entity.CreatedAt));
 
-        admin.MapGroup("/bills").MapCrud<Bill, CreateBillRequest, UpdateBillRequest, BillResponse>(
+        admin.MapGroup("/bills").MapReadOnlyCrud<Bill, BillResponse>(
             "Bills",
-            request => new Bill { Code = request.Code, BranchId = request.BranchId, ShiftId = request.ShiftId, SessionId = request.SessionId, Total = request.Total, PaymentMethod = request.PaymentMethod, ClaimedByCustomerId = request.ClaimedByCustomerId, ClaimedAt = request.ClaimedAt },
-            (entity, request) => { entity.Code = request.Code; entity.BranchId = request.BranchId; entity.ShiftId = request.ShiftId; entity.SessionId = request.SessionId; entity.Total = request.Total; entity.PaymentMethod = request.PaymentMethod; entity.ClaimedByCustomerId = request.ClaimedByCustomerId; entity.ClaimedAt = request.ClaimedAt; },
-            entity => new BillResponse(entity.Id, entity.Code, entity.BranchId, entity.ShiftId, entity.SessionId, entity.Total, entity.PaymentMethod, entity.ClaimedByCustomerId, entity.ClaimedAt),
-            entity => entity.Id);
+            entity => new BillResponse(entity.Id, entity.Code, entity.BranchId, entity.ShiftId, entity.SessionId, entity.Total, entity.PaymentMethod, entity.ClaimedByCustomerId, entity.ClaimedAt));
 
-        admin.MapGroup("/point-transactions").MapCrud<PointTransaction, CreatePointTransactionRequest, UpdatePointTransactionRequest, PointTransactionResponse>(
+        admin.MapGroup("/point-transactions").MapReadOnlyCrud<PointTransaction, PointTransactionResponse>(
             "PointTransactions",
-            request => new PointTransaction { CustomerId = request.CustomerId, BillId = request.BillId, Points = request.Points, Reason = request.Reason },
-            (entity, request) => { entity.CustomerId = request.CustomerId; entity.BillId = request.BillId; entity.Points = request.Points; entity.Reason = request.Reason; },
-            entity => new PointTransactionResponse(entity.Id, entity.CustomerId, entity.BillId, entity.Points, entity.Reason),
-            entity => entity.Id);
+            entity => new PointTransactionResponse(entity.Id, entity.CustomerId, entity.BillId, entity.Points, entity.Reason));
 
-        admin.MapGroup("/expenses").MapCrud<Expense, CreateExpenseRequest, UpdateExpenseRequest, ExpenseResponse>(
+        admin.MapGroup("/expenses").MapReadOnlyCrud<Expense, ExpenseResponse>(
             "Expenses",
-            request => new Expense { BranchId = request.BranchId, Category = request.Category, Amount = request.Amount, Date = request.Date, Note = request.Note, CreatedByEmployeeId = request.CreatedByEmployeeId },
-            (entity, request) => { entity.BranchId = request.BranchId; entity.Category = request.Category; entity.Amount = request.Amount; entity.Date = request.Date; entity.Note = request.Note; entity.CreatedByEmployeeId = request.CreatedByEmployeeId; },
-            entity => new ExpenseResponse(entity.Id, entity.BranchId, entity.Category, entity.Amount, entity.Date, entity.Note, entity.CreatedByEmployeeId),
-            entity => entity.Id);
+            entity => new ExpenseResponse(entity.Id, entity.BranchId, entity.Category, entity.Amount, entity.Date, entity.Note, entity.CreatedByEmployeeId));
 
-        admin.MapGroup("/payrolls").MapCrud<Payroll, CreatePayrollRequest, UpdatePayrollRequest, PayrollResponse>(
+        admin.MapGroup("/payrolls").MapReadOnlyCrud<Payroll, PayrollResponse>(
             "Payrolls",
-            request => new Payroll { EmployeeId = request.EmployeeId, Month = request.Month, TotalHours = request.TotalHours, BaseAmount = request.BaseAmount, Allowance = request.Allowance, Bonus = request.Bonus, Deduction = request.Deduction, NetAmount = request.NetAmount, Status = request.Status },
-            (entity, request) => { entity.EmployeeId = request.EmployeeId; entity.Month = request.Month; entity.TotalHours = request.TotalHours; entity.BaseAmount = request.BaseAmount; entity.Allowance = request.Allowance; entity.Bonus = request.Bonus; entity.Deduction = request.Deduction; entity.NetAmount = request.NetAmount; entity.Status = request.Status; },
-            entity => new PayrollResponse(entity.Id, entity.EmployeeId, entity.Month, entity.TotalHours, entity.BaseAmount, entity.Allowance, entity.Bonus, entity.Deduction, entity.NetAmount, entity.Status),
-            entity => entity.Id);
+            entity => new PayrollResponse(entity.Id, entity.EmployeeId, entity.Month, entity.TotalHours, entity.BaseAmount, entity.Allowance, entity.Bonus, entity.Deduction, entity.NetAmount, entity.Status));
 
         admin.MapGroup("/employee-branches").MapCrud<EmployeeBranch, CreateEmployeeBranchRequest, UpdateEmployeeBranchRequest, EmployeeBranchResponse>(
             "EmployeeBranches",
@@ -300,11 +281,7 @@ public static class AdminCrudEndpoints
                 return TypedResults.ValidationProblem(IdentityErrorFormatter.ToValidationErrors(roleResult).ToDictionary());
             }
 
-            if (request.Roles.Contains(BusinessRoles.Customer, StringComparer.Ordinal))
-            {
-                dbContext.Customers.Add(new Customer { UserId = user.Id, Tier = "" });
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
+            await EnsureRoleProfilesAsync(dbContext, userManager, user, request.Roles, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             var detail = new AdminUserDetailResponse(user.Id, user.Email ?? "", user.FullName, user.PhoneNumber, user.LockoutEnd, request.Roles.ToArray());
@@ -377,12 +354,7 @@ public static class AdminCrudEndpoints
                 return TypedResults.ValidationProblem(IdentityErrorFormatter.ToValidationErrors(addResult).ToDictionary());
             }
 
-            if (newRoles.Contains(BusinessRoles.Customer, StringComparer.Ordinal)
-                && !await dbContext.Customers.AnyAsync(customer => customer.UserId == user.Id, cancellationToken))
-            {
-                dbContext.Customers.Add(new Customer { UserId = user.Id, Tier = "" });
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
+            await EnsureRoleProfilesAsync(dbContext, userManager, user, newRoles, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             return TypedResults.Ok(new AdminUserDetailResponse(user.Id, user.Email ?? "", user.FullName, user.PhoneNumber, user.LockoutEnd, newRoles));
@@ -437,4 +409,36 @@ public static class AdminCrudEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
+    /// <summary>Customer accounts need a Customer profile; Staff/BranchManager accounts need an Employee record.</summary>
+    private static async Task EnsureRoleProfilesAsync(
+        AppDbContext dbContext,
+        UserManager<User> userManager,
+        User user,
+        IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken)
+    {
+        if (roles.Contains(BusinessRoles.Customer, StringComparer.Ordinal)
+            && !await dbContext.Customers.AnyAsync(customer => customer.UserId == user.Id, cancellationToken))
+        {
+            dbContext.Customers.Add(new Customer
+            {
+                UserId = user.Id,
+                Tier = Loyalty.Bronze,
+                MemberCode = Loyalty.NewMemberCode(),
+            });
+        }
+
+        if ((roles.Contains(BusinessRoles.Staff, StringComparer.Ordinal) || roles.Contains(BusinessRoles.BranchManager, StringComparer.Ordinal))
+            && !await dbContext.Employees.AnyAsync(employee => employee.UserId == user.Id, cancellationToken))
+        {
+            // The PIN is random and discarded; PIN login is a later phase (decision D2).
+            dbContext.Employees.Add(new Employee
+            {
+                UserId = user.Id,
+                PinHash = userManager.PasswordHasher.HashPassword(user, Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))),
+            });
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

@@ -8,6 +8,7 @@ public sealed class Customer : Entity
     public int Points { get; set; }
     public string Tier { get; set; } = "";
     public decimal TotalSpent { get; set; }
+    public string? MemberCode { get; set; }
 
     public User User { get; set; } = null!;
     public ICollection<Session> Sessions { get; } = new List<Session>();

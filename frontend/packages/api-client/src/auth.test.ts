@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthSession, type AuthTokens } from "./auth";
 import { ApiError } from "./http";
 
-const user = { id: "u1", email: "admin@cafecr.invalid", fullName: "Admin", phoneNumber: null, roles: ["Admin" as const] };
+const user = { id: "u1", email: "admin@cafecr.invalid", fullName: "Admin", phoneNumber: null, roles: ["Admin" as const], branchIds: [] };
 
 function tokens(n: number): AuthTokens {
   return {

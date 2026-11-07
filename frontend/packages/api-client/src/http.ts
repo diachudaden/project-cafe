@@ -1,10 +1,19 @@
 /** RFC 7807 problem body returned by the API for 400/404/409 responses. */
+/** Business-rule violation returned with 409 (e.g. shift conflicts). */
+export interface RuleViolation {
+  rule: string;
+  message: string;
+  canOverride: boolean;
+  isBlocking: boolean;
+}
+
 export interface ProblemDetails {
   type?: string;
   title?: string;
   status?: number;
   detail?: string;
   errors?: Record<string, string[]>;
+  violations?: RuleViolation[];
 }
 
 export class ApiError extends Error {
@@ -12,6 +21,8 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly fieldErrors: Record<string, string[]> = {},
+    readonly violations: RuleViolation[] = [],
+    readonly title?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -24,6 +35,7 @@ const statusMessages: Record<number, string> = {
   403: "Tài khoản không có quyền thực hiện thao tác này.",
   404: "Không tìm thấy dữ liệu.",
   409: "Dữ liệu bị xung đột với trạng thái hiện tại.",
+  429: "Thao tác quá nhanh. Vui lòng thử lại sau ít phút.",
 };
 
 async function toApiError(response: Response): Promise<ApiError> {
@@ -43,7 +55,7 @@ async function toApiError(response: Response): Promise<ApiError> {
     problem.title ??
     "Yêu cầu không thành công.";
 
-  return new ApiError(response.status, message, fieldErrors);
+  return new ApiError(response.status, message, fieldErrors, problem.violations ?? [], problem.title);
 }
 
 export interface HttpOptions {
@@ -56,6 +68,12 @@ export interface HttpOptions {
 }
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+
+/** Builds "?a=1&b=2", skipping undefined/null/empty values. */
+export function query(params: Record<string, string | number | boolean | null | undefined>): string {
+  const entries = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "");
+  return entries.length ? "?" + new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString() : "";
+}
 
 export interface Http {
   request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T>;

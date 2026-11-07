@@ -1,6 +1,6 @@
 # TASK-010: Implement shift closing and payroll
 
-- Status: Planned
+- Status: Completed (API + frontend; real-database verification pending)
 - Goal: Let approved staff reconcile a shift's cash and let authorized managers review expenses and calculate/approve payroll.
 
 ## User value
@@ -66,3 +66,16 @@ Do not treat schema columns as complete accounting or legal payroll rules.
 ## Verification
 
 Record confirmed calculations, test/build results, OpenAPI review, and migration/database status when implemented.
+
+## Implementation
+
+Implemented on branch `Finish_Roles_Configuration` (2026-10-31) using the approved defaults in [../docs/proposals/roles/05-decisions.md](../docs/proposals/roles/05-decisions.md). Schema changes are in migration `RoleWorkflows` (not yet applied to any shared database).
+
+- Closing preview (expected cash = Cash bill totals of the shift), submit with denominations (draft or submit; difference requires a note; submitting checks the employee out), review approve/reject (approved closings immutable).
+- Expense ledger is append-only with reversal entries. Payroll draft from approved attendance: hours × rate + night hours (22:00–06:00) × allowance + bonus − deduction; only Admin finalizes (D10); finalized payroll and its month's attendance are immutable.
+- Reports: revenue by period vs previous period, profit/loss, occupancy, branch comparison, today's dashboard with alerts. Notifications feed for assignment, request and closing events.
+
+## Verification results
+
+- `dotnet test CafeCR.slnx`: 64 unit tests (rules, calculators, workflow services on EF in-memory, SQL Server translation of feature queries via a command interceptor) and 7 HTTP integration tests (real API pipeline with JWT, policies, rate limiting, Swagger and the demo seed on an in-memory database) passed; `dotnet build CafeCR.slnx`: 0 warnings, 0 errors.
+- Not yet run: `dotnet ef database update` and the seed against a real SQL Server (Docker was unavailable in the implementation session).

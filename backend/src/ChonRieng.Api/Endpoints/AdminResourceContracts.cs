@@ -102,7 +102,7 @@ public sealed record CreatePointTransactionRequest(Guid CustomerId, Guid? BillId
 public sealed record UpdatePointTransactionRequest(Guid CustomerId, Guid? BillId, int Points, [property: Required, MaxLength(500)] string Reason);
 
 /// <summary>Expense data returned by the administrator API.</summary>
-public sealed record ExpenseResponse(Guid Id, Guid BranchId, string Category, decimal Amount, DateTimeOffset Date, string? Note, Guid CreatedByEmployeeId);
+public sealed record ExpenseResponse(Guid Id, Guid BranchId, string Category, decimal Amount, DateTimeOffset Date, string? Note, Guid? CreatedByEmployeeId);
 /// <summary>Payload for creating an expense.</summary>
 public sealed record CreateExpenseRequest(Guid BranchId, [property: Required, MaxLength(80)] string Category, decimal Amount, DateTimeOffset Date, [property: MaxLength(1000)] string? Note, Guid CreatedByEmployeeId);
 /// <summary>Payload for replacing an expense.</summary>

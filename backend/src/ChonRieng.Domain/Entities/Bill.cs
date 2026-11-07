@@ -12,6 +12,7 @@ public sealed class Bill : Entity
     public PaymentMethod PaymentMethod { get; set; }
     public Guid? ClaimedByCustomerId { get; set; }
     public DateTimeOffset? ClaimedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 
     public Branch Branch { get; set; } = null!;
     public Shift Shift { get; set; } = null!;

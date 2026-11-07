@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Text;
 using ChonRieng.Api.Endpoints;
+using ChonRieng.Api.Features;
+using ChonRieng.Api.Features.Common;
 using ChonRieng.Api.Authorization;
 using ChonRieng.Api.Middleware;
 using ChonRieng.Api.Services;
@@ -69,6 +71,7 @@ builder.Services.AddScoped(typeof(IEntityCrudService<>), typeof(EfEntityCrudServ
 builder.Services.AddScoped<IBranchAccessService, BranchAccessService>();
 builder.Services.AddScoped<IAuthorizationHandler, BranchScopeAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, CustomerOwnResourceAuthorizationHandler>();
+builder.Services.AddFeatureServices();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddValidation();
@@ -108,6 +111,7 @@ builder.Services.AddAuthorization(options =>
         policy.RequireAuthenticatedUser();
         policy.AddRequirements(new CustomerOwnResourceRequirement());
     });
+    options.AddFeaturePolicies();
 });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -128,6 +132,8 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Nhập access token JWT. Có thể lấy token bằng API đăng nhập.",
     });
     options.SchemaFilter<EnumAsStringSchemaFilter>();
+    // Feature DTOs may share a name with admin CRUD DTOs (e.g. ZoneResponse); prefix them with their area.
+    options.CustomSchemaIds(SwaggerSchemaIds.For);
     options.OperationFilter<AuthorizeOperationFilter>();
 });
 
@@ -162,9 +168,11 @@ app.UseSwagger();
 app.UseSwaggerUI();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapGet("/", () => Results.Redirect("/swagger"));
 app.MapAuthEndpoints();
 app.MapAdminCrudEndpoints();
+app.MapFeatureEndpoints();
 
 app.Run();
 
@@ -206,6 +214,21 @@ public sealed class AuthorizeOperationFilter : IOperationFilter
         operation.Responses.TryAdd(
             StatusCodes.Status403Forbidden.ToString(),
             new OpenApiResponse { Description = "Không có quyền truy cập theo vai trò hoặc phạm vi chi nhánh." });
+    }
+}
+
+public static class SwaggerSchemaIds
+{
+    private const string FeatureNamespace = "ChonRieng.Api.Features.";
+
+    public static string For(Type type)
+    {
+        var name = type.IsGenericType
+            ? string.Concat(type.GetGenericArguments().Select(For)) + type.Name[..type.Name.IndexOf('`')]
+            : type.Name;
+        return type.Namespace?.StartsWith(FeatureNamespace, StringComparison.Ordinal) == true
+            ? type.Namespace[FeatureNamespace.Length..].Replace(".", "") + name
+            : name;
     }
 }
 

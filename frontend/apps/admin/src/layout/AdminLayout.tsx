@@ -1,19 +1,74 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Button, Layout, Menu, Space, Typography } from "antd";
-import { useAuth } from "../auth/AuthProvider";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Badge, Button, Layout, List, Menu, Popover, Select, Space, Typography } from "antd";
+import { dateTime, hasRole, roleLabels } from "@cafecr/ui";
+import { api, useAuth } from "../api";
+import { useBranch } from "../branch/BranchContext";
 
-const menuItems = [
-  { key: "/branches", label: "Chi nhánh" },
-  { key: "/zones", label: "Khu vực" },
-  { key: "/seats", label: "Chỗ ngồi" },
-  { key: "/price-plans", label: "Bảng giá" },
-  { key: "/users", label: "Tài khoản" },
+const managementMenu = [
+  { key: "/", label: "Tổng quan" },
+  { key: "/schedule", label: "Lịch ca" },
+  { key: "/requests", label: "Đơn từ" },
+  { key: "/attendance", label: "Chấm công" },
+  { key: "/closings", label: "Kết ca" },
+  { key: "/expenses", label: "Thu chi" },
+  { key: "/payroll", label: "Lương" },
+  { key: "/reports", label: "Báo cáo" },
+  { key: "/floor", label: "Sơ đồ chỗ ngồi" },
+  { key: "/pricing", label: "Bảng giá" },
+  { key: "/employees", label: "Nhân viên" },
 ];
+
+const adminMenu = [
+  { key: "/branches", label: "Chi nhánh" },
+  { key: "/users", label: "Tài khoản & vai trò" },
+];
+
+function Notifications() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const feed = useQuery({ queryKey: ["notifications"], queryFn: api.notifications.feed, refetchInterval: 30_000 });
+  const read = useMutation({
+    mutationFn: () => api.notifications.markRead(),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+
+  const content = (
+    <List
+      style={{ width: 360, maxHeight: 420, overflow: "auto" }}
+      dataSource={feed.data?.items ?? []}
+      locale={{ emptyText: "Chưa có hoạt động nào." }}
+      renderItem={(n) => (
+        <List.Item
+          style={{ cursor: n.link ? "pointer" : undefined, opacity: n.readAt ? 0.6 : 1 }}
+          onClick={() => n.link?.startsWith("/admin") && navigate(n.link.replace(/^\/admin/, "") || "/")}
+        >
+          <List.Item.Meta title={n.title} description={<>{n.body}<br /><Typography.Text type="secondary">{dateTime(n.createdAt)}</Typography.Text></>} />
+        </List.Item>
+      )}
+    />
+  );
+
+  return (
+    <Popover
+      trigger="click"
+      title={<Space style={{ width: "100%", justifyContent: "space-between" }}>Hoạt động<Button size="small" type="link" onClick={() => read.mutate()}>Đánh dấu đã đọc</Button></Space>}
+      content={content}
+    >
+      <Badge count={feed.data?.unread ?? 0} size="small">
+        <Button>Hoạt động</Button>
+      </Badge>
+    </Popover>
+  );
+}
 
 export function AdminLayout() {
   const { state, logout } = useAuth();
+  const { branchId, setBranchId, branches, canSeeAll } = useBranch();
   const navigate = useNavigate();
   const location = useLocation();
+  const user = state.user!;
+  const isAdmin = hasRole(user, "Admin");
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -24,18 +79,30 @@ export function AdminLayout() {
         <Menu
           mode="inline"
           selectedKeys={[location.pathname]}
-          items={menuItems}
+          items={[
+            ...managementMenu,
+            ...(isAdmin ? [{ type: "divider" as const }, { type: "group" as const, label: "Quản trị", children: adminMenu }] : []),
+          ]}
           onClick={({ key }) => navigate(key)}
         />
       </Layout.Sider>
       <Layout>
-        <Layout.Header
-          style={{ background: "#fff", display: "flex", justifyContent: "flex-end", alignItems: "center", paddingInline: 16 }}
-        >
-          <Space>
-            <Typography.Text>{state.user?.fullName || state.user?.email}</Typography.Text>
-            <Button onClick={() => void logout()}>Đăng xuất</Button>
-          </Space>
+        <Layout.Header style={{ background: "#fff", display: "flex", gap: 12, alignItems: "center", paddingInline: 16, flexWrap: "wrap", height: "auto", minHeight: 64 }}>
+          <Select
+            style={{ minWidth: 240 }}
+            value={branchId ?? "all"}
+            onChange={(v) => setBranchId(v === "all" ? null : v)}
+            options={[
+              ...(canSeeAll ? [{ value: "all", label: "Tất cả chi nhánh" }] : []),
+              ...branches.map((b) => ({ value: b.id, label: b.name })),
+            ]}
+          />
+          <div style={{ flex: 1 }} />
+          <Notifications />
+          <Typography.Text>
+            {user.fullName || user.email} · {user.roles.map((r) => roleLabels[r]).join(", ")}
+          </Typography.Text>
+          <Button onClick={() => void logout()}>Đăng xuất</Button>
         </Layout.Header>
         <Layout.Content style={{ padding: 16 }}>
           <Outlet />
