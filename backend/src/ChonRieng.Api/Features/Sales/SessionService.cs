@@ -29,6 +29,13 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         }
 
         var now = clock.GetUtcNow();
+        if (await db.PaymentRequests.AnyAsync(
+                r => r.SeatId == seat.Id && r.Status == PaymentRequestStatus.Pending && r.ExpiresAt > now,
+                ct))
+        {
+            return SeatTaken();
+        }
+
         var plans = await db.PricePlans.Where(p => p.BranchId == null || p.BranchId == branchId).ToListAsync(ct);
         var plan = CatalogService.ResolveActivePlans(plans, branchId, now).SingleOrDefault(p => p.Id == request.PricePlanId);
         if (plan is null)
@@ -96,6 +103,105 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         }
 
         return (await GetAsync(session.Id, points, ct))!;
+    }
+
+    public async Task<Result<PaymentRequestContext>> PrepareCheckInPaymentAsync(
+        CurrentUser user,
+        Guid seatId,
+        Guid pricePlanId,
+        Guid? customerId,
+        CancellationToken ct)
+    {
+        var seat = await db.Seats.Include(s => s.Zone).SingleOrDefaultAsync(s => s.Id == seatId, ct);
+        if (seat is null || !user.CanAccessBranch(seat.Zone.BranchId))
+        {
+            return ServiceError.NotFound("Không tìm thấy chỗ ngồi.");
+        }
+
+        var now = clock.GetUtcNow();
+        if (seat.Status == SeatStatus.Maintenance)
+        {
+            return ServiceError.Conflict("Chỗ đang bảo trì", "Hãy chọn chỗ khác.");
+        }
+
+        if (await db.Sessions.AnyAsync(s => s.SeatId == seatId && s.Status == SessionStatus.Active, ct)
+            || await db.PaymentRequests.AnyAsync(
+                r => r.SeatId == seatId && r.Status == PaymentRequestStatus.Pending && r.ExpiresAt > now,
+                ct))
+        {
+            return SeatTaken();
+        }
+
+        var plans = await db.PricePlans
+            .Where(p => p.BranchId == null || p.BranchId == seat.Zone.BranchId)
+            .ToListAsync(ct);
+        var plan = CatalogService.ResolveActivePlans(plans, seat.Zone.BranchId, now)
+            .SingleOrDefault(p => p.Id == pricePlanId);
+        if (plan is null)
+        {
+            return ServiceError.Invalid("PricePlanId", "Bảng giá không áp dụng cho chi nhánh này hoặc đã hết hiệu lực.");
+        }
+
+        var shift = await ResolveShiftAsync(user, seat.Zone.BranchId, now, ct);
+        if (shift.Error is not null)
+        {
+            return shift.Error;
+        }
+
+        if (customerId is { } id && !await db.Customers.AnyAsync(c => c.Id == id, ct))
+        {
+            return ServiceError.Invalid("CustomerId", "Không tìm thấy khách hàng.");
+        }
+
+        return new PaymentRequestContext(
+            PaymentRequestKind.CheckIn,
+            seat.Zone.BranchId,
+            seat.Id,
+            seat.Type,
+            plan.Id,
+            customerId,
+            null,
+            shift.Value,
+            plan.Price);
+    }
+
+    public async Task<Result<PaymentRequestContext>> PrepareExtensionPaymentAsync(
+        CurrentUser user,
+        Guid sessionId,
+        CancellationToken ct)
+    {
+        var session = await db.Sessions
+            .Include(s => s.Seat).ThenInclude(s => s.Zone)
+            .Include(s => s.PricePlan)
+            .Include(s => s.Bill)
+            .SingleOrDefaultAsync(s => s.Id == sessionId, ct);
+        if (session is null || !user.CanAccessBranch(session.Seat.Zone.BranchId))
+        {
+            return ServiceError.NotFound();
+        }
+
+        if (session.Status != SessionStatus.Active || session.Bill is null)
+        {
+            return ServiceError.Conflict("Lượt ngồi đã kết thúc", "Chỉ gia hạn được lượt đang diễn ra.");
+        }
+
+        if (await db.PaymentRequests.AnyAsync(
+                r => r.SeatId == session.SeatId && r.Status == PaymentRequestStatus.Pending && r.ExpiresAt > clock.GetUtcNow(),
+                ct))
+        {
+            return ServiceError.Conflict("Đang có yêu cầu thanh toán", "Hãy hoàn tất hoặc hủy yêu cầu đang chờ trước khi tạo yêu cầu khác.");
+        }
+
+        return new PaymentRequestContext(
+            PaymentRequestKind.Extension,
+            session.Seat.Zone.BranchId,
+            session.SeatId,
+            session.Seat.Type,
+            session.PricePlanId,
+            session.CustomerId,
+            session.Id,
+            session.Bill.ShiftId,
+            session.PricePlan.ExtendPrice);
     }
 
     public async Task<Result<SessionView>> ExtendAsync(CurrentUser user, Guid sessionId, CancellationToken ct)
@@ -271,3 +377,14 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
 
     private static ServiceError SeatTaken() => ServiceError.Conflict("Chỗ đã có người", "Chỗ này không còn trống; hãy chọn chỗ khác.");
 }
+
+public sealed record PaymentRequestContext(
+    PaymentRequestKind Kind,
+    Guid BranchId,
+    Guid SeatId,
+    SeatType SeatType,
+    Guid PricePlanId,
+    Guid? CustomerId,
+    Guid? SessionId,
+    Guid ShiftId,
+    decimal Amount);

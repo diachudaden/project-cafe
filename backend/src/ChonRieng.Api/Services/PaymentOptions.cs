@@ -36,6 +36,13 @@ public sealed class PaymentOptions
             throw new InvalidOperationException("Payment__CodePrefix is required.");
         }
 
+        if (CodePrefix.Length > 12
+            || !CodePrefix.All(char.IsLetterOrDigit)
+            || string.Equals(CodePrefix, "CR", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Payment__CodePrefix must be 1-12 alphanumeric characters and must not be CR.");
+        }
+
         if (string.IsNullOrWhiteSpace(QrImageBaseUrl))
         {
             throw new InvalidOperationException("Payment__QrImageBaseUrl is required.");

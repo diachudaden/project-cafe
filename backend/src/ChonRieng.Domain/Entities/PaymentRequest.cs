@@ -11,7 +11,7 @@ public sealed class PaymentRequest : Entity
     public Guid PricePlanId { get; set; }
     public Guid? CustomerId { get; set; }
     public Guid? SessionId { get; set; }
-    public Guid? ShiftId { get; set; }
+    public Guid ShiftId { get; set; }
     public decimal Amount { get; set; }
     public PaymentRequestStatus Status { get; set; } = PaymentRequestStatus.Pending;
     public DateTimeOffset ExpiresAt { get; set; }

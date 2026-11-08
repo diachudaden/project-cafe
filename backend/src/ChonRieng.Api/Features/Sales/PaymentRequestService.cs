@@ -15,68 +15,180 @@ namespace ChonRieng.Api.Features.Sales;
 public sealed class PaymentRequestService(
     AppDbContext db,
     IOptions<PaymentOptions> options,
-    TimeProvider clock)
+    TimeProvider clock,
+    SessionService sessions)
 {
     private readonly PaymentOptions _options = options.Value;
 
-    public async Task<Result<CreatePaymentRequestResponse>> CreateAsync(CurrentUser user, CreatePaymentRequestRequest request, CancellationToken ct)
+    public async Task<Result<CreatePaymentRequestResponse>> CreateCheckInAsync(
+        CurrentUser user,
+        CreateCheckInPaymentRequest request,
+        CancellationToken ct)
     {
-        var seat = await db.Seats.Include(s => s.Zone).SingleOrDefaultAsync(s => s.Id == request.SeatId, ct);
-        if (seat is null || !user.CanAccessBranch(seat.Zone.BranchId))
+        var context = await sessions.PrepareCheckInPaymentAsync(user, request.SeatId, request.PricePlanId, request.CustomerId, ct);
+        if (context.Error is not null)
         {
-            return ServiceError.NotFound("Không tìm thấy chỗ ngồi hoặc không thuộc chi nhánh được phép.");
+            return context.Error;
         }
 
-        var branchId = seat.Zone.BranchId;
-        var pricePlan = await db.PricePlans.SingleOrDefaultAsync(
-            p => p.Id == request.PricePlanId && (p.BranchId == null || p.BranchId == branchId), ct);
-        if (pricePlan is null)
+        await ExpirePendingForSeatAsync(request.SeatId, ct);
+        context = await sessions.PrepareCheckInPaymentAsync(user, request.SeatId, request.PricePlanId, request.CustomerId, ct);
+        if (context.Error is not null)
         {
-            return ServiceError.Invalid("PricePlanId", "Bảng giá không áp dụng cho chi nhánh này.");
+            return context.Error;
         }
 
-        if (request.Amount <= 0)
+        return await CreateAsync(user, context.Value!, ct);
+    }
+
+    public async Task<Result<CreatePaymentRequestResponse>> CreateExtensionAsync(CurrentUser user, Guid sessionId, CancellationToken ct)
+    {
+        var context = await sessions.PrepareExtensionPaymentAsync(user, sessionId, ct);
+        if (context.Error is not null)
         {
-            request = request with { Amount = request.Kind == PaymentRequestKind.Extension ? pricePlan.ExtendPrice : pricePlan.Price };
+            return context.Error;
         }
 
-        var shiftId = request.ShiftId ?? await ResolveCurrentShiftAsync(branchId, ct);
-        if (shiftId is null)
+        await ExpirePendingForSeatAsync(context.Value!.SeatId, ct);
+        context = await sessions.PrepareExtensionPaymentAsync(user, sessionId, ct);
+        if (context.Error is not null)
         {
-            return ServiceError.Conflict("ShiftNotFound", "Chưa có ca đang mở cho chi nhánh này.");
+            return context.Error;
         }
 
-        if (request.CustomerId is Guid customerId && !await db.Customers.AnyAsync(c => c.Id == customerId, ct))
+        return await CreateAsync(user, context.Value!, ct);
+    }
+
+    public async Task<Result<PaymentRequestStatusResponse>> GetStatusAsync(string code, CancellationToken ct)
+    {
+        var normalizedCode = code.Trim().ToUpperInvariant();
+        var paymentRequest = await db.PaymentRequests.SingleOrDefaultAsync(p => p.Code == normalizedCode, ct);
+        if (paymentRequest is null)
         {
-            return ServiceError.Invalid("CustomerId", "Không tìm thấy khách hàng.");
+            return ServiceError.NotFound("Không tìm thấy yêu cầu thanh toán.");
         }
 
+        ExpireIfOverdue(paymentRequest);
+        await db.SaveChangesAsync(ct);
+        return new PaymentRequestStatusResponse(
+            paymentRequest.Code,
+            paymentRequest.Amount,
+            paymentRequest.Status,
+            paymentRequest.ExpiresAt,
+            paymentRequest.PaidAt);
+    }
+
+    public async Task<Result<Done>> CancelAsync(CurrentUser user, string code, CancellationToken ct)
+    {
+        var normalizedCode = code.Trim().ToUpperInvariant();
+        var paymentRequest = await db.PaymentRequests.SingleOrDefaultAsync(p => p.Code == normalizedCode, ct);
+        if (paymentRequest is null || !user.CanAccessBranch(paymentRequest.BranchId))
+        {
+            return ServiceError.NotFound("Không tìm thấy yêu cầu thanh toán.");
+        }
+
+        if (paymentRequest.CreatedByUserId != user.UserId && !user.CanManageBranch(paymentRequest.BranchId))
+        {
+            return ServiceError.NotFound("Không tìm thấy yêu cầu thanh toán.");
+        }
+
+        ExpireIfOverdue(paymentRequest);
+        if (paymentRequest.Status != PaymentRequestStatus.Pending)
+        {
+            return ServiceError.Conflict("Yêu cầu không còn chờ thanh toán", "Chỉ hủy được yêu cầu đang chờ.");
+        }
+
+        paymentRequest.Status = PaymentRequestStatus.Cancelled;
+        await db.SaveChangesAsync(ct);
+        return new Done();
+    }
+
+    public async Task<int> ExpirePendingAsync(CancellationToken ct)
+    {
         var now = clock.GetUtcNow();
-        var code = await GenerateUniqueCodeAsync(ct);
-        var expiresAt = now.AddMinutes(_options.HoldMinutes);
+        var expiredRequests = await db.PaymentRequests
+            .Where(p => p.Status == PaymentRequestStatus.Pending && p.ExpiresAt <= now)
+            .ToListAsync(ct);
 
+        foreach (var paymentRequest in expiredRequests)
+        {
+            paymentRequest.Status = PaymentRequestStatus.Expired;
+        }
+
+        if (expiredRequests.Count > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+
+        return expiredRequests.Count;
+    }
+
+    private async Task<Result<CreatePaymentRequestResponse>> CreateAsync(
+        CurrentUser user,
+        PaymentRequestContext context,
+        CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
         var paymentRequest = new PaymentRequest
         {
-            Code = code,
-            Kind = request.Kind,
-            BranchId = branchId,
-            SeatId = request.SeatId,
-            PricePlanId = request.PricePlanId,
-            CustomerId = request.CustomerId,
-            SessionId = request.SessionId,
-            ShiftId = shiftId,
-            Amount = request.Amount,
+            Code = await GenerateUniqueCodeAsync(ct),
+            Kind = context.Kind,
+            BranchId = context.BranchId,
+            SeatId = context.SeatId,
+            PricePlanId = context.PricePlanId,
+            CustomerId = context.CustomerId,
+            SessionId = context.SessionId,
+            ShiftId = context.ShiftId,
+            Amount = context.Amount,
             Status = PaymentRequestStatus.Pending,
-            ExpiresAt = expiresAt,
+            ExpiresAt = now.AddMinutes(_options.HoldMinutes),
             CreatedByUserId = user.UserId,
             CreatedAt = now,
         };
 
         db.PaymentRequests.Add(paymentRequest);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is Microsoft.Data.SqlClient.SqlException { Number: 2601 or 2627 })
+        {
+            db.Entry(paymentRequest).State = EntityState.Detached;
+            return ServiceError.Conflict("Chỗ đã được giữ", "Một thiết bị khác vừa tạo yêu cầu thanh toán cho chỗ này.");
+        }
 
-        var qrUrl = BuildQrUrl(paymentRequest.Amount, paymentRequest.Code);
-        return new CreatePaymentRequestResponse(paymentRequest.Id, paymentRequest.Code, paymentRequest.Amount, qrUrl, paymentRequest.ExpiresAt);
+        return new CreatePaymentRequestResponse(
+            paymentRequest.Code,
+            paymentRequest.Amount,
+            BuildQrUrl(paymentRequest.Amount, paymentRequest.Code),
+            paymentRequest.ExpiresAt);
+    }
+
+    private async Task ExpirePendingForSeatAsync(Guid seatId, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var expired = await db.PaymentRequests
+            .Where(p => p.SeatId == seatId && p.Status == PaymentRequestStatus.Pending && p.ExpiresAt <= now)
+            .ToListAsync(ct);
+        if (expired.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var paymentRequest in expired)
+        {
+            paymentRequest.Status = PaymentRequestStatus.Expired;
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private void ExpireIfOverdue(PaymentRequest paymentRequest)
+    {
+        if (paymentRequest.Status == PaymentRequestStatus.Pending && paymentRequest.ExpiresAt <= clock.GetUtcNow())
+        {
+            paymentRequest.Status = PaymentRequestStatus.Expired;
+        }
     }
 
     public async Task<IResult> HandleWebhookAsync(HttpRequest httpRequest, CancellationToken ct)
@@ -236,7 +348,7 @@ public sealed class PaymentRequestService(
     {
         for (var attempt = 0; attempt < 50; attempt++)
         {
-            var candidate = _options.CodePrefix + RandomNumberGenerator.GetString("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 8);
+            var candidate = Loyalty.NewPaymentCode(_options.CodePrefix);
             if (!await db.PaymentRequests.AnyAsync(r => r.Code == candidate, ct))
             {
                 return candidate;
@@ -244,17 +356,6 @@ public sealed class PaymentRequestService(
         }
 
         throw new InvalidOperationException("Không thể tạo mã thanh toán duy nhất.");
-    }
-
-    private async Task<Guid?> ResolveCurrentShiftAsync(Guid branchId, CancellationToken ct)
-    {
-        var now = clock.GetUtcNow();
-        var shift = await db.Shifts
-            .Where(s => s.BranchId == branchId && s.StartAt <= now && s.EndAt >= now)
-            .OrderByDescending(s => s.StartAt)
-            .FirstOrDefaultAsync(ct);
-
-        return shift?.Id;
     }
 
     private string BuildQrUrl(decimal amount, string code)
@@ -308,16 +409,19 @@ public sealed class PaymentRequestService(
     }
 }
 
-public sealed record CreatePaymentRequestRequest(
+public sealed record CreateCheckInPaymentRequest(
     Guid SeatId,
     Guid PricePlanId,
-    PaymentRequestKind Kind,
-    Guid? CustomerId,
-    Guid? SessionId,
-    Guid? ShiftId,
-    decimal Amount);
+    Guid? CustomerId);
 
-public sealed record CreatePaymentRequestResponse(Guid PaymentRequestId, string Code, decimal Amount, string QrUrl, DateTimeOffset ExpiresAt);
+public sealed record CreatePaymentRequestResponse(string Code, decimal Amount, string QrUrl, DateTimeOffset ExpiresAt);
+
+public sealed record PaymentRequestStatusResponse(
+    string Code,
+    decimal Amount,
+    PaymentRequestStatus Status,
+    DateTimeOffset ExpiresAt,
+    DateTimeOffset? PaidAt);
 
 public sealed record SePayWebhookPayload(
     string Id,

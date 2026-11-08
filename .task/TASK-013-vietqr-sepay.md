@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned.
+In progress; the payment-request lifecycle is complete in TASK-014, while SePay settlement, realtime, frontend, and demo work remain.
 
 ## Goal
 

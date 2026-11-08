@@ -18,7 +18,8 @@ This backlog tracks requirement-driven implementation tasks. Feature tasks inclu
 | TASK-010 | Completed | Implement shift closing and payroll | Cash reconciliation, expenses, payroll, and approvals; depends on TASK-008 and TASK-009. See [TASK-010](./TASK-010-shift-closing-finance.md).
 | TASK-011 | Completed | Admin web app on the existing API | React/Vite/Ant Design Admin app with real sign-in and CRUD for branches, zones, seats, price plans, and users; no backend changes. See [TASK-011](./TASK-011-admin-frontend.md).
 | TASK-012 | Completed | Role apps: Web Quản lý, POS, Web Khách | Manager/Admin management screens, staff POS and customer mobile web on the role APIs; see [TASK-012](./TASK-012-role-apps.md).
-| TASK-013 | Planned | VietQR + SePay payment and realtime bill flow | Reintroduces the approved VietQR + SePay flow with webhook validation, payment holds, and realtime POS/customer updates; see [TASK-013](./TASK-013-vietqr-sepay.md).
+| TASK-013 | In progress | VietQR + SePay payment and realtime bill flow | Umbrella scope for the approved VietQR + SePay integration; payment-request lifecycle is implemented in [TASK-014](./TASK-014-payment-requests-vietqr.md), with webhook settlement, realtime, frontend, and demo work remaining.
+| TASK-014 | Completed | VietQR payment requests, seat holds, and expiry | Server-priced check-in/extension QR requests, temporary seat holds, expiry, and focused tests; see [TASK-014](./TASK-014-payment-requests-vietqr.md).
 
 ## Working rules
 

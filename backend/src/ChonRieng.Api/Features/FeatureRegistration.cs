@@ -20,6 +20,7 @@ public static class FeatureRegistration
         services.AddScoped<WorkforceService>();
         services.AddScoped<SessionService>();
         services.AddScoped<PaymentRequestService>();
+        services.AddHostedService<PaymentRequestExpiryWorker>();
         services.AddScoped<LoyaltyService>();
         services.AddScoped<FinanceService>();
         services.AddScoped<ReportService>();

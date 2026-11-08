@@ -98,6 +98,13 @@ public sealed class CatalogService(AppDbContext db, TimeProvider clock)
             .ToDictionaryAsync(s => s.SeatId, ct);
 
         var now = clock.GetUtcNow();
+        var heldSeatIds = await db.PaymentRequests.AsNoTracking()
+            .Where(p => p.BranchId == branchId
+                && p.Status == PaymentRequestStatus.Pending
+                && p.ExpiresAt > now)
+            .Select(p => p.SeatId)
+            .ToHashSetAsync(ct);
+
         return new FloorResponse(branch.Id, branch.Name, zones.Select(z => new FloorZone(z.Id, z.Name, z.Seats.Select(seat =>
         {
             if (active.TryGetValue(seat.Id, out var s))
@@ -108,6 +115,11 @@ public sealed class CatalogService(AppDbContext db, TimeProvider clock)
                     : SeatLiveState.Occupied;
                 return new FloorSeat(seat.Id, seat.Code, seat.Type, state,
                     new SeatSessionInfo(s.Id, s.StartAt, s.EndAt, minutesLeft, s.CustomerName, s.BillCode, s.BillTotal));
+            }
+
+            if (heldSeatIds.Contains(seat.Id))
+            {
+                return new FloorSeat(seat.Id, seat.Code, seat.Type, SeatLiveState.Held, null);
             }
 
             return new FloorSeat(seat.Id, seat.Code, seat.Type,
@@ -335,6 +347,7 @@ public sealed class CatalogService(AppDbContext db, TimeProvider clock)
         IReadOnlyCollection<Guid> branchIds,
         CancellationToken ct)
     {
+        var now = clock.GetUtcNow();
         var seats = await db.Seats.AsNoTracking()
             .Where(s => branchIds.Contains(s.Zone.BranchId))
             .Select(s => new
@@ -342,7 +355,10 @@ public sealed class CatalogService(AppDbContext db, TimeProvider clock)
                 s.Zone.BranchId,
                 s.Type,
                 s.Status,
-                Busy = s.Sessions.Any(x => x.Status == SessionStatus.Active),
+                Busy = s.Sessions.Any(x => x.Status == SessionStatus.Active)
+                    || db.PaymentRequests.Any(p => p.SeatId == s.Id
+                        && p.Status == PaymentRequestStatus.Pending
+                        && p.ExpiresAt > now),
             })
             .ToListAsync(ct);
 

@@ -8,6 +8,7 @@ public enum SeatLiveState
 {
     Available,
     Occupied,
+    Held,
     EndingSoon,
     Overdue,
     Maintenance,

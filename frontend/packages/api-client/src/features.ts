@@ -12,7 +12,7 @@ export type SessionStatus = "Active" | "Expired" | "Closed";
 export type PaymentMethod = "Cash" | "VietQr";
 export type ShiftRequestType = "Swap" | "Leave" | "Drop";
 export type ClosingStatus = "Draft" | "Submitted" | "Approved" | "Rejected";
-export type SeatLiveState = "Available" | "Occupied" | "EndingSoon" | "Overdue" | "Maintenance";
+export type SeatLiveState = "Available" | "Occupied" | "Held" | "EndingSoon" | "Overdue" | "Maintenance";
 export type ReportPeriod = "Week" | "Month" | "Quarter" | "Year";
 
 // ---- Catalog ----
