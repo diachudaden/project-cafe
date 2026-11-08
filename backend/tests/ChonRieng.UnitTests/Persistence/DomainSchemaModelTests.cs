@@ -24,6 +24,8 @@ public sealed class DomainSchemaModelTests
         "Sessions",
         "SessionExtensions",
         "Bills",
+        "PaymentRequests",
+        "PaymentTransactions",
         "PointTransactions",
         "Expenses",
         "Payrolls",
@@ -44,7 +46,7 @@ public sealed class DomainSchemaModelTests
     }
 
     [Fact]
-    public void Model_maps_the_22_business_tables_and_identity_tables()
+    public void Model_maps_the_business_tables_and_identity_tables()
     {
         using var db = CreateContext();
 
@@ -54,7 +56,7 @@ public sealed class DomainSchemaModelTests
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.All(BusinessTables, table => Assert.Contains(table, tables));
-        Assert.Equal(28, tables.Count);
+        Assert.Equal(30, tables.Count);
         Assert.Contains("AspNetRoles", tables);
         Assert.Contains("AspNetUserRoles", tables);
         Assert.Contains("AspNetUserClaims", tables);
@@ -72,7 +74,7 @@ public sealed class DomainSchemaModelTests
             .Where(entity => BusinessTables.Contains(entity.GetTableName(), StringComparer.Ordinal))
             .ToArray();
 
-        Assert.Equal(22, businessEntities.Length);
+        Assert.Equal(24, businessEntities.Length);
         Assert.All(businessEntities, entity =>
         {
             var primaryKey = Assert.Single(entity.FindPrimaryKey()!.Properties);
@@ -125,9 +127,9 @@ public sealed class DomainSchemaModelTests
         var sql = db.Database.GenerateCreateScript();
 
         Assert.Contains("CREATE TABLE [Bills]", sql, StringComparison.Ordinal);
+        Assert.Contains("CREATE TABLE [PaymentRequests]", sql, StringComparison.Ordinal);
         Assert.Contains("CREATE TABLE [ShiftClosings]", sql, StringComparison.Ordinal);
         Assert.Contains("CREATE TABLE [Users]", sql, StringComparison.Ordinal);
-        Assert.DoesNotContain("PaymentTransactions", sql, StringComparison.Ordinal);
         Assert.DoesNotContain("LedgerEntries", sql, StringComparison.Ordinal);
     }
 

@@ -43,6 +43,14 @@ if (jwtOptions.AccessTokenMinutes <= 0 || jwtOptions.RefreshTokenDays <= 0)
     throw new InvalidOperationException("JWT access-token minutes and refresh-token days must be positive.");
 }
 
+var paymentOptions = builder.Configuration.GetSection(PaymentOptions.SectionName).Get<PaymentOptions>() ?? new PaymentOptions();
+if (paymentOptions.ValidateOnStart)
+{
+    paymentOptions.ValidateOrThrow();
+}
+
+builder.Services.Configure<PaymentOptions>(builder.Configuration.GetSection(PaymentOptions.SectionName));
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         connectionString,

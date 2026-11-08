@@ -48,6 +48,30 @@ public enum PaymentMethod : byte
     VietQr = 2,
 }
 
+public enum PaymentRequestKind : byte
+{
+    CheckIn = 1,
+    Extension = 2,
+}
+
+public enum PaymentRequestStatus : byte
+{
+    Pending = 1,
+    Paid = 2,
+    Expired = 3,
+    Cancelled = 4,
+    NeedsAttention = 5,
+}
+
+public enum PaymentMatchStatus : byte
+{
+    Unmatched = 1,
+    Matched = 2,
+    Overpaid = 3,
+    Underpaid = 4,
+    Duplicate = 5,
+}
+
 public enum ShiftRequestType : byte
 {
     Swap = 1,
