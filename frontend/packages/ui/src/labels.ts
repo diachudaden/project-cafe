@@ -45,7 +45,7 @@ export const seatStateStyles: Record<SeatLiveState, { label: string; color: stri
   Maintenance: { label: "Bảo trì", color: "#595959", background: "#f0f0f0" },
 };
 
-export const paymentLabels: Record<PaymentMethod, string> = { Cash: "Tiền mặt", VietQr: "VietQR (giả lập)" };
+export const paymentLabels: Record<PaymentMethod, string> = { Cash: "Tiền mặt", VietQr: "VietQR", Mixed: "Hỗn hợp" };
 
 export const closingLabels: Record<ClosingStatus, { label: string; color: string }> = {
   Draft: { label: "Nháp", color: "default" },

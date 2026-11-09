@@ -46,6 +46,7 @@ public enum PaymentMethod : byte
 {
     Cash = 1,
     VietQr = 2,
+    Mixed = 3,
 }
 
 public enum PaymentRequestKind : byte

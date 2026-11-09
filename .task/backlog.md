@@ -18,8 +18,11 @@ This backlog tracks requirement-driven implementation tasks. Feature tasks inclu
 | TASK-010 | Completed | Implement shift closing and payroll | Cash reconciliation, expenses, payroll, and approvals; depends on TASK-008 and TASK-009. See [TASK-010](./TASK-010-shift-closing-finance.md).
 | TASK-011 | Completed | Admin web app on the existing API | React/Vite/Ant Design Admin app with real sign-in and CRUD for branches, zones, seats, price plans, and users; no backend changes. See [TASK-011](./TASK-011-admin-frontend.md).
 | TASK-012 | Completed | Role apps: Web Quản lý, POS, Web Khách | Manager/Admin management screens, staff POS and customer mobile web on the role APIs; see [TASK-012](./TASK-012-role-apps.md).
-| TASK-013 | In progress | VietQR + SePay payment and realtime bill flow | Umbrella scope for the approved VietQR + SePay integration; payment-request lifecycle is implemented in [TASK-014](./TASK-014-payment-requests-vietqr.md), with webhook settlement, realtime, frontend, and demo work remaining.
+| TASK-013 | In progress | VietQR + SePay payment and realtime bill flow | TASK-014…016 implement payment requests, webhook ingestion, and settlement. TASK-017 adds synthetic verification guidance; actual provider/deployment validation is blocked. Realtime and remaining payment UI work are pending.
 | TASK-014 | Completed | VietQR payment requests, seat holds, and expiry | Server-priced check-in/extension QR requests, temporary seat holds, expiry, and focused tests; see [TASK-014](./TASK-014-payment-requests-vietqr.md).
+| TASK-015 | Implemented | Secure SePay webhook verification and ingestion | Raw-body HMAC, timestamp, payload validation, and idempotent recording; SQL Server concurrency verification pending. See [TASK-015](./TASK-015-sepay-webhook-ingestion.md).
+| TASK-016 | Implemented | Settle SePay payments into sessions and bills | Exact verified payments settle through check-in/extension rules; SQL Server concurrency verification pending. See [TASK-016](./TASK-016-sepay-payment-settlement.md).
+| TASK-017 | Blocked | Verify SePay Test-mode end-to-end readiness | Synthetic signed-request script and runbook are ready; actual SePay/deployment verification requires provider and deployment access. See [TASK-017](./TASK-017-sepay-test-mode-e2e.md).
 
 ## Working rules
 

@@ -37,11 +37,11 @@ public static class PaymentEndpoints
             .WithSummary("Tra cứu trạng thái yêu cầu thanh toán")
             .WithDescription("Công khai theo mã ngẫu nhiên; yêu cầu hết hạn được trả về trạng thái Expired.");
 
-        app.MapPost("/api/hooks/sepay-payment", async (HttpRequest request, PaymentRequestService service, CancellationToken ct) =>
-                await service.HandleWebhookAsync(request, ct))
+        app.MapPost("/api/hooks/sepay-payment", async (HttpRequest request, SePayWebhookService service, CancellationToken ct) =>
+                await service.HandleAsync(request, ct))
             .AllowAnonymous()
             .WithName("SePayPaymentWebhook")
             .WithSummary("Webhook xác nhận thanh toán SePay")
-            .WithDescription("Xác thực HMAC-SHA256 bằng X-SePay-Signature và X-SePay-Timestamp, lưu PaymentTransaction và cập nhật trạng thái PaymentRequest.");
+            .WithDescription("Xác thực chữ ký HMAC-SHA256 từ X-SePay-Signature và X-SePay-Timestamp. Giao dịch hợp lệ được lưu và chỉ khoản chuyển vào đúng tài khoản, khớp mã cùng số tiền mới hoàn tất hóa đơn; HTTP 200 không đồng nghĩa mọi giao dịch đã thanh toán thành công.");
     }
 }

@@ -22,14 +22,14 @@ public sealed class FinanceService(AppDbContext db, ShiftService shifts, TimePro
         }
 
         var bills = await db.Bills.AsNoTracking().Where(b => b.ShiftId == shiftId)
-            .GroupBy(b => b.PaymentMethod).Select(g => new { Method = g.Key, Total = g.Sum(b => b.Total), Count = g.Count() })
+            .Select(b => new { b.CashPaidTotal, b.VietQrPaidTotal })
             .ToListAsync(ct);
         var active = await db.Sessions.CountAsync(s => s.Status == SessionStatus.Active && s.Seat.Zone.BranchId == shift.BranchId, ct);
         var closing = await QueryClosings(db.ShiftClosings.Where(c => c.ShiftId == shiftId), ct);
         return new ClosingPreview(shift.Id, shift.BranchId, shift.Branch.Name, shift.Type, shift.StartAt, shift.EndAt,
-            bills.Where(b => b.Method == PaymentMethod.Cash).Sum(b => b.Total),
-            bills.Where(b => b.Method == PaymentMethod.VietQr).Sum(b => b.Total),
-            bills.Sum(b => b.Count), active, closing.SingleOrDefault()?.Closing);
+            bills.Sum(b => b.CashPaidTotal),
+            bills.Sum(b => b.VietQrPaidTotal),
+            await db.Bills.CountAsync(b => b.ShiftId == shiftId, ct), active, closing.SingleOrDefault()?.Closing);
     }
 
     public async Task<Result<ClosingPreview>> SubmitClosingAsync(CurrentUser user, Guid shiftId, SubmitClosingRequest request, CancellationToken ct)
@@ -60,7 +60,7 @@ public sealed class FinanceService(AppDbContext db, ShiftService shifts, TimePro
             }
         }
 
-        var expected = await db.Bills.Where(b => b.ShiftId == shiftId && b.PaymentMethod == PaymentMethod.Cash).SumAsync(b => (decimal?)b.Total, ct) ?? 0;
+        var expected = await db.Bills.Where(b => b.ShiftId == shiftId).SumAsync(b => (decimal?)b.CashPaidTotal, ct) ?? 0;
         var counted = counts.Sum(c => (decimal)int.Parse(c.Key) * c.Value);
         var difference = counted - expected;
         if (request.Submit && difference != 0 && string.IsNullOrWhiteSpace(request.Note))

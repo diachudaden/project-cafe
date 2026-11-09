@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress; the payment-request lifecycle is complete in TASK-014, while SePay settlement, realtime, frontend, and demo work remain.
+In progress; payment-request lifecycle, webhook ingestion, and payment settlement are implemented in TASK-014…016. TASK-017 has a synthetic runbook, but actual SePay Test-mode/deployment verification is blocked; realtime and remaining payment UI work are still pending.
 
 ## Goal
 
@@ -11,7 +11,7 @@ Reintroduce real payment processing for check-in and extension flows with VietQR
 ## Scope
 
 - Add the approved payment request and transaction flow for pending bank transfers.
-- Support VietQR generation, SePay webhook verification, and branch-scoped transaction resolution.
+- Support VietQR generation, SePay webhook verification and transaction ingestion, and payment settlement.
 - Keep cash payment behavior unchanged and reuse the existing check-in/extend core logic for successful webhook completion.
 - Emit realtime status updates for the POS and customer web experience.
 - Add fail-fast configuration and demo-safe environment values for the payment module.
@@ -33,6 +33,7 @@ Reintroduce real payment processing for check-in and extension flows with VietQR
 - TASK-007: POS session lifecycle and checkout/extend logic.
 - TASK-008: existing bill and customer points outcomes.
 - TASK-011/TASK-012: Admin/POS/customer apps consuming the payment status updates.
+- TASK-014…017: payment requests, webhook ingestion, settlement, and Test-mode verification.
 - .rule/business-rules.md: approved branch and customer handling rules.
 
 ## Out of scope

@@ -14,6 +14,7 @@ public static class Notifier
     public const string ClosingSubmitted = "closing.submitted";
     public const string ClosingReviewed = "closing.reviewed";
     public const string PayrollFinalized = "payroll.finalized";
+    public const string PaymentReceived = "payment.received";
 
     public static void Notify(this AppDbContext db, Guid userId, string type, string title, string body, string? link, DateTimeOffset now)
     {

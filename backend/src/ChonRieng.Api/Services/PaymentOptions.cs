@@ -10,7 +10,7 @@ public sealed class PaymentOptions
     public string CodePrefix { get; set; } = "TT";
     public string QrImageBaseUrl { get; set; } = "https://qr.sepay.vn/img";
     public int HoldMinutes { get; set; } = 10;
-    public string WebhookSecret { get; set; } = "demo-secret";
+    public string WebhookSecret { get; set; } = string.Empty;
     public int TimestampToleranceSeconds { get; set; } = 300;
     public bool ValidateOnStart { get; set; } = true;
 

@@ -174,6 +174,16 @@ public sealed class PaymentRequestTests : IDisposable
         Assert.Contains("Payment__CodePrefix", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Payment_options_require_an_environment_supplied_webhook_secret()
+    {
+        var options = new PaymentOptions { WebhookSecret = string.Empty };
+
+        var exception = Assert.Throws<InvalidOperationException>(options.ValidateOrThrow);
+
+        Assert.Contains("Payment__WebhookSecret", exception.Message, StringComparison.Ordinal);
+    }
+
     private sealed class TestClock(DateTimeOffset now) : TimeProvider
     {
         private DateTimeOffset _now = now.ToUniversalTime();

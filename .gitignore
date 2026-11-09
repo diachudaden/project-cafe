@@ -43,3 +43,4 @@ Thumbs.db
 *.dmp
 *.log
 project-cafe.pem
+.docs/sepay/sepay-document.txt

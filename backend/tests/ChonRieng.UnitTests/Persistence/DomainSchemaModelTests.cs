@@ -169,10 +169,11 @@ public sealed class DomainSchemaModelTests
 
         var migrations = db.Database.GetMigrations().ToArray();
 
-        Assert.Equal(4, migrations.Length);
+        Assert.Equal(5, migrations.Length);
         Assert.EndsWith("_InitialCafeCrSchema", migrations[0], StringComparison.Ordinal);
         Assert.EndsWith("_AddRefreshTokenExpiry", migrations[1], StringComparison.Ordinal);
         Assert.EndsWith("_RoleWorkflows", migrations[2], StringComparison.Ordinal);
         Assert.EndsWith("_PaymentRequestTables", migrations[3], StringComparison.Ordinal);
+        Assert.EndsWith("_BillTenderTotals", migrations[4], StringComparison.Ordinal);
     }
 }

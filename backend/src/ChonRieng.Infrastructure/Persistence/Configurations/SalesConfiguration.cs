@@ -55,6 +55,8 @@ internal sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Code).HasMaxLength(8).IsRequired();
         builder.Property(x => x.Total).HasColumnType("decimal(12,0)");
+        builder.Property(x => x.CashPaidTotal).HasColumnType("decimal(12,0)");
+        builder.Property(x => x.VietQrPaidTotal).HasColumnType("decimal(12,0)");
         builder.Property(x => x.PaymentMethod).HasConversion<byte>();
         builder.HasIndex(x => x.Code).IsUnique();
         builder.HasIndex(x => x.ClaimedByCustomerId);

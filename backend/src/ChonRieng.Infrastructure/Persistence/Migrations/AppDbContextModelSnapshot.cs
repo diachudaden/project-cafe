@@ -109,6 +109,9 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("BranchId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<decimal>("CashPaidTotal")
+                        .HasColumnType("decimal(12,0)");
+
                     b.Property<DateTimeOffset?>("ClaimedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -134,6 +137,9 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("Total")
+                        .HasColumnType("decimal(12,0)");
+
+                    b.Property<decimal>("VietQrPaidTotal")
                         .HasColumnType("decimal(12,0)");
 
                     b.HasKey("Id");

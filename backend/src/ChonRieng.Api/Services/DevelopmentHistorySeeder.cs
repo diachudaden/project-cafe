@@ -171,9 +171,9 @@ internal static class DevelopmentHistorySeeder
 
                         var bill = AddSession(db, rng, customers, billCodes, shift, branch.Id, seatId, plan, s.Start, s.Extend, s.Active, now, seatBusyUntil);
                         billCount++;
-                        if (bill.PaymentMethod == PaymentMethod.Cash)
+                        if (bill.CashPaidTotal > 0)
                         {
-                            cash += bill.Total;
+                            cash += bill.CashPaidTotal;
                         }
                     }
 
@@ -265,6 +265,7 @@ internal static class DevelopmentHistorySeeder
         }
         while (!billCodes.Add(code));
 
+        var paymentMethod = rng.NextDouble() < 0.7 ? PaymentMethod.Cash : PaymentMethod.VietQr;
         var bill = new Bill
         {
             Code = code,
@@ -272,7 +273,9 @@ internal static class DevelopmentHistorySeeder
             ShiftId = shift.Id,
             SessionId = session.Id,
             Total = plan.Price,
-            PaymentMethod = rng.NextDouble() < 0.7 ? PaymentMethod.Cash : PaymentMethod.VietQr,
+            CashPaidTotal = paymentMethod == PaymentMethod.Cash ? plan.Price : 0,
+            VietQrPaidTotal = paymentMethod == PaymentMethod.VietQr ? plan.Price : 0,
+            PaymentMethod = paymentMethod,
             CreatedAt = start,
         };
         db.Sessions.Add(session);
@@ -290,6 +293,15 @@ internal static class DevelopmentHistorySeeder
             var extendedAt = start.AddMinutes(plan.DurationMinutes - 10);
             db.SessionExtensions.Add(new SessionExtension { SessionId = session.Id, AddedMinutes = plan.DurationMinutes, Price = plan.ExtendPrice, CreatedAt = extendedAt });
             bill.Total += plan.ExtendPrice;
+            if (bill.PaymentMethod == PaymentMethod.Cash)
+            {
+                bill.CashPaidTotal += plan.ExtendPrice;
+            }
+            else
+            {
+                bill.VietQrPaidTotal += plan.ExtendPrice;
+            }
+
             if (attachedAtCheckIn)
             {
                 db.PointTransactions.Add(Loyalty.Award(customer!, bill, plan.ExtendPrice, extendedAt, $"Gia hạn hóa đơn {code}"));

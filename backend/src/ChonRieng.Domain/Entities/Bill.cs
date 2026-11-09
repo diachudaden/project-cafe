@@ -9,6 +9,8 @@ public sealed class Bill : Entity
     public Guid ShiftId { get; set; }
     public Guid SessionId { get; set; }
     public decimal Total { get; set; }
+    public decimal CashPaidTotal { get; set; }
+    public decimal VietQrPaidTotal { get; set; }
     public PaymentMethod PaymentMethod { get; set; }
     public Guid? ClaimedByCustomerId { get; set; }
     public DateTimeOffset? ClaimedAt { get; set; }
