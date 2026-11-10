@@ -121,6 +121,10 @@ public sealed class SePayWebhookTests : IDisposable
         Assert.Equal(shift.Id, (await _db.Bills.SingleAsync()).ShiftId);
         Assert.Equal(PaymentMethod.VietQr, (await _db.Bills.SingleAsync()).PaymentMethod);
         Assert.Equal(45_000, (await _db.Bills.SingleAsync()).VietQrPaidTotal);
+        Assert.NotNull(paymentRequest.SessionId);
+        var status = await new PaymentRequestService(_db, Options.Create(_options), _clock, new SessionService(_db, _clock))
+            .GetStatusAsync(paymentRequest.Code, default);
+        Assert.Equal((await _db.Bills.SingleAsync()).Code, status.Value!.BillCode);
         Assert.Equal(1, await _db.Sessions.CountAsync());
         Assert.Equal(1, await _db.Bills.CountAsync());
         Assert.Equal(1, await _db.PaymentTransactions.CountAsync());
@@ -175,6 +179,26 @@ public sealed class SePayWebhookTests : IDisposable
         var paymentRequest = await _db.PaymentRequests.SingleAsync();
         _clock.Advance(TimeSpan.FromMinutes(11));
         var body = Payload("tx-expired", AccountNumber, paymentRequest.Code, 45_000);
+        var timestamp = Timestamp();
+
+        var result = await SendAsync(body, timestamp, Sign(timestamp, body));
+
+        Assert.Equal(StatusCodes.Status200OK, StatusCode(result));
+        Assert.Equal(PaymentRequestStatus.NeedsAttention, paymentRequest.Status);
+        Assert.Empty(await _db.Sessions.ToListAsync());
+        Assert.Empty(await _db.Bills.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Payment_received_after_cancel_is_marked_for_attention_and_not_settled()
+    {
+        var (manager, _, seat, plan, _) = await SeedCheckInAsync();
+        await CreateCheckInRequestAsync(manager, seat, plan);
+        var paymentRequest = await _db.PaymentRequests.SingleAsync();
+        var cancelResult = await new PaymentRequestService(_db, Options.Create(_options), _clock, new SessionService(_db, _clock))
+            .CancelAsync(manager, paymentRequest.Code, default);
+        Assert.True(cancelResult.IsSuccess);
+        var body = Payload("tx-after-cancel", AccountNumber, paymentRequest.Code, 45_000);
         var timestamp = Timestamp();
 
         var result = await SendAsync(body, timestamp, Sign(timestamp, body));

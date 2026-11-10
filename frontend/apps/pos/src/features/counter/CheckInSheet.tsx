@@ -5,6 +5,7 @@ import type { CustomerLookup, FloorSeat, PaymentMethod, SessionView } from "@caf
 import { paymentLabels, seatTypeLabels, tierLabels, time, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
+import { PaymentRequestModal } from "./PaymentRequestModal";
 
 /** Tap a free seat → choose plan / member / payment → "Thu tiền" (3 taps for a walk-in). */
 export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; seat: FloorSeat; onClose: () => void }) {
@@ -17,15 +18,25 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
   const [members, setMembers] = useState<CustomerLookup[] | null>(null);
   const [member, setMember] = useState<CustomerLookup | null>(null);
   const [done, setDone] = useState<SessionView | null>(null);
+  const [paymentRequest, setPaymentRequest] = useState<Awaited<ReturnType<typeof api.payments.createCheckIn>> | null>(null);
   const plan = plans.data?.find((p) => p.id === (planId ?? plans.data?.[0]?.id));
 
   const checkIn = useMutation({
-    mutationFn: () => api.sessions.checkIn({ seatId: seat.id, pricePlanId: plan!.id, paymentMethod: payment, customerId: member?.customerId }),
+    mutationFn: () => api.sessions.checkIn({ seatId: seat.id, pricePlanId: plan!.id, paymentMethod: "Cash", customerId: member?.customerId }),
     onSuccess: (s) => {
       setDone(s);
       void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
       void queryClient.invalidateQueries({ queryKey: ["current-shift"] });
     },
+    onError: notify.fail,
+  });
+  const createPaymentRequest = useMutation({
+    mutationFn: () => api.payments.createCheckIn({
+      seatId: seat.id,
+      pricePlanId: plan!.id,
+      customerId: member?.customerId,
+    }),
+    onSuccess: setPaymentRequest,
     onError: notify.fail,
   });
 
@@ -36,6 +47,21 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
       notify.fail(e);
     }
   };
+
+  if (paymentRequest) {
+    return (
+      <PaymentRequestModal
+        branchId={branchId}
+        request={paymentRequest}
+        title={`Thanh toán check-in ${seat.code}`}
+        description={`${seat.code} · ${plan?.durationMinutes ? `${plan.durationMinutes / 60} tiếng` : "Check-in"}`}
+        onClose={() => {
+          setPaymentRequest(null);
+          void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
+        }}
+      />
+    );
+  }
 
   if (done) {
     return (
@@ -81,10 +107,17 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
           <Radio.Group block optionType="button" buttonStyle="solid" value={payment} onChange={(e) => setPayment(e.target.value)}
             options={(["Cash", "VietQr"] as PaymentMethod[]).map((p) => ({ value: p, label: paymentLabels[p] }))} />
         </div>
-        <Button type="primary" block size="large" style={{ height: 56, fontSize: 18 }} disabled={!plan} loading={checkIn.isPending}
-          onClick={() => Modal.confirm({ title: `Thu ${plan ? vnd(plan.price) : ""} (${paymentLabels[payment]})?`, okText: "Đã thu tiền", cancelText: "Hủy", onOk: () => checkIn.mutateAsync() })}>
-          Thu tiền {plan ? vnd(plan.price) : ""}
-        </Button>
+        {payment === "VietQr" ? (
+          <Button type="primary" block size="large" style={{ height: 56, fontSize: 18 }} disabled={!plan}
+            loading={createPaymentRequest.isPending} onClick={() => createPaymentRequest.mutate()}>
+            Tạo QR thanh toán {plan ? vnd(plan.price) : ""}
+          </Button>
+        ) : (
+          <Button type="primary" block size="large" style={{ height: 56, fontSize: 18 }} disabled={!plan} loading={checkIn.isPending}
+            onClick={() => Modal.confirm({ title: `Thu ${plan ? vnd(plan.price) : ""} (${paymentLabels.Cash})?`, okText: "Đã thu tiền", cancelText: "Hủy", onOk: () => checkIn.mutateAsync() })}>
+            Thu tiền {plan ? vnd(plan.price) : ""}
+          </Button>
+        )}
       </Space>
     </Drawer>
   );

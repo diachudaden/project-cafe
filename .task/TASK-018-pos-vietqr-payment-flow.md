@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned.
+Implemented; manual SePay Test-mode verification remains pending.
 
 ## Goal
 
@@ -86,4 +86,15 @@ The cashier can create a payment request, show the QR and amount to the customer
 
 ## Implementation and verification results
 
-Not started.
+- Added typed POS API-client methods for check-in/extension payment requests, status lookup, and cancellation.
+- Check-in keeps the existing Cash path; VietQR now creates a pending server-priced request. Session extensions offer Cash or VietQR and use the existing extension request endpoint.
+- Added a cashier modal with server-provided QR, amount and code, expiry countdown, pending polling every 2.5 seconds, cancellation, distinct terminal states, and the settled bill/session details. Successful settlement refreshes the POS floor and current shift.
+- Added the settled bill code to payment status and records the check-in session ID during settlement so the POS can load the final session. A transfer received after a request was cancelled or expired is marked `NeedsAttention` rather than appearing as a successful sale.
+- Verification passed:
+  - `npx vitest run apps/pos/src/features/counter/paymentStatus.test.ts` — 2 tests passed.
+  - `npm --prefix frontend run typecheck` — passed.
+  - `npm --prefix frontend test` — 10 tests passed across the API-client and UI workspaces.
+  - `npm run build -w @cafecr/pos --prefix frontend` — passed; Vite reported the existing large-chunk warning.
+  - `dotnet test CafeCR.slnx --no-restore` — 93 tests passed (85 unit, 8 integration).
+  - `git diff --check` — passed.
+- Not verified: actual SePay callback/QR behavior, expiry/cancel demo against the provider, deployment, or migration application. Do not treat synthetic callbacks as provider verification; follow TASK-017 and use the approved demo database/environment.

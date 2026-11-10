@@ -326,6 +326,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             db.Sessions.Add(session);
             db.Bills.Add(bill);
             paymentRequest.SeatId = seat.Id;
+            paymentRequest.SessionId = session.Id;
             paymentRequest.BillId = bill.Id;
             paymentRequest.PaidAt = now;
             return new PaymentSettlementOutcome(true, null, bill.Id, bill.Code, seat.Code, session.Id);

@@ -229,11 +229,7 @@ public sealed class SePayWebhookService(
 
         if (paymentRequest.Status != PaymentRequestStatus.Pending || paymentRequest.ExpiresAt <= now)
         {
-            if (paymentRequest.Status == PaymentRequestStatus.Pending)
-            {
-                paymentRequest.Status = PaymentRequestStatus.NeedsAttention;
-            }
-
+            paymentRequest.Status = PaymentRequestStatus.NeedsAttention;
             transaction.Note = "Giao dịch đến sau khi yêu cầu hết hạn hoặc bị hủy.";
             return;
         }

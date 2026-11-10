@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress; payment-request lifecycle, webhook ingestion, and settlement are implemented in TASK-014…016. TASK-018 plans the POS QR-and-polling flow (no SignalR); actual SePay Test-mode/deployment verification in TASK-017 remains blocked.
+In progress; payment-request lifecycle, webhook ingestion, settlement, and the POS QR-and-polling flow (TASK-018) are implemented. Actual SePay Test-mode/deployment verification in TASK-017 remains blocked.
 
 ## Goal
 

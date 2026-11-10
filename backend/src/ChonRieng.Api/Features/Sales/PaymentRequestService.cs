@@ -59,7 +59,9 @@ public sealed class PaymentRequestService(
     public async Task<Result<PaymentRequestStatusResponse>> GetStatusAsync(string code, CancellationToken ct)
     {
         var normalizedCode = code.Trim().ToUpperInvariant();
-        var paymentRequest = await db.PaymentRequests.SingleOrDefaultAsync(p => p.Code == normalizedCode, ct);
+        var paymentRequest = await db.PaymentRequests
+            .Include(p => p.Bill)
+            .SingleOrDefaultAsync(p => p.Code == normalizedCode, ct);
         if (paymentRequest is null)
         {
             return ServiceError.NotFound("Không tìm thấy yêu cầu thanh toán.");
@@ -72,7 +74,8 @@ public sealed class PaymentRequestService(
             paymentRequest.Amount,
             paymentRequest.Status,
             paymentRequest.ExpiresAt,
-            paymentRequest.PaidAt);
+            paymentRequest.PaidAt,
+            paymentRequest.Bill?.Code);
     }
 
     public async Task<Result<Done>> CancelAsync(CurrentUser user, string code, CancellationToken ct)
@@ -229,4 +232,5 @@ public sealed record PaymentRequestStatusResponse(
     decimal Amount,
     PaymentRequestStatus Status,
     DateTimeOffset ExpiresAt,
-    DateTimeOffset? PaidAt);
+    DateTimeOffset? PaidAt,
+    string? BillCode);
