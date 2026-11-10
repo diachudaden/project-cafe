@@ -23,6 +23,7 @@ This backlog tracks requirement-driven implementation tasks. Feature tasks inclu
 | TASK-015 | Implemented | Secure SePay webhook verification and ingestion | Raw-body HMAC, timestamp, payload validation, and idempotent recording; SQL Server concurrency verification pending. See [TASK-015](./TASK-015-sepay-webhook-ingestion.md).
 | TASK-016 | Implemented | Settle SePay payments into sessions and bills | Exact verified payments settle through check-in/extension rules; SQL Server concurrency verification pending. See [TASK-016](./TASK-016-sepay-payment-settlement.md).
 | TASK-017 | Blocked | Verify SePay Test-mode end-to-end readiness | Synthetic signed-request script and runbook are ready; actual SePay/deployment verification requires provider and deployment access. See [TASK-017](./TASK-017-sepay-test-mode-e2e.md).
+| TASK-018 | Planned | Add VietQR payment flow to POS | Demo-first check-in and extension QR screens with status polling, terminal states, and refreshed bill/session results; no SignalR. See [TASK-018](./TASK-018-pos-vietqr-payment-flow.md).
 
 ## Working rules
 

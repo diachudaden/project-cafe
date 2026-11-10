@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress; payment-request lifecycle, webhook ingestion, and payment settlement are implemented in TASK-014…016. TASK-017 has a synthetic runbook, but actual SePay Test-mode/deployment verification is blocked; realtime and remaining payment UI work are still pending.
+In progress; payment-request lifecycle, webhook ingestion, and settlement are implemented in TASK-014…016. TASK-018 plans the POS QR-and-polling flow (no SignalR); actual SePay Test-mode/deployment verification in TASK-017 remains blocked.
 
 ## Goal
 
@@ -34,6 +34,7 @@ Reintroduce real payment processing for check-in and extension flows with VietQR
 - TASK-008: existing bill and customer points outcomes.
 - TASK-011/TASK-012: Admin/POS/customer apps consuming the payment status updates.
 - TASK-014…017: payment requests, webhook ingestion, settlement, and Test-mode verification.
+- TASK-018: cashier-facing VietQR request, QR display, and status polling in POS.
 - .rule/business-rules.md: approved branch and customer handling rules.
 
 ## Out of scope
