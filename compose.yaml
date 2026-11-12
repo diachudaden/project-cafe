@@ -24,7 +24,7 @@ services:
       Payment__CodePrefix: ${Payment__CodePrefix:-TT}
       Payment__QrImageBaseUrl: ${Payment__QrImageBaseUrl:-https://qr.sepay.vn/img}
       Payment__HoldMinutes: ${Payment__HoldMinutes:-10}
-      Payment__WebhookSecret: ${Payment__WebhookSecret:-demo-sepay-secret}
+      Payment__WebhookSecret: ${Payment__WebhookSecret:?Set Payment__WebhookSecret in .env to the SePay HMAC secret}
       Payment__TimestampToleranceSeconds: ${Payment__TimestampToleranceSeconds:-300}
       Payment__ValidateOnStart: ${Payment__ValidateOnStart:-true}
     # Bound to localhost only: the public entry point is the web (nginx) service.
