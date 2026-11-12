@@ -43,7 +43,7 @@ export function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f5f0eb", padding: 16 }}>
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 16 }}>
       <Card style={{ width: "100%", maxWidth: 380 }}>
         <Typography.Title level={3} style={{ marginTop: 0 }}>
           Chốn Riêng — Web Quản lý

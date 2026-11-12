@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
-import { Spin } from "antd";
+import { Spin, theme } from "antd";
+import { ThemeToggle } from "@cafecr/ui";
 import { useAuth } from "./api";
 import { FindPage } from "./pages/FindPage";
 import { ClaimPage } from "./pages/ClaimPage";
@@ -25,8 +26,12 @@ function RequireCustomer({ children }: { children: ReactNode }) {
 
 /** Mobile-first layout with 4 bottom tabs (reference: Tìm quán · Quét bill · Điểm · Tôi). */
 export function App() {
+  const { token } = theme.useToken();
   return (
-    <div style={{ maxWidth: 560, margin: "0 auto", minHeight: "100vh", background: "#faf6f1", paddingBottom: 72 }}>
+    <div style={{ maxWidth: 560, margin: "0 auto", minHeight: "100vh", background: token.colorBgLayout, paddingBottom: 72 }}>
+      <div style={{ position: "fixed", top: 12, right: 12, zIndex: 10 }}>
+        <ThemeToggle />
+      </div>
       <Routes>
         <Route path="/" element={<FindPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -35,11 +40,11 @@ export function App() {
         <Route path="/me" element={<RequireCustomer><MePage /></RequireCustomer>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #eee", display: "flex", justifyContent: "center", paddingBottom: "env(safe-area-inset-bottom)" }}>
+      <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: token.colorBgContainer, borderTop: `1px solid ${token.colorBorderSecondary}`, display: "flex", justifyContent: "center", paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div style={{ display: "flex", width: "100%", maxWidth: 560 }}>
           {tabs.map((t) => (
             <NavLink key={t.to} to={t.to} end style={({ isActive }) => ({
-              flex: 1, textAlign: "center", padding: "8px 0", textDecoration: "none", color: isActive ? "#8b5a2b" : "#8c8c8c", fontWeight: isActive ? 600 : 400,
+              flex: 1, textAlign: "center", padding: "8px 0", textDecoration: "none", color: isActive ? token.colorPrimary : token.colorTextSecondary, fontWeight: isActive ? 600 : 400,
             })}>
               <div style={{ fontSize: 20 }}>{t.icon}</div>
               <div style={{ fontSize: 12 }}>{t.label}</div>

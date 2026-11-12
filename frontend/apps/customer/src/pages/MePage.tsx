@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, Descriptions, List, Typography } from "antd";
+import { Button, Card, Descriptions, List, Typography, theme } from "antd";
 import { dateTime, minutesLeftText, time, vnd } from "@cafecr/ui";
 import { api, useAuth } from "../api";
 
@@ -9,11 +9,12 @@ export function MePage() {
   const session = useQuery({ queryKey: ["my-session"], queryFn: api.loyalty.session, refetchInterval: 30_000 });
   const bills = useQuery({ queryKey: ["my-bills"], queryFn: api.loyalty.bills });
   const user = state.user!;
+  const { token } = theme.useToken();
 
   return (
     <div style={{ padding: 16 }}>
       {session.data && (
-        <Card style={{ marginBottom: 16, background: session.data.minutesLeft <= 15 ? "#fff7e6" : undefined }}>
+        <Card style={{ marginBottom: 16, background: session.data.minutesLeft <= 15 ? token.colorWarningBg : undefined }}>
           <Typography.Text strong>Đang ngồi tại {session.data.branchName} · {session.data.seatCode}</Typography.Text>
           <div style={{ fontSize: 22 }}>{minutesLeftText(session.data.minutesLeft)}</div>
           <Typography.Text type="secondary">Hết giờ lúc {time(session.data.endAt)} — nhờ nhân viên gia hạn nếu muốn ngồi thêm.</Typography.Text>

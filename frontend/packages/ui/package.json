@@ -9,6 +9,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cafecr/api-client": "*"
+    "@cafecr/api-client": "*",
+    "antd": "^5.22.2",
+    "react": "^18.3.1"
   }
 }

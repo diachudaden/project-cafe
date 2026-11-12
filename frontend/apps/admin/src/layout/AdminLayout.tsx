@@ -1,7 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Badge, Button, Layout, List, Menu, Popover, Select, Space, Typography } from "antd";
-import { dateTime, hasRole, roleLabels } from "@cafecr/ui";
+import { Badge, Button, Layout, List, Menu, Popover, Select, Space, Typography, theme } from "antd";
+import { ThemeToggle, dateTime, hasRole, roleLabels } from "@cafecr/ui";
 import { api, useAuth } from "../api";
 import { useBranch } from "../branch/BranchContext";
 
@@ -64,6 +64,7 @@ function Notifications() {
 
 export function AdminLayout() {
   const { state, logout } = useAuth();
+  const { token } = theme.useToken();
   const { branchId, setBranchId, branches, canSeeAll } = useBranch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,7 +88,7 @@ export function AdminLayout() {
         />
       </Layout.Sider>
       <Layout>
-        <Layout.Header style={{ background: "#fff", display: "flex", gap: 12, alignItems: "center", paddingInline: 16, flexWrap: "wrap", height: "auto", minHeight: 64 }}>
+        <Layout.Header style={{ background: token.colorBgContainer, display: "flex", gap: 12, alignItems: "center", paddingInline: 16, flexWrap: "wrap", height: "auto", minHeight: 64 }}>
           <Select
             style={{ minWidth: 240 }}
             value={branchId ?? "all"}
@@ -102,6 +103,7 @@ export function AdminLayout() {
           <Typography.Text>
             {user.fullName || user.email} · {user.roles.map((r) => roleLabels[r]).join(", ")}
           </Typography.Text>
+          <ThemeToggle />
           <Button onClick={() => void logout()}>Đăng xuất</Button>
         </Layout.Header>
         <Layout.Content style={{ padding: 16 }}>

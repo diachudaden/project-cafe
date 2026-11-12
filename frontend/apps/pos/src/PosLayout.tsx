@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Badge, Button, Layout, Segmented, Space, Typography } from "antd";
-import { shiftTypeLabels, time, vnd } from "@cafecr/ui";
+import { ThemeToggle, shiftTypeLabels, time, vnd } from "@cafecr/ui";
 import { api, useAuth } from "./api";
 import { ClosingWizard } from "./features/counter/ClosingWizard";
 
@@ -34,6 +34,7 @@ export function PosLayout() {
         <div style={{ flex: 1 }} />
         {shift && <Button danger type="primary" onClick={() => setClosing(true)}>Kết ca</Button>}
         <Typography.Text style={{ color: "#fff" }}>{state.user?.fullName.replace("[DEMO DATA] ", "")}</Typography.Text>
+        <ThemeToggle ghost />
         <Button ghost onClick={() => void logout()}>Đăng xuất</Button>
       </Layout.Header>
       <div style={{ padding: "12px 16px 0" }}>
