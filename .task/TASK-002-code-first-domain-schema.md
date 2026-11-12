@@ -54,7 +54,7 @@
 
 ## Explicit exclusions
 
-- Do not reintroduce the removed VietQR/SePay payment module, webhook, payment ledger, or payment-specific persistence.
+- Do not reintroduce the removed VietQR/SePay payment module, webhook, payment ledger, or payment-specific persistence; the approved payment scope is replaced by TASK-013 and must be implemented there instead.
 - `PaymentMethod` in the reference schema may remain a simple simulated tender type on `Bill`; it is not a request to add a payment gateway.
 - Do not implement the application use cases, controllers, authorization, seed data, or automatic migration-on-startup in this task.
 - Do not add the full frontend or six-service Docker Compose architecture described elsewhere in the reference document.

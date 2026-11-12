@@ -24,6 +24,8 @@ public sealed class DomainSchemaModelTests
         "Sessions",
         "SessionExtensions",
         "Bills",
+        "PaymentRequests",
+        "PaymentTransactions",
         "PointTransactions",
         "Expenses",
         "Payrolls",
@@ -44,7 +46,7 @@ public sealed class DomainSchemaModelTests
     }
 
     [Fact]
-    public void Model_maps_the_22_business_tables_and_identity_tables()
+    public void Model_maps_the_business_tables_and_identity_tables()
     {
         using var db = CreateContext();
 
@@ -54,7 +56,7 @@ public sealed class DomainSchemaModelTests
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.All(BusinessTables, table => Assert.Contains(table, tables));
-        Assert.Equal(28, tables.Count);
+        Assert.Equal(30, tables.Count);
         Assert.Contains("AspNetRoles", tables);
         Assert.Contains("AspNetUserRoles", tables);
         Assert.Contains("AspNetUserClaims", tables);
@@ -72,7 +74,7 @@ public sealed class DomainSchemaModelTests
             .Where(entity => BusinessTables.Contains(entity.GetTableName(), StringComparer.Ordinal))
             .ToArray();
 
-        Assert.Equal(22, businessEntities.Length);
+        Assert.Equal(24, businessEntities.Length);
         Assert.All(businessEntities, entity =>
         {
             var primaryKey = Assert.Single(entity.FindPrimaryKey()!.Properties);
@@ -115,6 +117,20 @@ public sealed class DomainSchemaModelTests
         var shift = db.Model.FindEntityType(typeof(Shift))!;
         Assert.True(shift.FindProperty(nameof(Shift.RowVersion))!.IsConcurrencyToken);
         Assert.Equal(ValueGenerated.OnAddOrUpdate, shift.FindProperty(nameof(Shift.RowVersion))!.ValueGenerated);
+
+        var paymentRequest = db.Model.FindEntityType(typeof(PaymentRequest))!;
+        Assert.Contains(paymentRequest.GetIndexes(), index =>
+            index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual([nameof(PaymentRequest.Code)]));
+        Assert.Contains(paymentRequest.GetIndexes(), index =>
+            index.IsUnique
+            && index.GetFilter() == "[Status] = 1"
+            && index.Properties.Select(property => property.Name).SequenceEqual([nameof(PaymentRequest.SeatId)]));
+        Assert.True(paymentRequest.FindProperty(nameof(PaymentRequest.RowVersion))!.IsConcurrencyToken);
+        Assert.Equal("decimal(12,0)", paymentRequest.FindProperty(nameof(PaymentRequest.Amount))!.GetColumnType());
+
+        var paymentTransaction = db.Model.FindEntityType(typeof(PaymentTransaction))!;
+        Assert.Contains(paymentTransaction.GetIndexes(), index =>
+            index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual([nameof(PaymentTransaction.ProviderTxId)]));
     }
 
     [Fact]
@@ -125,9 +141,9 @@ public sealed class DomainSchemaModelTests
         var sql = db.Database.GenerateCreateScript();
 
         Assert.Contains("CREATE TABLE [Bills]", sql, StringComparison.Ordinal);
+        Assert.Contains("CREATE TABLE [PaymentRequests]", sql, StringComparison.Ordinal);
         Assert.Contains("CREATE TABLE [ShiftClosings]", sql, StringComparison.Ordinal);
         Assert.Contains("CREATE TABLE [Users]", sql, StringComparison.Ordinal);
-        Assert.DoesNotContain("PaymentTransactions", sql, StringComparison.Ordinal);
         Assert.DoesNotContain("LedgerEntries", sql, StringComparison.Ordinal);
     }
 
@@ -153,9 +169,11 @@ public sealed class DomainSchemaModelTests
 
         var migrations = db.Database.GetMigrations().ToArray();
 
-        Assert.Equal(3, migrations.Length);
+        Assert.Equal(5, migrations.Length);
         Assert.EndsWith("_InitialCafeCrSchema", migrations[0], StringComparison.Ordinal);
         Assert.EndsWith("_AddRefreshTokenExpiry", migrations[1], StringComparison.Ordinal);
         Assert.EndsWith("_RoleWorkflows", migrations[2], StringComparison.Ordinal);
+        Assert.EndsWith("_PaymentRequestTables", migrations[3], StringComparison.Ordinal);
+        Assert.EndsWith("_BillTenderTotals", migrations[4], StringComparison.Ordinal);
     }
 }

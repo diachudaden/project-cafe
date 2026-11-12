@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using ChonRieng.Api.Services;
@@ -19,6 +21,7 @@ namespace ChonRieng.IntegrationTests;
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string SeedPassword = "Seed-Test-Only-123!";
+    public static readonly string WebhookSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
     private readonly string _database = $"RoleApiTests-{Guid.NewGuid()}";
 
     static ApiFactory()
@@ -26,6 +29,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // Program reads these before the test host can override configuration.
         Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", "Server=unused-in-memory");
         Environment.SetEnvironmentVariable("Jwt__SigningKey", "integration-test-signing-key-at-least-32-bytes-long");
+        Environment.SetEnvironmentVariable("Payment__WebhookSecret", WebhookSecret);
         Environment.SetEnvironmentVariable("BootstrapAdmin__Email", "admin.test@cafecr.invalid");
         Environment.SetEnvironmentVariable("BootstrapAdmin__Password", "Admin-Test-Only-123!");
         Environment.SetEnvironmentVariable("DevelopmentSeed__Password", SeedPassword);
@@ -61,6 +65,46 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 public sealed class RoleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+
+    [Fact]
+    public async Task SePay_webhook_accepts_a_signed_event_through_the_real_http_pipeline_and_replay_is_safe()
+    {
+        var client = factory.CreateClient();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var transactionId = $"pipeline-{Guid.NewGuid():N}";
+        var body = $$"""
+            {
+              "id": "{{transactionId}}",
+              "transactionDate": "2026-11-02 10:00:00",
+              "accountNumber": "0000000000",
+              "transferType": "out",
+              "transferAmount": 1
+            }
+            """;
+        var signature = Convert.ToHexString(HMACSHA256.HashData(
+            Encoding.UTF8.GetBytes(ApiFactory.WebhookSecret),
+            Encoding.UTF8.GetBytes($"{timestamp}.{body}"))).ToLowerInvariant();
+
+        async Task<HttpResponseMessage> SendWebhookAsync()
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/hooks/sepay-payment")
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json"),
+            };
+            request.Headers.Add("X-SePay-Timestamp", timestamp);
+            request.Headers.Add("X-SePay-Signature", $"sha256={signature}");
+            return await client.SendAsync(request);
+        }
+
+        using var first = await SendWebhookAsync();
+        using var retry = await SendWebhookAsync();
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await db.PaymentTransactions.CountAsync(transaction => transaction.ProviderTxId == transactionId));
+    }
 
     [Fact]
     public async Task Login_returns_branch_ids_for_staff_and_none_for_customers()

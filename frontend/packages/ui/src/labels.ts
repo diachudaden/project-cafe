@@ -39,12 +39,13 @@ export const seatTypeLabels: Record<SeatType, string> = { Single: "Bàn đơn", 
 export const seatStateStyles: Record<SeatLiveState, { label: string; color: string; background: string }> = {
   Available: { label: "Trống", color: "#237804", background: "#d9f7be" },
   Occupied: { label: "Đang dùng", color: "#0958d9", background: "#d6e4ff" },
+  Held: { label: "Chờ thanh toán", color: "#722ed1", background: "#efdbff" },
   EndingSoon: { label: "Sắp hết giờ", color: "#ad4e00", background: "#ffe7ba" },
   Overdue: { label: "Quá giờ", color: "#a8071a", background: "#ffccc7" },
   Maintenance: { label: "Bảo trì", color: "#595959", background: "#f0f0f0" },
 };
 
-export const paymentLabels: Record<PaymentMethod, string> = { Cash: "Tiền mặt", VietQr: "VietQR (giả lập)" };
+export const paymentLabels: Record<PaymentMethod, string> = { Cash: "Tiền mặt", VietQr: "VietQR", Mixed: "Hỗn hợp" };
 
 export const closingLabels: Record<ClosingStatus, { label: string; color: string }> = {
   Draft: { label: "Nháp", color: "default" },

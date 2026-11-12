@@ -80,11 +80,11 @@ function Floor({ branchId }: { branchId: string }) {
                 <button
                   key={seat.id}
                   type="button"
-                  disabled={seat.state === "Maintenance"}
+                  disabled={seat.state === "Maintenance" || seat.state === "Held"}
                   onClick={() => (seat.session ? setActions(seat) : setCheckIn(seat))}
                   style={{
                     minHeight: 96, borderRadius: 12, border: `2px solid ${style.color}`, background: style.background, color: style.color,
-                    cursor: seat.state === "Maintenance" ? "not-allowed" : "pointer", textAlign: "left", padding: 12, fontSize: 15,
+                    cursor: seat.state === "Maintenance" || seat.state === "Held" ? "not-allowed" : "pointer", textAlign: "left", padding: 12, fontSize: 15,
                   }}
                 >
                   <div style={{ fontSize: 18, fontWeight: 700 }}>{seat.code}</div>

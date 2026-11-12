@@ -9,10 +9,11 @@ export type ShiftStatus = "Draft" | "Published";
 export type ShiftPhase = "Draft" | "Published" | "InProgress" | "Closed" | "Approved";
 export type AssignmentStatus = "Offered" | "Accepted" | "Declined";
 export type SessionStatus = "Active" | "Expired" | "Closed";
-export type PaymentMethod = "Cash" | "VietQr";
+export type PaymentMethod = "Cash" | "VietQr" | "Mixed";
+export type PaymentRequestStatus = "Pending" | "Paid" | "Expired" | "Cancelled" | "NeedsAttention";
 export type ShiftRequestType = "Swap" | "Leave" | "Drop";
 export type ClosingStatus = "Draft" | "Submitted" | "Approved" | "Rejected";
-export type SeatLiveState = "Available" | "Occupied" | "EndingSoon" | "Overdue" | "Maintenance";
+export type SeatLiveState = "Available" | "Occupied" | "Held" | "EndingSoon" | "Overdue" | "Maintenance";
 export type ReportPeriod = "Week" | "Month" | "Quarter" | "Year";
 
 // ---- Catalog ----
@@ -85,6 +86,10 @@ export interface SessionView {
   customer: { id: string; fullName: string; tier: string } | null;
   bill: { id: string; code: string; total: number; paymentMethod: PaymentMethod; claimed: boolean; createdAt: string };
   pointsAwarded: number;
+}
+export interface PaymentRequestView { code: string; amount: number; qrUrl: string; expiresAt: string }
+export interface PaymentRequestStatusView {
+  code: string; amount: number; status: PaymentRequestStatus; expiresAt: string; paidAt: string | null; billCode: string | null;
 }
 export interface CustomerLookup { customerId: string; fullName: string; tier: string; points: number; memberCode: string | null }
 export interface ClaimResult { code: string; total: number; pointsEarned: number; balance: number; tier: string }
@@ -197,6 +202,14 @@ export function createFeatureApi(http: Http) {
       active: (branchId: string) => get<SessionView[]>(`/api/branches/${branchId}/sessions/active`),
       bill: (code: string) => get<SessionView>(`/api/bills/${encodeURIComponent(code)}`),
       lookupCustomer: (q: string) => get<CustomerLookup[]>(`/api/customers/lookup${query({ q })}`),
+    },
+    payments: {
+      createCheckIn: (input: { seatId: string; pricePlanId: string; customerId?: string | null }) =>
+        post<PaymentRequestView>("/api/payments/requests", input),
+      createExtension: (sessionId: string) =>
+        post<PaymentRequestView>(`/api/sessions/${sessionId}/extend/payment-request`),
+      status: (code: string) => get<PaymentRequestStatusView>(`/api/payments/${encodeURIComponent(code)}`),
+      cancel: (code: string) => del(`/api/payments/requests/${encodeURIComponent(code)}`),
     },
     loyalty: {
       claim: (code: string) => post<ClaimResult>("/api/me/bills/claim", { code }),

@@ -22,6 +22,17 @@ The task files (TASK-006…010) say not to guess these product rules. Each has a
 | D16 | Manager scope on accounts | Managers can assign/unassign **Staff** to their branches and edit staff rate; cannot create users or change roles | Prevent privilege escalation | |
 | D17 | Shift rules in MVP | Phase 2: overlap + assigned-branch + understaffed warning. Phase 5: rest 8 h (override with reason), travel 60 min, 48 h/week warning, approved leave | Rules are all from the reference; this only decides the order | |
 | D18 | Demo prices | 45.000đ per 4 h, 40.000đ extension (demo-labelled) | Reference examples use 45.000đ | |
+| D19 | Payment flow | Keep `Bill` as paid-only and add `PaymentRequest` for pending bank transfers | Business reporting still reads `Bills` only; pending transfer state belongs in a separate request record | ✅ |
+| D20 | Payment code format | `Payment__CodePrefix` default `TT` + 8 chars from the `Loyalty` alphabet, case-insensitive matching, unique code required | Avoid collisions with `Customer.MemberCode` (`CR` prefix) and keep SePay `code`/`content` parsing deterministic | ✅ |
+| D21 | Seat hold semantics | Keep `Seat` status unchanged; use a pending `PaymentRequest` to block a seat temporarily while the transfer is pending | The seat is considered occupied while the pending request is valid; expiry releases it automatically | ✅ |
+| D22 | Cash flow | Keep the existing cash check-in/extend flow unchanged and add the payment event/realtime layer after the persisted record is committed | No change to the existing cash accounting logic or reporting model | ✅ |
+| D23 | Transfer completion | POS creates a VietQR request; webhook verifies the correct amount and then executes the same check-in/extend logic with `PaymentMethod.VietQr` | Reuse the core workflow instead of duplicating the existing business rules | ✅ |
+| D24 | QR payload | Use `Payment__QrImageBaseUrl` with `acc`, `bank`, `amount`, `des` parameters and escape all values before generating the QR URL | Matches SePay Test mode and avoids malformed QR image links | ✅ |
+| D25 | Webhook security | Secure `POST /api/hooks/sepay-payment` with HMAC-SHA256 using `X-SePay-Signature` and `X-SePay-Timestamp` over `{timestamp}.{raw_body}` | Required by the approved payment flow and must reject tampered or stale payloads | ✅ |
+| D26 | Transaction states | Store `PaymentTransaction` rows for every provider event; resolve by matching code/amount and set `MatchStatus` such as `Matched`, `Underpaid`, `Overpaid`, `Duplicate`, `Unmatched` | Keep the payment ledger audit trail without inventing a full accounting module | ✅ |
+| D27 | Realtime contract | Emit `PaymentReceived`, `PaymentNeedsAttention`, `PaymentExpired`, `PrintReceipt`, and `PaymentStatusChanged` over SignalR `/hubs/pos` with camelCase payloads | Required for immediate POS and customer feedback without changing the `Bill` model | ✅ |
+| D28 | Customer notification | When a member bill is paid, send a `payment.received` notification through the existing `Notifier` pipeline | The member experience should update as soon as the payment is finalized | ✅ |
+| D29 | Configuration | Require `Payment__*` settings with fail-fast validation on startup and include them in Docker Compose environment values | Prevents silent misconfiguration and keeps the demo environment runnable in Testing mode | ✅ |
 
 ## Questions without a default
 

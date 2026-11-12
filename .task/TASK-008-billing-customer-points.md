@@ -39,7 +39,7 @@ Staff can complete a session's simulated-tender record; customers can claim an e
 - Confirm whether extension charges are included in the original bill total and how a completed checkout initiates bill creation.
 - Confirm which roles can record tender details and whether VietQr in this schema means simulated confirmation only.
 
-No real payment processor, QR verification, gateway webhook, or financial ledger is in scope.
+No real payment processor, QR verification, gateway webhook, or financial ledger is in scope; this work is replaced by TASK-013 for the approved VietQR + SePay flow.
 
 ## Acceptance criteria
 

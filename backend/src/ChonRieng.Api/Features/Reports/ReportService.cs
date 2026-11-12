@@ -85,8 +85,8 @@ public sealed class ReportService(AppDbContext db, TimeProvider clock)
                     current.Count(b => b.Day >= m && b.Day < m.AddMonths(1))));
 
         return new RevenueReport(from, to.AddDays(-1), total, current.Count,
-            current.Where(b => b.Method == PaymentMethod.Cash).Sum(b => b.Total),
-            current.Where(b => b.Method == PaymentMethod.VietQr).Sum(b => b.Total),
+            current.Sum(b => b.CashPaidTotal),
+            current.Sum(b => b.VietQrPaidTotal),
             previous, previous == 0 ? null : Math.Round((total - previous) / previous * 100, 1), buckets.ToList());
     }
 
@@ -231,7 +231,7 @@ public sealed class ReportService(AppDbContext db, TimeProvider clock)
     private IQueryable<Branch> BranchesInScope(Guid[]? ids) =>
         db.Branches.AsNoTracking().Where(b => ids == null || ids.Contains(b.Id)).OrderBy(b => b.Name);
 
-    private sealed record BillRow(Guid BranchId, DateOnly Day, decimal Total, PaymentMethod Method);
+    private sealed record BillRow(Guid BranchId, DateOnly Day, decimal Total, decimal CashPaidTotal, decimal VietQrPaidTotal);
 
     private async Task<List<BillRow>> BillsAsync(Guid[]? ids, DateOnly from, DateOnly toExclusive, CancellationToken ct)
     {
@@ -239,9 +239,10 @@ public sealed class ReportService(AppDbContext db, TimeProvider clock)
         var end = VietnamTime.StartOfDay(toExclusive);
         var rows = await db.Bills.AsNoTracking()
             .Where(b => b.CreatedAt >= start && b.CreatedAt < end && (ids == null || ids.Contains(b.BranchId)))
-            .Select(b => new { b.BranchId, b.CreatedAt, b.Total, b.PaymentMethod })
+            .Select(b => new { b.BranchId, b.CreatedAt, b.Total, b.CashPaidTotal, b.VietQrPaidTotal })
             .ToListAsync(ct);
-        return rows.Select(r => new BillRow(r.BranchId, DateOnly.FromDateTime(r.CreatedAt.ToVietnam().DateTime), r.Total, r.PaymentMethod)).ToList();
+        return rows.Select(r => new BillRow(r.BranchId, DateOnly.FromDateTime(r.CreatedAt.ToVietnam().DateTime), r.Total,
+            r.CashPaidTotal, r.VietQrPaidTotal)).ToList();
     }
 
     private async Task<List<Expense>> ExpensesAsync(Guid[]? ids, DateOnly from, DateOnly toExclusive, CancellationToken ct)

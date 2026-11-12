@@ -23,6 +23,8 @@ public static class Loyalty
 
     public static string NewBillCode() => RandomNumberGenerator.GetString(CodeAlphabet, 8);
 
+    public static string NewPaymentCode(string prefix) => prefix.ToUpperInvariant() + RandomNumberGenerator.GetString(CodeAlphabet, 8);
+
     public static string NewMemberCode() => "CR" + RandomNumberGenerator.GetString(CodeAlphabet, 8);
 
     public static string NormalizeCode(string code) => code.Trim().ToUpperInvariant();

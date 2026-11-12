@@ -83,7 +83,7 @@ public sealed class AttendanceService(AppDbContext db, TimeProvider clock)
                 a.Shift,
                 BranchName = a.Shift.Branch.Name,
                 CheckInAt = a.CheckInAt!.Value,
-                Cash = a.Shift.Bills.Where(b => b.PaymentMethod == PaymentMethod.Cash).Sum(b => (decimal?)b.Total) ?? 0,
+                Cash = a.Shift.Bills.Sum(b => (decimal?)b.CashPaidTotal) ?? 0,
                 BillCount = a.Shift.Bills.Count(),
             })
             .FirstOrDefaultAsync(ct);

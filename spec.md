@@ -30,4 +30,4 @@ The repository provides a .NET 10 API with Swagger/OpenAPI, an EF Core Code Firs
 4. Add focused tests for behavior changes.
 5. Verify changes with the smallest relevant build or test command and report the actual result.
 
-The payment gateway feature has been removed. `PaymentMethod` is only a simulated tender type on `Bill`; this project does not define gateway integrations or webhooks.
+The payment gateway feature was removed from the baseline and is replaced by TASK-013: a real VietQR + SePay payment flow with webhook verification and realtime bill updates. `PaymentMethod` remains a simulated tender type on `Bill` for the baseline, while the gateway integration work is implemented in the approved payment task.

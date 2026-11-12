@@ -107,6 +107,18 @@ public sealed class WorkflowTests : IDisposable
     }
 
     [Fact]
+    public async Task Mixed_tender_cannot_be_submitted_for_a_new_check_in()
+    {
+        var result = await Sessions.CheckInAsync(
+            Staff,
+            new CheckInSessionRequest(_seat.Id, _plan.Id, PaymentMethod.Mixed, null),
+            default);
+
+        Assert.Equal(400, result.Error!.Status);
+        Assert.Empty(await _db.Bills.ToListAsync());
+    }
+
+    [Fact]
     public async Task Staff_from_another_branch_cannot_see_or_sell_here()
     {
         var other = As(_otherStaff.User, BusinessRoles.Staff, _otherBranch.Id);
