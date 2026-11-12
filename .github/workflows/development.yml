@@ -1,0 +1,85 @@
+name: Development CI/CD
+
+# PRs into development: build + test only.
+# Push/merge into development: build + test, then deploy to the dev server.
+on:
+  push:
+    branches: [development]
+  pull_request:
+    branches: [development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore CafeCR.slnx
+      - run: dotnet build CafeCR.slnx --no-restore --configuration Release
+      - run: dotnet test CafeCR.slnx --no-build --configuration Release
+
+  frontend:
+    name: Frontend typecheck, test & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  deploy:
+    name: Deploy to development server
+    needs: [backend, frontend]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # Never run two deploys at once; a newer push waits for the current one.
+    concurrency:
+      group: deploy-development
+      cancel-in-progress: false
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          SSH_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      # Database migrations are intentionally NOT run here; apply them by hand.
+      # Secrets come from the .env file that already lives in APP_DIR on the server.
+      - name: Pull and restart containers
+        env:
+          SSH_HOST: ${{ secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.EC2_USER }}
+          APP_DIR: ${{ secrets.EC2_APP_DIR }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" bash -s -- "$APP_DIR" <<'EOF'
+          set -euo pipefail
+          cd "$1"
+          test -f .env || { echo "Missing .env in $1"; exit 1; }
+          git fetch origin development
+          git checkout development
+          git pull --ff-only origin development
+          echo "Deploying $(git rev-parse --short HEAD)"
+          docker compose up --build -d --remove-orphans
+          docker image prune -f
+          docker compose ps
+          EOF
