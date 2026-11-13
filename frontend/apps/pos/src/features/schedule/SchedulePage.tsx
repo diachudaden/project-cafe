@@ -59,7 +59,7 @@ export function SchedulePage() {
             <List size="small" dataSource={open.data} locale={{ emptyText: "Không có ca trống." }}
               renderItem={(s) => (
                 <List.Item actions={[<Button key="c" size="middle" type="primary" loading={claim.isPending} onClick={() => claim.mutate(s.shiftId)}>Nhận</Button>]}>
-                  {dayMonth(s.date)} {shiftTypeLabels[s.type]} {time(s.startAt)}–{time(s.endAt)} · {s.branchName.replace("[DEMO DATA] ", "")} ({s.acceptedCount}/{s.requiredStaff}) {!s.isMyBranch && <Tag color="purple">Chi nhánh khác</Tag>}
+                  {dayMonth(s.date)} {shiftTypeLabels[s.type]} {time(s.startAt)}–{time(s.endAt)} · {s.branchName.replace("[DEMO DATA] ", "")} ({s.acceptedCount}/{s.requiredStaff}) {!s.isMyBranch && <Tag color="purple">Chi nhánh khác</Tag>} {Date.parse(s.startAt) <= Date.now() && <Tag color="green">Đang diễn ra</Tag>}
                 </List.Item>
               )} />
           </Card>

@@ -49,7 +49,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 services.Remove(descriptor);
             }
 
-            services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_database));
+            services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_database)
+                .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
         });
     }
 
@@ -243,6 +244,53 @@ public sealed class RoleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.NoContent, (await staff.PostAsync($"/api/shifts/{shiftId}/claim", null)).StatusCode);
         var relogin = await LoginAsync("staff05.demo@cafecr.invalid");
         Assert.Contains(relogin.GetProperty("user").GetProperty("branchIds").EnumerateArray(), b => b.GetGuid() == otherBranch);
+    }
+
+    [Fact]
+    public async Task Open_shift_added_to_a_published_week_is_visible_and_claimable_while_running()
+    {
+        var admin = await ClientAsync("admin01.demo@cafecr.invalid");
+        var branches = await factory.CreateClient().GetFromJsonAsync<JsonElement>("/api/branches", Json);
+        var branchId = branches[branches.GetArrayLength() - 1].GetProperty("id").GetGuid();
+
+        // Fresh staff account without any branch link or other shifts, so no scheduling rule interferes.
+        var email = $"open-shift-{Guid.NewGuid():N}@cafecr.invalid";
+        const string password = "Open-Shift-Test-123!";
+        (await admin.PostAsJsonAsync("/api/admin/users", new { email, password, fullName = "Open Shift Tester", phoneNumber = (string?)null, roles = new[] { "Staff" } }, Json))
+            .EnsureSuccessStatusCode();
+
+        // Week already published (a far-future week keeps it clear of the demo history).
+        var now = DateTimeOffset.UtcNow;
+        var date = Today.AddDays(200);
+        var weekStart = date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
+        var dayStart = new DateTimeOffset(date.ToDateTime(new TimeOnly(1, 11)), TimeSpan.FromHours(7));
+        (await admin.PostAsJsonAsync("/api/shifts", new { branchId, date, type = "Morning", startAt = dayStart, endAt = dayStart.AddHours(2), requiredStaff = 1, isOpen = false }, Json))
+            .EnsureSuccessStatusCode();
+        (await admin.PostAsJsonAsync("/api/shifts/publish", new { branchId, weekStart }, Json)).EnsureSuccessStatusCode();
+        var later = await admin.PostAsJsonAsync("/api/shifts", new { branchId, date, type = "Evening", startAt = dayStart.AddHours(10), endAt = dayStart.AddHours(14), requiredStaff = 1, isOpen = true }, Json);
+        later.EnsureSuccessStatusCode();
+        Assert.Equal("Published", (await later.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("status").GetString());
+
+        // A running open shift (started an hour ago, ends in 5 h) in today's week.
+        var today = Today;
+        var running = await admin.PostAsJsonAsync("/api/shifts", new
+        {
+            branchId, date = today, type = "Night", startAt = now.AddHours(-1).AddSeconds(7), endAt = now.AddHours(5), requiredStaff = 1, isOpen = true,
+        }, Json);
+        running.EnsureSuccessStatusCode();
+        var runningId = (await running.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("id").GetGuid();
+        (await admin.PostAsJsonAsync("/api/shifts/publish", new { branchId, weekStart = today.AddDays(-(((int)today.DayOfWeek + 6) % 7)) }, Json))
+            .EnsureSuccessStatusCode();
+
+        var login = await factory.CreateClient().PostAsJsonAsync("/api/auth/login", new { email, password }, Json);
+        login.EnsureSuccessStatusCode();
+        var staff = factory.CreateClient();
+        staff.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",
+            (await login.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("accessToken").GetString());
+
+        var open = await staff.GetFromJsonAsync<JsonElement>("/api/shifts/open", Json);
+        Assert.Contains(open.EnumerateArray(), s => s.GetProperty("shiftId").GetGuid() == runningId);
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.PostAsync($"/api/shifts/{runningId}/claim", null)).StatusCode);
     }
 
     [Fact]

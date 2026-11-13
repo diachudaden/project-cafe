@@ -9,6 +9,8 @@ namespace ChonRieng.Api.Features.Scheduling;
 public sealed class ShiftService(AppDbContext db, TimeProvider clock)
 {
     public static readonly TimeSpan CheckInOpensBefore = TimeSpan.FromMinutes(15);
+    /// <summary>An open shift can still be claimed while it runs, as long as at least this much of it is left.</summary>
+    public static readonly TimeSpan OpenShiftMinimumRemaining = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan MaxShiftLength = TimeSpan.FromHours(16);
 
     public async Task<Result<IReadOnlyList<ShiftView>>> ListAsync(CurrentUser user, Guid branchId, DateOnly from, DateOnly to, CancellationToken ct)
@@ -51,6 +53,14 @@ public sealed class ShiftService(AppDbContext db, TimeProvider clock)
             return ServiceError.Conflict("Ca đã tồn tại", "Chi nhánh đã có ca cùng loại và giờ bắt đầu.");
         }
 
+        // A shift added to a week that is already published goes out immediately; otherwise it would
+        // silently stay Draft (invisible to staff, e.g. an open shift nobody can claim) until someone
+        // presses "Công bố" again.
+        var weekStart = request.Date.AddDays(-(((int)request.Date.DayOfWeek + 6) % 7));
+        var weekEnd = weekStart.AddDays(6);
+        var weekPublished = await db.Shifts.AnyAsync(s => s.BranchId == request.BranchId && s.Status == ShiftStatus.Published
+            && s.Date >= weekStart && s.Date <= weekEnd, ct);
+
         var shift = new Shift
         {
             BranchId = request.BranchId,
@@ -60,7 +70,7 @@ public sealed class ShiftService(AppDbContext db, TimeProvider clock)
             EndAt = request.EndAt,
             RequiredStaff = request.RequiredStaff,
             IsOpen = request.IsOpen,
-            Status = ShiftStatus.Draft,
+            Status = weekPublished ? ShiftStatus.Published : ShiftStatus.Draft,
         };
         db.Shifts.Add(shift);
         await db.SaveChangesAsync(ct);
@@ -431,9 +441,10 @@ public sealed class ShiftService(AppDbContext db, TimeProvider clock)
         }
 
         var branchIds = employee.Branches.Select(b => b.BranchId).ToList();
-        var now = clock.GetUtcNow();
+        // Running shifts stay listed while enough of them is left to be worth joining.
+        var claimableUntil = clock.GetUtcNow() + OpenShiftMinimumRemaining;
         return await db.Shifts.AsNoTracking()
-            .Where(s => s.IsOpen && s.Status == ShiftStatus.Published && s.StartAt > now && s.Branch.IsActive
+            .Where(s => s.IsOpen && s.Status == ShiftStatus.Published && s.EndAt > claimableUntil && s.Branch.IsActive
                 && !s.Assignments.Any(a => a.EmployeeId == employee.Id && a.Status != ShiftAssignmentStatus.Declined)
                 && s.Assignments.Count(a => a.Status == ShiftAssignmentStatus.Accepted) < s.RequiredStaff)
             .OrderByDescending(s => branchIds.Contains(s.BranchId))
@@ -448,8 +459,8 @@ public sealed class ShiftService(AppDbContext db, TimeProvider clock)
     {
         var employee = await db.Employees.Include(e => e.Branches).SingleOrDefaultAsync(e => e.UserId == user.UserId, ct);
         var shift = await db.Shifts.Include(s => s.Assignments).Include(s => s.Branch).SingleOrDefaultAsync(s => s.Id == shiftId, ct);
-        if (employee is null || shift is null || !shift.IsOpen || shift.Status != ShiftStatus.Published || shift.StartAt <= clock.GetUtcNow()
-            || !shift.Branch.IsActive)
+        if (employee is null || shift is null || !shift.IsOpen || shift.Status != ShiftStatus.Published
+            || shift.EndAt <= clock.GetUtcNow() + OpenShiftMinimumRemaining || !shift.Branch.IsActive)
         {
             return ServiceError.NotFound("Không tìm thấy ca trống.");
         }

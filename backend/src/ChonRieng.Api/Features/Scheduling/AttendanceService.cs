@@ -19,8 +19,9 @@ public sealed class AttendanceService(AppDbContext db, TimeProvider clock)
             return ServiceError.NotFound();
         }
 
-        var accepted = await db.ShiftAssignments.AnyAsync(a => a.ShiftId == shiftId && a.EmployeeId == employee.Id && a.Status == ShiftAssignmentStatus.Accepted, ct);
-        if (!accepted || shift.Status != ShiftStatus.Published)
+        var assignment = await db.ShiftAssignments.AsNoTracking()
+            .SingleOrDefaultAsync(a => a.ShiftId == shiftId && a.EmployeeId == employee.Id && a.Status == ShiftAssignmentStatus.Accepted, ct);
+        if (assignment is null || shift.Status != ShiftStatus.Published)
         {
             return ServiceError.Conflict("Chưa nhận ca", "Bạn chỉ điểm danh được ca đã công bố và đã nhận.");
         }
@@ -50,7 +51,7 @@ public sealed class AttendanceService(AppDbContext db, TimeProvider clock)
         var attendance = new Attendance { EmployeeId = employee.Id, ShiftId = shiftId, CheckInAt = now, Method = "App" };
         db.Attendances.Add(attendance);
         await db.SaveChangesAsync(ct);
-        return ToView(attendance, shift);
+        return ToView(attendance, shift, assignment.RespondedAt);
     }
 
     public async Task<Result<AttendanceView>> CheckOutAsync(CurrentUser user, Guid shiftId, CancellationToken ct)
@@ -69,7 +70,7 @@ public sealed class AttendanceService(AppDbContext db, TimeProvider clock)
 
         attendance.CheckOutAt = clock.GetUtcNow();
         await db.SaveChangesAsync(ct);
-        return ToView(attendance, attendance.Shift);
+        return ToView(attendance, attendance.Shift, await RespondedAtAsync(attendance, ct));
     }
 
     /// <summary>The shift the employee is currently working (checked in, not checked out).</summary>
@@ -106,6 +107,7 @@ public sealed class AttendanceService(AppDbContext db, TimeProvider clock)
             {
                 a.Shift,
                 a.EmployeeId,
+                a.RespondedAt,
                 Name = a.Employee.User.FullName,
                 Attendance = a.Shift.Attendances.FirstOrDefault(x => x.EmployeeId == a.EmployeeId),
             })
@@ -118,7 +120,7 @@ public sealed class AttendanceService(AppDbContext db, TimeProvider clock)
                 var att = r.Attendance;
                 return new AttendanceReviewRow(att?.Id, r.Shift.Id, r.Shift.Date, r.Shift.Type, r.Shift.StartAt, r.Shift.EndAt,
                     r.EmployeeId, r.Name, att?.CheckInAt, att?.CheckOutAt,
-                    LateMinutes(att?.CheckInAt, r.Shift.StartAt),
+                    LateMinutes(att?.CheckInAt, ExpectedStart(r.Shift.StartAt, r.RespondedAt)),
                     att?.CheckOutAt is { } outAt && outAt < r.Shift.EndAt ? (int)(r.Shift.EndAt - outAt).TotalMinutes : 0,
                     att?.CheckOutAt is { } outAt2 && outAt2 > r.Shift.EndAt ? (int)(outAt2 - r.Shift.EndAt).TotalMinutes : 0,
                     att is null && r.Shift.EndAt <= now,
@@ -149,15 +151,25 @@ public sealed class AttendanceService(AppDbContext db, TimeProvider clock)
         attendance.ApprovedByUserId = approved ? user.UserId : null;
         attendance.ApprovedAt = approved ? clock.GetUtcNow() : null;
         await db.SaveChangesAsync(ct);
-        return ToView(attendance, attendance.Shift);
+        return ToView(attendance, attendance.Shift, await RespondedAtAsync(attendance, ct));
     }
 
     internal static int LateMinutes(DateTimeOffset? checkIn, DateTimeOffset start) =>
         checkIn is { } c && c > start ? (int)(c - start).TotalMinutes : 0;
 
-    private static AttendanceView ToView(Attendance a, Shift shift)
+    /// <summary>Someone who claimed an open shift after it started is expected from the moment they claimed it.</summary>
+    internal static DateTimeOffset ExpectedStart(DateTimeOffset shiftStart, DateTimeOffset? respondedAt) =>
+        respondedAt is { } r && r > shiftStart ? r : shiftStart;
+
+    private Task<DateTimeOffset?> RespondedAtAsync(Attendance attendance, CancellationToken ct) =>
+        db.ShiftAssignments.AsNoTracking()
+            .Where(a => a.ShiftId == attendance.ShiftId && a.EmployeeId == attendance.EmployeeId)
+            .Select(a => a.RespondedAt)
+            .FirstOrDefaultAsync(ct);
+
+    private static AttendanceView ToView(Attendance a, Shift shift, DateTimeOffset? respondedAt)
     {
-        var late = LateMinutes(a.CheckInAt, shift.StartAt);
+        var late = LateMinutes(a.CheckInAt, ExpectedStart(shift.StartAt, respondedAt));
         return new AttendanceView(a.Id, a.ShiftId, a.EmployeeId, a.CheckInAt, a.CheckOutAt, late, late > LateThresholdMinutes, a.Approved);
     }
 }

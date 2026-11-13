@@ -25,6 +25,15 @@ Four follow-ups from the admin/POS review:
 - New `GET /api/employees`: Admin gets the whole chain, BranchManager the employees of their branches.
 - `CrudPage` supports `listParams` and a `toolbar`; `@ant-design/icons` added to the admin app.
 
+## Follow-up (13/11, list still empty on the server)
+
+Checked the live data: every published open shift with a free spot was already in the past, and tonight's open shift at Chi nhánh A was still **Draft**: it had been added to a week that was already published, and `CreateAsync` always created Draft, so it stayed hidden until "Công bố" was pressed again.
+
+- A shift created in a week that already has published shifts is now created **Published**.
+- Open shifts stay listed and claimable while running, until 30 minutes before the end (POS tag "Đang diễn ra").
+- Lateness for a shift claimed after it started counts from the claim time (`ShiftAssignment.RespondedAt`), not the shift start.
+- Integration test: open shift added to a published week is published; a running open shift is listed and claimable by a staff member with no branch link.
+
 ## Verification
 
 - `dotnet test CafeCR.slnx`: unit 85, integration 10 passed (new: cross-branch open shift claim, user list role/search filters).
