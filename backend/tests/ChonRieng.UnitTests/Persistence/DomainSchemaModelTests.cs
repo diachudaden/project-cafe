@@ -26,6 +26,7 @@ public sealed class DomainSchemaModelTests
         "Bills",
         "PaymentRequests",
         "PaymentTransactions",
+        "PaymentLogs",
         "PointTransactions",
         "Expenses",
         "Payrolls",
@@ -56,7 +57,7 @@ public sealed class DomainSchemaModelTests
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.All(BusinessTables, table => Assert.Contains(table, tables));
-        Assert.Equal(30, tables.Count);
+        Assert.Equal(31, tables.Count);
         Assert.Contains("AspNetRoles", tables);
         Assert.Contains("AspNetUserRoles", tables);
         Assert.Contains("AspNetUserClaims", tables);
@@ -74,7 +75,7 @@ public sealed class DomainSchemaModelTests
             .Where(entity => BusinessTables.Contains(entity.GetTableName(), StringComparer.Ordinal))
             .ToArray();
 
-        Assert.Equal(24, businessEntities.Length);
+        Assert.Equal(25, businessEntities.Length);
         Assert.All(businessEntities, entity =>
         {
             var primaryKey = Assert.Single(entity.FindPrimaryKey()!.Properties);
@@ -169,11 +170,12 @@ public sealed class DomainSchemaModelTests
 
         var migrations = db.Database.GetMigrations().ToArray();
 
-        Assert.Equal(5, migrations.Length);
+        Assert.Equal(6, migrations.Length);
         Assert.EndsWith("_InitialCafeCrSchema", migrations[0], StringComparison.Ordinal);
         Assert.EndsWith("_AddRefreshTokenExpiry", migrations[1], StringComparison.Ordinal);
         Assert.EndsWith("_RoleWorkflows", migrations[2], StringComparison.Ordinal);
         Assert.EndsWith("_PaymentRequestTables", migrations[3], StringComparison.Ordinal);
         Assert.EndsWith("_BillTenderTotals", migrations[4], StringComparison.Ordinal);
+        Assert.EndsWith("_PaymentLogs", migrations[5], StringComparison.Ordinal);
     }
 }

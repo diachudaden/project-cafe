@@ -15,6 +15,7 @@ import { PayrollPage } from "./features/payroll/PayrollPage";
 import { ReportsPage } from "./features/reports/ReportsPage";
 import { FloorPage } from "./features/floor/FloorPage";
 import { PricingPage } from "./features/pricing/PricingPage";
+import { PaymentLogsPage } from "./features/payment-logs/PaymentLogsPage";
 import { EmployeesPage } from "./features/employees/EmployeesPage";
 import { BranchesPage } from "./features/branches/BranchesPage";
 import { UsersPage } from "./features/users/UsersPage";
@@ -46,6 +47,7 @@ export function App() {
         <Route path="/floor" element={<FloorPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/employees" element={<EmployeesPage />} />
+        <Route path="/payment-logs" element={<PaymentLogsPage />} />
         <Route path="/branches" element={<AdminOnly><BranchesPage /></AdminOnly>} />
         <Route path="/users" element={<AdminOnly><UsersPage /></AdminOnly>} />
       </Route>

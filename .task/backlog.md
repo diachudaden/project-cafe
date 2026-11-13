@@ -25,6 +25,7 @@ This backlog tracks requirement-driven implementation tasks. Feature tasks inclu
 | TASK-017 | Blocked | Verify SePay Test-mode end-to-end readiness | Synthetic signed-request script and runbook are ready; actual SePay/deployment verification requires provider and deployment access. See [TASK-017](./TASK-017-sepay-test-mode-e2e.md).
 | TASK-018 | Implemented | Add VietQR payment flow to POS | Demo-first check-in and extension QR screens with status polling, terminal states, and refreshed bill/session results; no SignalR. Automated checks pass; actual SePay Test-mode demo verification remains pending. See [TASK-018](./TASK-018-pos-vietqr-payment-flow.md).
 | TASK-019 | Implemented | Admin menu icons, employee/account filters, cross-branch open shifts | Icons in the admin menu; filters and show-all on Nhân viên; search and Staff/Manager/Customer tabs on Tài khoản; open shifts visible and claimable across branches. See [TASK-019](./TASK-019-admin-filters-open-shifts.md).
+| TASK-020 | Implemented | Payment trace log (create bill → done) | `PaymentLogs` table written by `PaymentLogService` at every payment step (incl. rejected SePay callbacks) and an admin "Nhật ký thanh toán" page with per-code timeline. See [TASK-020](./TASK-020-payment-trace-log.md).
 
 ## Working rules
 

@@ -13,8 +13,12 @@ public sealed class PaymentRequestService(
     AppDbContext db,
     IOptions<PaymentOptions> options,
     TimeProvider clock,
-    SessionService sessions)
+    SessionService sessions,
+    PaymentLogService paymentLog)
 {
+    /// <summary>POS polls every few seconds; a poll is logged on status change or at most this often.</summary>
+    private static readonly TimeSpan PollLogInterval = TimeSpan.FromSeconds(30);
+
     private readonly PaymentOptions _options = options.Value;
 
     public async Task<Result<CreatePaymentRequestResponse>> CreateCheckInAsync(
@@ -67,8 +71,14 @@ public sealed class PaymentRequestService(
             return ServiceError.NotFound("Không tìm thấy yêu cầu thanh toán.");
         }
 
-        ExpireIfOverdue(paymentRequest);
+        var expired = ExpireIfOverdue(paymentRequest);
         await db.SaveChangesAsync(ct);
+        if (expired)
+        {
+            await LogExpiredAsync(paymentRequest, "Hết hạn khi POS kiểm tra trạng thái.");
+        }
+
+        await LogPollAsync(paymentRequest, ct);
         return new PaymentRequestStatusResponse(
             paymentRequest.Code,
             paymentRequest.Amount,
@@ -100,6 +110,11 @@ public sealed class PaymentRequestService(
 
         paymentRequest.Status = PaymentRequestStatus.Cancelled;
         await db.SaveChangesAsync(ct);
+        await paymentLog.WriteAsync(new PaymentLogEntry(PaymentLogStage.Cancelled, "Nhân viên hủy yêu cầu thanh toán.")
+        {
+            Request = paymentRequest,
+            Detail = new { cancelledBy = user.UserId },
+        });
         return new Done();
     }
 
@@ -118,6 +133,10 @@ public sealed class PaymentRequestService(
         if (expiredRequests.Count > 0)
         {
             await db.SaveChangesAsync(ct);
+            foreach (var paymentRequest in expiredRequests)
+            {
+                await LogExpiredAsync(paymentRequest, "Hết hạn (tác vụ nền) mà chưa nhận được thanh toán.");
+            }
         }
 
         return expiredRequests.Count;
@@ -157,6 +176,21 @@ public sealed class PaymentRequestService(
             return ServiceError.Conflict("Chỗ đã được giữ", "Một thiết bị khác vừa tạo yêu cầu thanh toán cho chỗ này.");
         }
 
+        await paymentLog.WriteAsync(new PaymentLogEntry(PaymentLogStage.RequestCreated,
+            paymentRequest.Kind == PaymentRequestKind.CheckIn ? "Tạo mã QR thanh toán check-in." : "Tạo mã QR thanh toán gia hạn.")
+        {
+            Request = paymentRequest,
+            Detail = new
+            {
+                kind = paymentRequest.Kind.ToString(),
+                paymentRequest.SeatId,
+                paymentRequest.SessionId,
+                paymentRequest.ShiftId,
+                createdBy = user.UserId,
+                paymentRequest.ExpiresAt,
+            },
+        });
+
         return new CreatePaymentRequestResponse(
             paymentRequest.Code,
             paymentRequest.Amount,
@@ -181,14 +215,64 @@ public sealed class PaymentRequestService(
         }
 
         await db.SaveChangesAsync(ct);
+        foreach (var paymentRequest in expired)
+        {
+            await LogExpiredAsync(paymentRequest, "Hết hạn khi tạo yêu cầu mới cho cùng chỗ ngồi.");
+        }
     }
 
-    private void ExpireIfOverdue(PaymentRequest paymentRequest)
+    private Task LogExpiredAsync(PaymentRequest paymentRequest, string message) =>
+        paymentLog.WriteAsync(new PaymentLogEntry(PaymentLogStage.Expired, message)
+        {
+            Request = paymentRequest,
+            Detail = new { paymentRequest.ExpiresAt },
+        });
+
+    /// <summary>Logs the first poll, every status change, and otherwise one poll per <see cref="PollLogInterval"/>.</summary>
+    private async Task LogPollAsync(PaymentRequest paymentRequest, CancellationToken ct)
+    {
+        var status = paymentRequest.Status.ToString();
+        DateTimeOffset? lastAt = null;
+        string? lastDetail = null;
+        try
+        {
+            var last = await db.PaymentLogs.AsNoTracking()
+                .Where(l => l.PaymentRequestId == paymentRequest.Id && l.Stage == PaymentLogStage.StatusPolled)
+                .OrderByDescending(l => l.OccurredAt)
+                .Select(l => new { l.OccurredAt, l.Detail })
+                .FirstOrDefaultAsync(ct);
+            lastAt = last?.OccurredAt;
+            lastDetail = last?.Detail;
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            // Tracing must never break the status poll (e.g. PaymentLogs migration not applied yet).
+            return;
+        }
+
+        var changed = lastAt is null || lastDetail is null || !lastDetail.Contains($"\"status\":\"{status}\"", StringComparison.Ordinal);
+        if (!changed && clock.GetUtcNow() - lastAt!.Value < PollLogInterval)
+        {
+            return;
+        }
+
+        await paymentLog.WriteAsync(new PaymentLogEntry(PaymentLogStage.StatusPolled, $"POS kiểm tra trạng thái: {status}.")
+        {
+            Request = paymentRequest,
+            BillCode = paymentRequest.Bill?.Code,
+            Detail = new { status, billCode = paymentRequest.Bill?.Code },
+        });
+    }
+
+    private bool ExpireIfOverdue(PaymentRequest paymentRequest)
     {
         if (paymentRequest.Status == PaymentRequestStatus.Pending && paymentRequest.ExpiresAt <= clock.GetUtcNow())
         {
             paymentRequest.Status = PaymentRequestStatus.Expired;
+            return true;
         }
+
+        return false;
     }
 
     private async Task<string> GenerateUniqueCodeAsync(CancellationToken ct)

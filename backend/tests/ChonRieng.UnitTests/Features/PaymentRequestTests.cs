@@ -63,7 +63,8 @@ public sealed class PaymentRequestTests : IDisposable
             TimestampToleranceSeconds = 300,
         }),
         _clock,
-        new SessionService(_db, _clock));
+        new SessionService(_db, _clock),
+        TestPaymentLog.For(_db, _clock));
 
     [Fact]
     public async Task Check_in_request_uses_server_price_and_holds_the_seat()

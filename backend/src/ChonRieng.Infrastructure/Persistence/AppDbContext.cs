@@ -23,6 +23,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Bill> Bills => Set<Bill>();
     public DbSet<PaymentRequest> PaymentRequests => Set<PaymentRequest>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+    public DbSet<PaymentLog> PaymentLogs => Set<PaymentLog>();
     public DbSet<PointTransaction> PointTransactions => Set<PointTransaction>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<Payroll> Payrolls => Set<Payroll>();

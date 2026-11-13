@@ -19,10 +19,14 @@ public sealed class SePayWebhookService(
     IOptions<PaymentOptions> options,
     TimeProvider clock,
     SessionService sessions,
+    PaymentLogService paymentLog,
     ILogger<SePayWebhookService> logger)
 {
     private const int MaximumBodyBytes = 256 * 1024;
     private readonly PaymentOptions _options = options.Value;
+
+    /// <summary>Trace rows of the current callback; written after commit so "Settled" is never logged for a rolled-back payment.</summary>
+    private readonly List<PaymentLogEntry> _pending = [];
 
     private static readonly JsonSerializerOptions PayloadJson = new()
     {
@@ -34,15 +38,33 @@ public sealed class SePayWebhookService(
     public async Task<IResult> HandleAsync(HttpRequest request, CancellationToken ct)
     {
         var body = await ReadBodyAsync(request, ct);
+        var timestamp = request.Headers["X-SePay-Timestamp"].FirstOrDefault();
+        var signature = request.Headers["X-SePay-Signature"].FirstOrDefault();
+        await paymentLog.WriteAsync(new PaymentLogEntry(PaymentLogStage.WebhookReceived, "SePay gọi webhook.")
+        {
+            Detail = new
+            {
+                bodyBytes = body?.Length ?? request.ContentLength,
+                hasTimestamp = !string.IsNullOrWhiteSpace(timestamp),
+                hasSignature = !string.IsNullOrWhiteSpace(signature),
+                hasAuthorization = request.Headers.Authorization.Count > 0,
+                contentType = request.ContentType,
+                remoteIp = request.HttpContext.Connection.RemoteIpAddress?.ToString(),
+                forwardedFor = request.Headers["X-Forwarded-For"].FirstOrDefault(),
+                userAgent = request.Headers.UserAgent.FirstOrDefault(),
+            },
+        });
+
         if (body is null)
         {
+            await RejectAsync("Nội dung webhook quá lớn (> 256 KB).", new { reason = "too_large", request.ContentLength });
             return Results.Json(new { success = false }, statusCode: StatusCodes.Status413PayloadTooLarge);
         }
 
-        var timestamp = request.Headers["X-SePay-Timestamp"].FirstOrDefault();
-        var signature = request.Headers["X-SePay-Signature"].FirstOrDefault();
-        if (!IsValidSignature(timestamp, signature, body))
+        var signatureError = CheckSignature(timestamp, signature, body);
+        if (signatureError is not null)
         {
+            await RejectAsync(signatureError.Message, signatureError.Detail);
             return Results.Json(new { success = false }, statusCode: StatusCodes.Status401Unauthorized);
         }
 
@@ -51,17 +73,98 @@ public sealed class SePayWebhookService(
         {
             payload = JsonSerializer.Deserialize<SePayWebhookPayload>(body, PayloadJson);
         }
-        catch (JsonException)
+        catch (JsonException exception)
         {
+            await RejectAsync("JSON webhook không đọc được.", new { reason = "bad_json", error = exception.Message, exception.Path });
             return Results.Json(new { success = false }, statusCode: StatusCodes.Status400BadRequest);
         }
 
-        if (!IsValidPayload(payload))
+        var payloadError = PayloadError(payload);
+        if (payloadError is not null)
         {
+            await RejectAsync($"Dữ liệu webhook không hợp lệ: {payloadError}", new
+            {
+                reason = "bad_payload",
+                field = payloadError,
+                id = payload?.Id,
+                transferType = payload?.TransferType,
+                amount = payload?.TransferAmount,
+                transactionDate = payload?.TransactionDate,
+            }, payload?.Id);
             return Results.Json(new { success = false }, statusCode: StatusCodes.Status400BadRequest);
         }
 
-        return await ProcessAsync(payload!, ct);
+        try
+        {
+            return await ProcessAsync(payload!, ct);
+        }
+        catch (Exception exception)
+        {
+            // Rows collected so far show how far processing got; the database work itself was rolled back.
+            await FlushAsync();
+            await paymentLog.WriteAsync(new PaymentLogEntry(PaymentLogStage.Exception,
+                "Lỗi khi xử lý webhook; giao dịch đã hoàn tác, SePay sẽ gửi lại.")
+            {
+                ProviderTxId = payload!.Id,
+                Amount = payload.TransferAmount,
+                PaymentCode = payload.Code,
+                Detail = new { type = exception.GetType().Name, exception.Message, inner = exception.InnerException?.Message },
+            });
+            throw;
+        }
+    }
+
+    private Task RejectAsync(string message, object detail, string? providerTxId = null) =>
+        paymentLog.WriteAsync(new PaymentLogEntry(PaymentLogStage.WebhookRejected, message) { Detail = detail, ProviderTxId = providerTxId });
+
+    private async Task FlushAsync()
+    {
+        foreach (var entry in _pending)
+        {
+            await paymentLog.WriteAsync(entry);
+        }
+
+        _pending.Clear();
+    }
+
+    private sealed record SignatureError(string Message, object Detail);
+
+    private SignatureError? CheckSignature(string? timestamp, string? signature, byte[] rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(timestamp) || string.IsNullOrWhiteSpace(signature))
+        {
+            return new("Thiếu header X-SePay-Timestamp hoặc X-SePay-Signature.", new
+            {
+                reason = "missing_headers",
+                hasTimestamp = !string.IsNullOrWhiteSpace(timestamp),
+                hasSignature = !string.IsNullOrWhiteSpace(signature),
+            });
+        }
+
+        if (!long.TryParse(timestamp, NumberStyles.None, CultureInfo.InvariantCulture, out var unixTimestamp))
+        {
+            return new("X-SePay-Timestamp không phải số giây Unix.", new { reason = "bad_timestamp", timestampLength = timestamp.Length });
+        }
+
+        var skew = clock.GetUtcNow().ToUnixTimeSeconds() - (decimal)unixTimestamp;
+        if (Math.Abs(skew) > _options.TimestampToleranceSeconds)
+        {
+            return new($"Timestamp lệch {skew:0} giây so với máy chủ (cho phép ±{_options.TimestampToleranceSeconds}).", new
+            {
+                reason = "stale_timestamp",
+                skewSeconds = skew,
+                toleranceSeconds = _options.TimestampToleranceSeconds,
+            });
+        }
+
+        return IsValidSignature(timestamp, signature, rawBody)
+            ? null
+            : new("Chữ ký HMAC không khớp (sai WebhookSecret hoặc nội dung bị thay đổi).", new
+            {
+                reason = "bad_signature",
+                startsWithSha256 = signature.Trim().StartsWith("sha256=", StringComparison.OrdinalIgnoreCase),
+                signatureLength = signature.Trim().Length,
+            });
     }
 
     private bool IsValidSignature(string? timestamp, string? signature, byte[] rawBody)
@@ -113,6 +216,7 @@ public sealed class SePayWebhookService(
     {
         if (await db.PaymentTransactions.AsNoTracking().AnyAsync(t => t.ProviderTxId == payload.Id, ct))
         {
+            await LogDuplicateAsync(payload);
             return Results.Ok(new { success = true });
         }
 
@@ -150,30 +254,66 @@ public sealed class SePayWebhookService(
             db.ChangeTracker.Clear();
             if (await db.PaymentTransactions.AsNoTracking().AnyAsync(t => t.ProviderTxId == payload.Id, ct))
             {
+                await LogDuplicateAsync(payload);
                 return Results.Ok(new { success = true });
             }
 
             throw;
         }
 
+        _pending.Add(new PaymentLogEntry(PaymentLogStage.TransactionRecorded, "Đã lưu giao dịch ngân hàng.")
+        {
+            Transaction = providerTransaction,
+            PaymentCode = providerTransaction.Code,
+            Detail = new
+            {
+                gateway = payload.Gateway,
+                transferType = payload.TransferType,
+                providerTransaction.OccurredAt,
+                providerTransaction.ReferenceCode,
+                codeField = providerTransaction.Code,
+                hasContent = !string.IsNullOrWhiteSpace(payload.Content),
+                receivedAfterSeconds = (providerTransaction.ReceivedAt - providerTransaction.OccurredAt).TotalSeconds,
+            },
+        });
+
         if (!string.Equals(payload.TransferType, "in", StringComparison.OrdinalIgnoreCase))
         {
             providerTransaction.Note = "Giao dịch chuyển ra được bỏ qua.";
+            _pending.Add(new PaymentLogEntry(PaymentLogStage.TransactionIgnored, providerTransaction.Note) { Transaction = providerTransaction });
         }
         else if (!string.Equals(payload.AccountNumber, _options.AccountNumber, StringComparison.OrdinalIgnoreCase))
         {
             providerTransaction.Note = "Tài khoản nhận không khớp cấu hình.";
+            _pending.Add(new PaymentLogEntry(PaymentLogStage.TransactionIgnored, providerTransaction.Note)
+            {
+                Transaction = providerTransaction,
+                Detail = new { accountLast4 = Last4(payload.AccountNumber), configuredLast4 = Last4(_options.AccountNumber) },
+            });
         }
         else
         {
-            var paymentRequest = await FindPaymentRequestAsync(payload, ct);
+            var (paymentRequest, matchedBy, candidates) = await FindPaymentRequestAsync(payload, ct);
             if (paymentRequest is null)
             {
                 providerTransaction.Note = "Không tìm thấy mã thanh toán hoặc mã khớp không duy nhất.";
+                _pending.Add(new PaymentLogEntry(PaymentLogStage.TransactionUnmatched, providerTransaction.Note)
+                {
+                    Transaction = providerTransaction,
+                    PaymentCode = candidates.Length == 1 ? candidates[0] : providerTransaction.Code,
+                    Detail = new { codeField = payload.Code, codesInContent = candidates, prefix = _options.CodePrefix },
+                });
             }
             else
             {
                 providerTransaction.PaymentRequestId = paymentRequest.Id;
+                _pending.Add(new PaymentLogEntry(PaymentLogStage.CodeMatched, $"Khớp mã {paymentRequest.Code} (theo {matchedBy}).")
+                {
+                    Request = paymentRequest,
+                    Transaction = providerTransaction,
+                    Amount = payload.TransferAmount,
+                    Detail = new { matchedBy, requestStatus = paymentRequest.Status.ToString(), paymentRequest.ExpiresAt, expected = paymentRequest.Amount, paid = payload.TransferAmount },
+                });
                 await MatchPaymentAsync(payload, paymentRequest, providerTransaction, ct);
             }
         }
@@ -184,33 +324,41 @@ public sealed class SePayWebhookService(
             await transaction.CommitAsync(ct);
         }
 
+        await FlushAsync();
         return Results.Ok(new { success = true });
     }
 
-    private async Task<PaymentRequest?> FindPaymentRequestAsync(SePayWebhookPayload payload, CancellationToken ct)
+    /// <summary>
+    /// Finds the request by SePay's <c>code</c> field first, then by a single payment code found in the transfer content.
+    /// The content fallback matters when SePay's own code pattern differs from ours and it sends a wrong/partial code.
+    /// </summary>
+    private async Task<(PaymentRequest? Request, string MatchedBy, string[] Candidates)> FindPaymentRequestAsync(
+        SePayWebhookPayload payload,
+        CancellationToken ct)
     {
-        string? code = null;
         if (!string.IsNullOrWhiteSpace(payload.Code))
         {
-            code = payload.Code.Trim().ToUpperInvariant();
+            var code = payload.Code.Trim().ToUpperInvariant();
+            var byCode = await db.PaymentRequests.SingleOrDefaultAsync(r => r.Code == code, ct);
+            if (byCode is not null)
+            {
+                return (byCode, "code", [code]);
+            }
         }
-        else if (!string.IsNullOrWhiteSpace(payload.Content))
-        {
-            var matches = PaymentCodeRegex().Matches(payload.Content)
+
+        var matches = string.IsNullOrWhiteSpace(payload.Content)
+            ? []
+            : PaymentCodeRegex().Matches(payload.Content)
                 .Select(match => match.Value.ToUpperInvariant())
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
-            if (matches.Length != 1)
-            {
-                return null;
-            }
-
-            code = matches[0];
+        if (matches.Length != 1)
+        {
+            return (null, "", matches);
         }
 
-        return code is null
-            ? null
-            : await db.PaymentRequests.SingleOrDefaultAsync(r => r.Code == code, ct);
+        var byContent = await db.PaymentRequests.SingleOrDefaultAsync(r => r.Code == matches[0], ct);
+        return (byContent, "content", matches);
     }
 
     private async Task MatchPaymentAsync(
@@ -224,13 +372,25 @@ public sealed class SePayWebhookService(
         {
             transaction.MatchStatus = PaymentMatchStatus.Duplicate;
             transaction.Note = "Yêu cầu đã được thanh toán trước đó.";
+            _pending.Add(new PaymentLogEntry(PaymentLogStage.AlreadyPaid, "Nhận thêm tiền cho yêu cầu đã thanh toán; cần hoàn tiền thủ công.")
+            {
+                Request = paymentRequest, Transaction = transaction, Amount = payload.TransferAmount,
+            });
             return;
         }
 
         if (paymentRequest.Status != PaymentRequestStatus.Pending || paymentRequest.ExpiresAt <= now)
         {
+            var previous = paymentRequest.Status;
             paymentRequest.Status = PaymentRequestStatus.NeedsAttention;
             transaction.Note = "Giao dịch đến sau khi yêu cầu hết hạn hoặc bị hủy.";
+            _pending.Add(new PaymentLogEntry(PaymentLogStage.LatePayment, transaction.Note)
+            {
+                Request = paymentRequest,
+                Transaction = transaction,
+                Amount = payload.TransferAmount,
+                Detail = new { previousStatus = previous.ToString(), paymentRequest.ExpiresAt, lateBySeconds = (now - paymentRequest.ExpiresAt).TotalSeconds },
+            });
             return;
         }
 
@@ -243,6 +403,13 @@ public sealed class SePayWebhookService(
             transaction.Note = payload.TransferAmount < paymentRequest.Amount
                 ? $"Thanh toán thiếu {paymentRequest.Amount - payload.TransferAmount:0} VND."
                 : $"Thanh toán thừa {payload.TransferAmount - paymentRequest.Amount:0} VND.";
+            _pending.Add(new PaymentLogEntry(PaymentLogStage.AmountMismatch, transaction.Note)
+            {
+                Request = paymentRequest,
+                Transaction = transaction,
+                Amount = payload.TransferAmount,
+                Detail = new { expected = paymentRequest.Amount, paid = payload.TransferAmount },
+            });
             return;
         }
 
@@ -253,6 +420,10 @@ public sealed class SePayWebhookService(
             transaction.MatchStatus = PaymentMatchStatus.Unmatched;
             transaction.Note = outcome.Reason;
             logger.LogWarning("A verified SePay payment requires attention for request {PaymentRequestId}.", paymentRequest.Id);
+            _pending.Add(new PaymentLogEntry(PaymentLogStage.SettlementFailed, $"Đã nhận tiền nhưng không tạo được bill: {outcome.Reason}")
+            {
+                Request = paymentRequest, Transaction = transaction,
+            });
             return;
         }
 
@@ -260,22 +431,44 @@ public sealed class SePayWebhookService(
         paymentRequest.PaidAt = now;
         transaction.MatchStatus = PaymentMatchStatus.Matched;
         transaction.Note = "Thanh toán khớp và đã hoàn tất.";
+        _pending.Add(new PaymentLogEntry(PaymentLogStage.Settled,
+            paymentRequest.Kind == PaymentRequestKind.CheckIn
+                ? $"Đã tạo bill {outcome.BillCode} cho chỗ {outcome.SeatCode}."
+                : $"Đã gia hạn lượt ngồi, bill {outcome.BillCode}.")
+        {
+            Request = paymentRequest,
+            Transaction = transaction,
+            BillId = outcome.BillId,
+            BillCode = outcome.BillCode,
+            Detail = new { outcome.SeatCode, outcome.SessionId, seatChanged = paymentRequest.Kind == PaymentRequestKind.CheckIn && outcome.SeatCode is not null },
+        });
     }
 
-    private static bool IsValidPayload(SePayWebhookPayload? payload) =>
-        payload is not null
-        && !string.IsNullOrWhiteSpace(payload.Id)
-        && payload.Id.Length <= 128
-        && !string.IsNullOrWhiteSpace(payload.AccountNumber)
-        && payload.AccountNumber.Length <= 32
-        && (string.Equals(payload.TransferType, "in", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(payload.TransferType, "out", StringComparison.OrdinalIgnoreCase))
-        && payload.TransferAmount > 0
-        && payload.TransferAmount <= long.MaxValue
-        && decimal.Truncate(payload.TransferAmount) == payload.TransferAmount
-        && !string.IsNullOrWhiteSpace(payload.TransactionDate)
-        && DateTime.TryParseExact(payload.TransactionDate, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture,
-            DateTimeStyles.None, out _);
+    /// <summary>Returns the first invalid field, or null when the payload is usable.</summary>
+    private static string? PayloadError(SePayWebhookPayload? payload) => payload switch
+    {
+        null => "body",
+        { Id: null or "" } or { Id.Length: > 128 } => "id",
+        { AccountNumber: null or "" } or { AccountNumber.Length: > 32 } => "accountNumber",
+        _ when !string.Equals(payload.TransferType, "in", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(payload.TransferType, "out", StringComparison.OrdinalIgnoreCase) => "transferType",
+        _ when payload.TransferAmount <= 0 || payload.TransferAmount > long.MaxValue
+            || decimal.Truncate(payload.TransferAmount) != payload.TransferAmount => "transferAmount",
+        _ when string.IsNullOrWhiteSpace(payload.TransactionDate)
+            || !DateTime.TryParseExact(payload.TransactionDate, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out _) => "transactionDate",
+        _ => null,
+    };
+
+    private Task LogDuplicateAsync(SePayWebhookPayload payload) =>
+        paymentLog.WriteAsync(new PaymentLogEntry(PaymentLogStage.WebhookDuplicate, "SePay gửi lại giao dịch đã nhận; bỏ qua.")
+        {
+            ProviderTxId = payload.Id,
+            Amount = payload.TransferAmount,
+            PaymentCode = payload.Code,
+        });
+
+    private static string Last4(string value) => value.Length <= 4 ? value : value[^4..];
 
     private static DateTimeOffset ParseOccurredAt(string value)
     {

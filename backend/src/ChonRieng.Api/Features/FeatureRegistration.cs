@@ -21,6 +21,9 @@ public static class FeatureRegistration
         services.AddScoped<SessionService>();
         services.AddScoped<PaymentRequestService>();
         services.AddScoped<SePayWebhookService>();
+        services.AddSingleton<PaymentLogService>();
+        services.AddScoped<PaymentLogQueryService>();
+        services.AddHttpContextAccessor();
         services.AddHostedService<PaymentRequestExpiryWorker>();
         services.AddScoped<LoyaltyService>();
         services.AddScoped<FinanceService>();
@@ -41,6 +44,7 @@ public static class FeatureRegistration
         app.MapCatalogEndpoints();
         app.MapSchedulingEndpoints();
         app.MapPaymentEndpoints();
+        app.MapPaymentLogEndpoints();
         app.MapSalesEndpoints();
         app.MapFinanceEndpoints();
         app.MapReportEndpoints();

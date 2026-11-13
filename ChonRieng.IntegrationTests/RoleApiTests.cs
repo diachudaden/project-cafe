@@ -264,6 +264,26 @@ public sealed class RoleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal("staff01.demo@cafecr.invalid", single.GetProperty("email").GetString());
     }
 
+    [Fact]
+    public async Task Rejected_webhooks_show_up_in_the_admin_payment_log_only()
+    {
+        var anonymous = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/hooks/sepay-payment")
+        {
+            Content = new StringContent("{}", Encoding.UTF8, "application/json"),
+        };
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(request)).StatusCode);
+
+        var admin = await ClientAsync("admin01.demo@cafecr.invalid");
+        var logs = await admin.GetFromJsonAsync<JsonElement>("/api/payment-logs?stage=WebhookRejected&level=Error&pageSize=10", Json);
+        Assert.True(logs.GetProperty("total").GetInt32() >= 1);
+        Assert.Contains("missing_headers", logs.GetProperty("items")[0].GetProperty("detail").GetString());
+
+        var staff = await ClientAsync("staff02.demo@cafecr.invalid");
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync("/api/payment-logs")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync("/api/payment-logs/TTZZZZZZZZ")).StatusCode);
+    }
+
     private static DateOnly Today => DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7)).DateTime);
 
     private async Task<JsonElement> LoginAsync(string email)

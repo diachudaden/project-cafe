@@ -32,7 +32,13 @@ export function PaymentRequestModal({
   const status = useQuery({
     queryKey: ["payment-request-status", request.code],
     queryFn: () => api.payments.status(request.code),
-    refetchInterval: (query) => query.state.data?.status === "Pending" ? 2500 : false,
+    // Keep polling while pending, and also after a failed call (data still undefined): a single network
+    // error on the first poll must not leave the cashier on a QR screen that never updates.
+    refetchInterval: (query) => {
+      const current = query.state.data?.status;
+      if (current === undefined) return query.state.status === "error" ? 5000 : 2500;
+      return current === "Pending" ? 2500 : false;
+    },
     retry: false,
   });
   const paymentStatus = status.data?.status;

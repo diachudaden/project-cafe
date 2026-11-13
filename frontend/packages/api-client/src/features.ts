@@ -87,6 +87,37 @@ export interface SessionView {
   bill: { id: string; code: string; total: number; paymentMethod: PaymentMethod; claimed: boolean; createdAt: string };
   pointsAwarded: number;
 }
+export const paymentLogStages = [
+  "RequestCreated", "StatusPolled", "WebhookReceived", "WebhookRejected", "WebhookDuplicate", "TransactionRecorded",
+  "TransactionIgnored", "TransactionUnmatched", "CodeMatched", "AmountMismatch", "LatePayment", "AlreadyPaid",
+  "SettlementFailed", "Settled", "Expired", "Cancelled", "Exception",
+] as const;
+export type PaymentLogStage = (typeof paymentLogStages)[number];
+export type PaymentLogLevel = "Info" | "Warning" | "Error";
+export interface PaymentLogView {
+  id: string; occurredAt: string; stage: PaymentLogStage; level: PaymentLogLevel; paymentRequestId: string | null;
+  paymentCode: string | null; providerTxId: string | null; billCode: string | null; branchId: string | null;
+  amount: number | null; message: string; detail: string | null; traceId: string | null; elapsedMs: number | null;
+}
+export interface PaymentLogPage { page: number; pageSize: number; total: number; items: PaymentLogView[] }
+export interface PaymentLogFilter {
+  branchId?: string; search?: string; stage?: PaymentLogStage[]; level?: PaymentLogLevel[]; from?: string; to?: string;
+  page?: number; pageSize?: number;
+}
+export interface PaymentTrace {
+  request: {
+    id: string; code: string; kind: "CheckIn" | "Extension"; status: PaymentRequestStatus; amount: number; branchId: string;
+    branchName: string; seatCode: string; createdByName: string | null; createdAt: string; expiresAt: string;
+    paidAt: string | null; billCode: string | null;
+  };
+  transactions: {
+    id: string; providerTxId: string; amount: number; code: string | null; content: string | null; referenceCode: string | null;
+    occurredAt: string; receivedAt: string; matchStatus: string; note: string | null; suspect: boolean;
+  }[];
+  logs: PaymentLogView[];
+  relatedLogs: PaymentLogView[];
+  diagnosis: string[];
+}
 export interface PaymentRequestView { code: string; amount: number; qrUrl: string; expiresAt: string }
 export interface PaymentRequestStatusView {
   code: string; amount: number; status: PaymentRequestStatus; expiresAt: string; paidAt: string | null; billCode: string | null;
@@ -211,6 +242,13 @@ export function createFeatureApi(http: Http) {
         post<PaymentRequestView>(`/api/sessions/${sessionId}/extend/payment-request`),
       status: (code: string) => get<PaymentRequestStatusView>(`/api/payments/${encodeURIComponent(code)}`),
       cancel: (code: string) => del(`/api/payments/requests/${encodeURIComponent(code)}`),
+    },
+    paymentLogs: {
+      list: (f: PaymentLogFilter) => get<PaymentLogPage>(`/api/payment-logs${query({
+        branchId: f.branchId, search: f.search, stage: f.stage?.join(","), level: f.level?.join(","), from: f.from, to: f.to,
+        page: f.page, pageSize: f.pageSize,
+      })}`),
+      trace: (code: string) => get<PaymentTrace>(`/api/payment-logs/${encodeURIComponent(code)}`),
     },
     loyalty: {
       claim: (code: string) => post<ClaimResult>("/api/me/bills/claim", { code }),

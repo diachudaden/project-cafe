@@ -388,6 +388,79 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.ToTable("Notifications", (string)null);
                 });
 
+            modelBuilder.Entity("ChonRieng.Domain.Entities.PaymentLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Amount")
+                        .HasColumnType("decimal(14,0)");
+
+                    b.Property<string>("BillCode")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid?>("BillId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BranchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<long?>("ElapsedMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte>("Level")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PaymentCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("PaymentRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PaymentTransactionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProviderTxId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<byte>("Stage")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("TraceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("PaymentRequestId");
+
+                    b.HasIndex("BranchId", "OccurredAt");
+
+                    b.HasIndex("Level", "OccurredAt");
+
+                    b.HasIndex("PaymentCode", "OccurredAt");
+
+                    b.ToTable("PaymentLogs", (string)null);
+                });
+
             modelBuilder.Entity("ChonRieng.Domain.Entities.PaymentRequest", b =>
                 {
                     b.Property<Guid>("Id")

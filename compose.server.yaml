@@ -1,0 +1,17 @@
+services:
+  web:
+    ports: !reset []          # chỉ Caddy mở cổng ra ngoài
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on: [web]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # giữ chứng chỉ HTTPS, đừng xoá volume này
+      - caddy_config:/config
+volumes:
+  caddy_data:
+  caddy_config:

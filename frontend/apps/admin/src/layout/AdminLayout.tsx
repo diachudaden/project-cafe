@@ -2,7 +2,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Layout, List, Menu, Popover, Select, Space, Typography, theme } from "antd";
 import {
-  ApartmentOutlined, AppstoreOutlined, BarChartOutlined, CalendarOutlined, ClockCircleOutlined, DashboardOutlined, DollarOutlined,
+  ApartmentOutlined, AppstoreOutlined, AuditOutlined, BarChartOutlined, CalendarOutlined, ClockCircleOutlined, DashboardOutlined, DollarOutlined,
   FileDoneOutlined, FormOutlined, SafetyCertificateOutlined, TagsOutlined, TeamOutlined, WalletOutlined,
 } from "@ant-design/icons";
 import { ThemeToggle, dateTime, hasRole, roleLabels } from "@cafecr/ui";
@@ -16,6 +16,7 @@ const managementMenu = [
   { key: "/attendance", icon: <ClockCircleOutlined />, label: "Chấm công" },
   { key: "/closings", icon: <FileDoneOutlined />, label: "Kết ca" },
   { key: "/expenses", icon: <WalletOutlined />, label: "Thu chi" },
+  { key: "/payment-logs", icon: <AuditOutlined />, label: "Nhật ký thanh toán" },
   { key: "/payroll", icon: <DollarOutlined />, label: "Lương" },
   { key: "/reports", icon: <BarChartOutlined />, label: "Báo cáo" },
   { key: "/floor", icon: <AppstoreOutlined />, label: "Sơ đồ chỗ ngồi" },

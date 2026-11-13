@@ -105,7 +105,7 @@ public sealed class SePayWebhookTests : IDisposable
     {
         var (manager, branch, seat, plan, shift) = await SeedCheckInAsync();
         var requestResult = await new PaymentRequestService(
-            _db, Options.Create(_options), _clock, new SessionService(_db, _clock))
+            _db, Options.Create(_options), _clock, new SessionService(_db, _clock), TestPaymentLog.For(_db, _clock))
             .CreateCheckInAsync(manager, new CreateCheckInPaymentRequest(seat.Id, plan.Id, null), default);
         Assert.True(requestResult.IsSuccess);
         var paymentRequest = await _db.PaymentRequests.SingleAsync();
@@ -122,7 +122,7 @@ public sealed class SePayWebhookTests : IDisposable
         Assert.Equal(PaymentMethod.VietQr, (await _db.Bills.SingleAsync()).PaymentMethod);
         Assert.Equal(45_000, (await _db.Bills.SingleAsync()).VietQrPaidTotal);
         Assert.NotNull(paymentRequest.SessionId);
-        var status = await new PaymentRequestService(_db, Options.Create(_options), _clock, new SessionService(_db, _clock))
+        var status = await new PaymentRequestService(_db, Options.Create(_options), _clock, new SessionService(_db, _clock), TestPaymentLog.For(_db, _clock))
             .GetStatusAsync(paymentRequest.Code, default);
         Assert.Equal((await _db.Bills.SingleAsync()).Code, status.Value!.BillCode);
         Assert.Equal(1, await _db.Sessions.CountAsync());
@@ -137,7 +137,7 @@ public sealed class SePayWebhookTests : IDisposable
     {
         var (manager, _, seat, plan, _) = await SeedCheckInAsync();
         await new PaymentRequestService(
-            _db, Options.Create(_options), _clock, new SessionService(_db, _clock))
+            _db, Options.Create(_options), _clock, new SessionService(_db, _clock), TestPaymentLog.For(_db, _clock))
             .CreateCheckInAsync(manager, new CreateCheckInPaymentRequest(seat.Id, plan.Id, null), default);
         var paymentRequest = await _db.PaymentRequests.SingleAsync();
         var body = Payload("tx-wrong-account", "999999999", paymentRequest.Code, 45_000);
@@ -195,7 +195,7 @@ public sealed class SePayWebhookTests : IDisposable
         var (manager, _, seat, plan, _) = await SeedCheckInAsync();
         await CreateCheckInRequestAsync(manager, seat, plan);
         var paymentRequest = await _db.PaymentRequests.SingleAsync();
-        var cancelResult = await new PaymentRequestService(_db, Options.Create(_options), _clock, new SessionService(_db, _clock))
+        var cancelResult = await new PaymentRequestService(_db, Options.Create(_options), _clock, new SessionService(_db, _clock), TestPaymentLog.For(_db, _clock))
             .CancelAsync(manager, paymentRequest.Code, default);
         Assert.True(cancelResult.IsSuccess);
         var body = Payload("tx-after-cancel", AccountNumber, paymentRequest.Code, 45_000);
@@ -268,7 +268,7 @@ public sealed class SePayWebhookTests : IDisposable
             manager,
             new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null),
             default)).Value!;
-        await new PaymentRequestService(_db, Options.Create(_options), _clock, sessions)
+        await new PaymentRequestService(_db, Options.Create(_options), _clock, sessions, TestPaymentLog.For(_db, _clock))
             .CreateExtensionAsync(manager, activeSession.Id, default);
         var paymentRequest = await _db.PaymentRequests.SingleAsync();
         var body = Payload("tx-extension", AccountNumber, paymentRequest.Code, 40_000);
@@ -292,7 +292,7 @@ public sealed class SePayWebhookTests : IDisposable
     private async Task CreateCheckInRequestAsync(CurrentUser manager, Seat seat, PricePlan plan)
     {
         var result = await new PaymentRequestService(
-            _db, Options.Create(_options), _clock, new SessionService(_db, _clock))
+            _db, Options.Create(_options), _clock, new SessionService(_db, _clock), TestPaymentLog.For(_db, _clock))
             .CreateCheckInAsync(manager, new CreateCheckInPaymentRequest(seat.Id, plan.Id, null), default);
         Assert.True(result.IsSuccess);
     }
@@ -355,6 +355,7 @@ public sealed class SePayWebhookTests : IDisposable
             Options.Create(_options),
             _clock,
             new SessionService(_db, _clock),
+            TestPaymentLog.For(_db, _clock),
             NullLogger<SePayWebhookService>.Instance);
         return await service.HandleAsync(context.Request, default);
     }
@@ -366,6 +367,81 @@ public sealed class SePayWebhookTests : IDisposable
         var signedBytes = Encoding.UTF8.GetBytes($"{timestamp}.{body}");
         var signature = HMACSHA256.HashData(Encoding.UTF8.GetBytes(Secret), signedBytes);
         return $"sha256={Convert.ToHexString(signature).ToLowerInvariant()}";
+    }
+
+    [Fact]
+    public async Task Paid_request_leaves_a_full_trace_from_creation_to_settlement()
+    {
+        var (manager, _, seat, plan, _) = await SeedCheckInAsync();
+        var payments = new PaymentRequestService(_db, Options.Create(_options), _clock, new SessionService(_db, _clock), TestPaymentLog.For(_db, _clock));
+        await payments.CreateCheckInAsync(manager, new CreateCheckInPaymentRequest(seat.Id, plan.Id, null), default);
+        var paymentRequest = await _db.PaymentRequests.SingleAsync();
+        await payments.GetStatusAsync(paymentRequest.Code, default);
+        await payments.GetStatusAsync(paymentRequest.Code, default); // throttled: same status within 30 s
+        _clock.Advance(TimeSpan.FromSeconds(20));
+        var body = Payload("tx-trace", AccountNumber, paymentRequest.Code, 45_000);
+        var timestamp = Timestamp();
+        await SendAsync(body, timestamp, Sign(timestamp, body));
+        await payments.GetStatusAsync(paymentRequest.Code, default);
+
+        var stages = await _db.PaymentLogs.AsNoTracking().Where(l => l.PaymentCode == paymentRequest.Code || l.PaymentRequestId == paymentRequest.Id)
+            .OrderBy(l => l.OccurredAt).ThenBy(l => l.Id).Select(l => l.Stage).ToListAsync();
+        Assert.Equal(
+            [
+                PaymentLogStage.RequestCreated, PaymentLogStage.StatusPolled, PaymentLogStage.TransactionRecorded,
+                PaymentLogStage.CodeMatched, PaymentLogStage.Settled, PaymentLogStage.StatusPolled,
+            ],
+            stages);
+        var settled = await _db.PaymentLogs.SingleAsync(l => l.Stage == PaymentLogStage.Settled);
+        Assert.Equal((await _db.Bills.SingleAsync()).Code, settled.BillCode);
+        Assert.Equal(20_000, settled.ElapsedMs);
+        Assert.Equal(1, await _db.PaymentLogs.CountAsync(l => l.Stage == PaymentLogStage.WebhookReceived));
+    }
+
+    [Fact]
+    public async Task Rejected_callbacks_are_logged_with_the_reason()
+    {
+        var body = Payload("tx-rejected", AccountNumber, "TTABCDEFGH", 10_000);
+        var staleTimestamp = (_clock.GetUtcNow().ToUnixTimeSeconds() - 900).ToString();
+        await SendAsync(body, staleTimestamp, Sign(staleTimestamp, body));
+        var timestamp = Timestamp();
+        await SendAsync(body, timestamp, "sha256=" + new string('0', 64));
+        await SendAsync(body, null, null);
+
+        var rejected = await _db.PaymentLogs.Where(l => l.Stage == PaymentLogStage.WebhookRejected).OrderBy(l => l.OccurredAt).ThenBy(l => l.Id).ToListAsync();
+        Assert.Equal(3, rejected.Count);
+        Assert.All(rejected, l => Assert.Equal(PaymentLogLevel.Error, l.Level));
+        Assert.Contains("stale_timestamp", rejected[0].Detail);
+        Assert.Contains("bad_signature", rejected[1].Detail);
+        Assert.Contains("missing_headers", rejected[2].Detail);
+        Assert.DoesNotContain(Secret, string.Join("", rejected.Select(l => l.Detail)));
+        Assert.Empty(await _db.PaymentTransactions.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Wrong_code_field_falls_back_to_the_code_in_transfer_content()
+    {
+        var (manager, _, seat, plan, _) = await SeedCheckInAsync();
+        await new PaymentRequestService(_db, Options.Create(_options), _clock, new SessionService(_db, _clock), TestPaymentLog.For(_db, _clock))
+            .CreateCheckInAsync(manager, new CreateCheckInPaymentRequest(seat.Id, plan.Id, null), default);
+        var paymentRequest = await _db.PaymentRequests.SingleAsync();
+        var body = $$"""
+            {
+              "id": "tx-fallback",
+              "transactionDate": "2026-11-02 10:00:00",
+              "accountNumber": "{{AccountNumber}}",
+              "code": "TT1234",
+              "content": "NGUYEN VAN A CK {{paymentRequest.Code}} FT123",
+              "transferType": "in",
+              "transferAmount": 45000
+            }
+            """;
+        var timestamp = Timestamp();
+        await SendAsync(body, timestamp, Sign(timestamp, body));
+
+        Assert.Equal(PaymentRequestStatus.Paid, paymentRequest.Status);
+        var matched = await _db.PaymentLogs.SingleAsync(l => l.Stage == PaymentLogStage.CodeMatched);
+        Assert.Contains("\"matchedBy\":\"content\"", matched.Detail);
     }
 
     private static string Payload(string id, string accountNumber, string code, decimal amount) =>
