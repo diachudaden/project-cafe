@@ -59,7 +59,7 @@ export interface MyShift {
   date: string; type: ShiftType; startAt: string; endAt: string; phase: ShiftPhase; checkInAt: string | null; checkOutAt: string | null;
   canCheckIn: boolean; colleagues: Colleague[];
 }
-export interface OpenShift { shiftId: string; branchId: string; branchName: string; date: string; type: ShiftType; startAt: string; endAt: string; requiredStaff: number; acceptedCount: number }
+export interface OpenShift { shiftId: string; branchId: string; branchName: string; date: string; type: ShiftType; startAt: string; endAt: string; requiredStaff: number; acceptedCount: number; isMyBranch: boolean }
 export interface AttendanceView { id: string; shiftId: string; employeeId: string; checkInAt: string | null; checkOutAt: string | null; lateMinutes: number; isLate: boolean; approved: boolean }
 export interface AttendanceRow {
   attendanceId: string | null; shiftId: string; date: string; shiftType: ShiftType; shiftStart: string; shiftEnd: string;
@@ -181,6 +181,7 @@ export function createFeatureApi(http: Http) {
       approve: (attendanceId: string, approved: boolean) => post<AttendanceView>(`/api/attendances/${attendanceId}/approve`, { approved }),
     },
     workforce: {
+      allEmployees: () => get<EmployeeView[]>("/api/employees"),
       employees: (branchId: string) => get<EmployeeView[]>(`/api/branches/${branchId}/employees`),
       updateEmployee: (id: string, hourlyRate: number, nightAllowance: number) => put<EmployeeView>(`/api/employees/${id}`, { hourlyRate, nightAllowance }),
       setBranches: (id: string, branchIds: string[], homeBranchId: string) => put<EmployeeView>(`/api/employees/${id}/branches`, { branchIds, homeBranchId }),

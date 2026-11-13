@@ -66,9 +66,13 @@ export interface AdminUser {
   fullName: string;
   phoneNumber: string | null;
   lockoutEnd: string | null;
-}
-export interface AdminUserDetail extends AdminUser {
   roles: Role[];
+}
+export type AdminUserDetail = AdminUser;
+/** Filters for the account list: free text over name/email/phone and one or more roles. */
+export interface UserListFilter {
+  search?: string;
+  role?: Role[];
 }
 export interface CreateUserInput {
   email: string;
@@ -80,7 +84,8 @@ export interface CreateUserInput {
 export type UpdateUserInput = Omit<CreateUserInput, "password">;
 
 export interface CrudResource<T, TCreate, TUpdate = TCreate, TDetail = T> {
-  list(page: number, pageSize: number): Promise<Page<T>>;
+  /** Extra query parameters are sent as-is; arrays are joined with commas. */
+  list(page: number, pageSize: number, params?: Record<string, string | string[] | undefined>): Promise<Page<T>>;
   get(id: string): Promise<TDetail>;
   create(input: TCreate): Promise<TDetail>;
   update(id: string, input: TUpdate): Promise<TDetail>;
@@ -92,7 +97,14 @@ function crud<T, TCreate, TUpdate = TCreate, TDetail = T>(
   path: string,
 ): CrudResource<T, TCreate, TUpdate, TDetail> {
   return {
-    list: (page, pageSize) => http.request("GET", `${path}?page=${page}&pageSize=${pageSize}`),
+    list: (page, pageSize, params) => {
+      const search = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+      for (const [key, value] of Object.entries(params ?? {})) {
+        const text = Array.isArray(value) ? value.join(",") : value;
+        if (text) search.set(key, text);
+      }
+      return http.request("GET", `${path}?${search}`);
+    },
     get: (id) => http.request("GET", `${path}/${id}`),
     create: (input) => http.request("POST", path, input),
     update: (id, input) => http.request("PUT", `${path}/${id}`, input),

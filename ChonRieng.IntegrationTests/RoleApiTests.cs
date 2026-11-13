@@ -211,6 +211,59 @@ public sealed class RoleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.OK, (await factory.CreateClient().GetAsync("/swagger/v1/swagger.json")).StatusCode);
     }
 
+    [Fact]
+    public async Task Staff_see_and_claim_open_shifts_at_branches_they_are_not_linked_to()
+    {
+        var staffLogin = await LoginAsync("staff05.demo@cafecr.invalid");
+        var linked = staffLogin.GetProperty("user").GetProperty("branchIds").EnumerateArray().Select(b => b.GetGuid()).ToHashSet();
+        var branches = await factory.CreateClient().GetFromJsonAsync<JsonElement>("/api/branches", Json);
+        var otherBranch = branches.EnumerateArray().Select(b => b.GetProperty("id").GetGuid()).First(id => !linked.Contains(id));
+
+        var admin = await ClientAsync("admin01.demo@cafecr.invalid");
+        var date = Today.AddDays(120);
+        var weekStart = date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
+        var start = new DateTimeOffset(date.ToDateTime(new TimeOnly(3, 17)), TimeSpan.FromHours(7));
+        var created = await admin.PostAsJsonAsync("/api/shifts", new
+        {
+            branchId = otherBranch, date, type = "Morning", startAt = start, endAt = start.AddHours(4), requiredStaff = 1, isOpen = true,
+        }, Json);
+        created.EnsureSuccessStatusCode();
+        var shiftId = (await created.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("id").GetGuid();
+
+        var staff = await ClientAsync("staff05.demo@cafecr.invalid");
+        // Draft open shifts stay hidden until the week is published.
+        var beforePublish = await staff.GetFromJsonAsync<JsonElement>("/api/shifts/open", Json);
+        Assert.DoesNotContain(beforePublish.EnumerateArray(), s => s.GetProperty("shiftId").GetGuid() == shiftId);
+        (await admin.PostAsJsonAsync("/api/shifts/publish", new { branchId = otherBranch, weekStart }, Json)).EnsureSuccessStatusCode();
+
+        var open = await staff.GetFromJsonAsync<JsonElement>("/api/shifts/open", Json);
+        var listed = open.EnumerateArray().Single(s => s.GetProperty("shiftId").GetGuid() == shiftId);
+        Assert.False(listed.GetProperty("isMyBranch").GetBoolean());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await staff.PostAsync($"/api/shifts/{shiftId}/claim", null)).StatusCode);
+        var relogin = await LoginAsync("staff05.demo@cafecr.invalid");
+        Assert.Contains(relogin.GetProperty("user").GetProperty("branchIds").EnumerateArray(), b => b.GetGuid() == otherBranch);
+    }
+
+    [Fact]
+    public async Task Admin_user_list_filters_by_role_group_and_search_text()
+    {
+        var admin = await ClientAsync("admin01.demo@cafecr.invalid");
+
+        var staff = await admin.GetFromJsonAsync<JsonElement>("/api/admin/users?page=1&pageSize=100&role=Staff", Json);
+        Assert.NotEmpty(staff.GetProperty("items").EnumerateArray());
+        Assert.All(staff.GetProperty("items").EnumerateArray(),
+            u => Assert.Contains(u.GetProperty("roles").EnumerateArray(), r => r.GetString() == "Staff"));
+
+        var managers = await admin.GetFromJsonAsync<JsonElement>("/api/admin/users?page=1&pageSize=100&role=BranchManager,Admin", Json);
+        Assert.All(managers.GetProperty("items").EnumerateArray(),
+            u => Assert.Contains(u.GetProperty("roles").EnumerateArray(), r => r.GetString() is "BranchManager" or "Admin"));
+
+        var found = await admin.GetFromJsonAsync<JsonElement>("/api/admin/users?page=1&pageSize=100&search=STAFF01.DEMO", Json);
+        var single = Assert.Single(found.GetProperty("items").EnumerateArray());
+        Assert.Equal("staff01.demo@cafecr.invalid", single.GetProperty("email").GetString());
+    }
+
     private static DateOnly Today => DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7)).DateTime);
 
     private async Task<JsonElement> LoginAsync(string email)

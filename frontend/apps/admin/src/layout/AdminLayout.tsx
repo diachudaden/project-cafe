@@ -1,27 +1,31 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Layout, List, Menu, Popover, Select, Space, Typography, theme } from "antd";
+import {
+  ApartmentOutlined, AppstoreOutlined, BarChartOutlined, CalendarOutlined, ClockCircleOutlined, DashboardOutlined, DollarOutlined,
+  FileDoneOutlined, FormOutlined, SafetyCertificateOutlined, TagsOutlined, TeamOutlined, WalletOutlined,
+} from "@ant-design/icons";
 import { ThemeToggle, dateTime, hasRole, roleLabels } from "@cafecr/ui";
 import { api, useAuth } from "../api";
 import { useBranch } from "../branch/BranchContext";
 
 const managementMenu = [
-  { key: "/", label: "Tổng quan" },
-  { key: "/schedule", label: "Lịch ca" },
-  { key: "/requests", label: "Đơn từ" },
-  { key: "/attendance", label: "Chấm công" },
-  { key: "/closings", label: "Kết ca" },
-  { key: "/expenses", label: "Thu chi" },
-  { key: "/payroll", label: "Lương" },
-  { key: "/reports", label: "Báo cáo" },
-  { key: "/floor", label: "Sơ đồ chỗ ngồi" },
-  { key: "/pricing", label: "Bảng giá" },
-  { key: "/employees", label: "Nhân viên" },
+  { key: "/", icon: <DashboardOutlined />, label: "Tổng quan" },
+  { key: "/schedule", icon: <CalendarOutlined />, label: "Lịch ca" },
+  { key: "/requests", icon: <FormOutlined />, label: "Đơn từ" },
+  { key: "/attendance", icon: <ClockCircleOutlined />, label: "Chấm công" },
+  { key: "/closings", icon: <FileDoneOutlined />, label: "Kết ca" },
+  { key: "/expenses", icon: <WalletOutlined />, label: "Thu chi" },
+  { key: "/payroll", icon: <DollarOutlined />, label: "Lương" },
+  { key: "/reports", icon: <BarChartOutlined />, label: "Báo cáo" },
+  { key: "/floor", icon: <AppstoreOutlined />, label: "Sơ đồ chỗ ngồi" },
+  { key: "/pricing", icon: <TagsOutlined />, label: "Bảng giá" },
+  { key: "/employees", icon: <TeamOutlined />, label: "Nhân viên" },
 ];
 
 const adminMenu = [
-  { key: "/branches", label: "Chi nhánh" },
-  { key: "/users", label: "Tài khoản & vai trò" },
+  { key: "/branches", icon: <ApartmentOutlined />, label: "Chi nhánh" },
+  { key: "/users", icon: <SafetyCertificateOutlined />, label: "Tài khoản & vai trò" },
 ];
 
 function Notifications() {

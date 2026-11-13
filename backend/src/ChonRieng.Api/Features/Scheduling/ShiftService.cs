@@ -417,6 +417,11 @@ public sealed class ShiftService(AppDbContext db, TimeProvider clock)
         return new Done();
     }
 
+    /// <summary>
+    /// Open shifts form one chain-wide pool: every employee sees published open shifts of every active branch,
+    /// their own branches first. Before, only linked branches were listed, so a staff member linked to the main
+    /// branch never saw open shifts posted at the other branches.
+    /// </summary>
     public async Task<IReadOnlyList<OpenShiftView>> OpenShiftsAsync(CurrentUser user, CancellationToken ct)
     {
         var employee = await db.Employees.AsNoTracking().Include(e => e.Branches).SingleOrDefaultAsync(e => e.UserId == user.UserId, ct);
@@ -428,21 +433,23 @@ public sealed class ShiftService(AppDbContext db, TimeProvider clock)
         var branchIds = employee.Branches.Select(b => b.BranchId).ToList();
         var now = clock.GetUtcNow();
         return await db.Shifts.AsNoTracking()
-            .Where(s => s.IsOpen && s.Status == ShiftStatus.Published && s.StartAt > now && branchIds.Contains(s.BranchId)
+            .Where(s => s.IsOpen && s.Status == ShiftStatus.Published && s.StartAt > now && s.Branch.IsActive
                 && !s.Assignments.Any(a => a.EmployeeId == employee.Id && a.Status != ShiftAssignmentStatus.Declined)
                 && s.Assignments.Count(a => a.Status == ShiftAssignmentStatus.Accepted) < s.RequiredStaff)
-            .OrderBy(s => s.StartAt)
+            .OrderByDescending(s => branchIds.Contains(s.BranchId))
+            .ThenBy(s => s.StartAt)
             .Select(s => new OpenShiftView(s.Id, s.BranchId, s.Branch.Name, s.Date, s.Type, s.StartAt, s.EndAt, s.RequiredStaff,
-                s.Assignments.Count(a => a.Status == ShiftAssignmentStatus.Accepted)))
+                s.Assignments.Count(a => a.Status == ShiftAssignmentStatus.Accepted), branchIds.Contains(s.BranchId)))
             .Take(100)
             .ToListAsync(ct);
     }
 
     public async Task<Result<Done>> ClaimAsync(CurrentUser user, Guid shiftId, CancellationToken ct)
     {
-        var employee = await db.Employees.SingleOrDefaultAsync(e => e.UserId == user.UserId, ct);
-        var shift = await db.Shifts.Include(s => s.Assignments).SingleOrDefaultAsync(s => s.Id == shiftId, ct);
-        if (employee is null || shift is null || !shift.IsOpen || shift.Status != ShiftStatus.Published || shift.StartAt <= clock.GetUtcNow())
+        var employee = await db.Employees.Include(e => e.Branches).SingleOrDefaultAsync(e => e.UserId == user.UserId, ct);
+        var shift = await db.Shifts.Include(s => s.Assignments).Include(s => s.Branch).SingleOrDefaultAsync(s => s.Id == shiftId, ct);
+        if (employee is null || shift is null || !shift.IsOpen || shift.Status != ShiftStatus.Published || shift.StartAt <= clock.GetUtcNow()
+            || !shift.Branch.IsActive)
         {
             return ServiceError.NotFound("Không tìm thấy ca trống.");
         }
@@ -453,10 +460,17 @@ public sealed class ShiftService(AppDbContext db, TimeProvider clock)
             return ServiceError.Conflict("Ca đã đủ người", "Ca vừa được người khác nhận.");
         }
 
-        var violations = await CheckRulesAsync(employee.Id, shift, ct);
+        // Claiming an open shift at another branch links the employee to that branch, so the
+        // branch rule does not apply here (the remaining rules still do).
+        var violations = (await CheckRulesAsync(employee.Id, shift, ct)).Where(v => v.Rule != "branch").ToList();
         if (!ShiftConflictChecker.IsAllowed(violations, null))
         {
             return ServiceError.Conflict("Vi phạm quy tắc xếp ca", "Bạn không thể nhận ca này.", violations);
+        }
+
+        if (employee.Branches.All(b => b.BranchId != shift.BranchId))
+        {
+            db.EmployeeBranches.Add(new EmployeeBranch { EmployeeId = employee.Id, BranchId = shift.BranchId, IsHome = false });
         }
 
         var assignment = shift.Assignments.SingleOrDefault(a => a.EmployeeId == employee.Id)

@@ -20,6 +20,19 @@ public sealed class WorkforceService(AppDbContext db, ShiftService shifts, TimeP
         return Result<IReadOnlyList<EmployeeView>>.From(await QueryEmployees(db.Employees.Where(e => ids.Contains(e.Id)), ct));
     }
 
+    /// <summary>Every employee the caller manages: the whole chain for Admin, employees of the manager's branches otherwise.</summary>
+    public async Task<IReadOnlyList<EmployeeView>> ListAllEmployeesAsync(CurrentUser user, CancellationToken ct)
+    {
+        var query = db.Employees.AsQueryable();
+        if (!user.IsAdmin)
+        {
+            var scope = user.Scope.BranchIds.ToList();
+            query = query.Where(e => e.Branches.Any(b => scope.Contains(b.BranchId)));
+        }
+
+        return await QueryEmployees(query, ct);
+    }
+
     public async Task<Result<EmployeeView>> UpdateEmployeeAsync(CurrentUser user, Guid employeeId, UpdateEmployeeRequest request, CancellationToken ct)
     {
         var employee = await db.Employees.Include(e => e.Branches).SingleOrDefaultAsync(e => e.Id == employeeId, ct);

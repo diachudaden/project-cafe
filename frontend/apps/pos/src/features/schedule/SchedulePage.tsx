@@ -14,7 +14,7 @@ export function SchedulePage() {
   const queryClient = useQueryClient();
   const today = todayVn();
   const mine = useQuery({ queryKey: ["my-shifts", today], queryFn: () => api.shifts.mine(addDays(today, -1), addDays(today, 13)) });
-  const open = useQuery({ queryKey: ["open-shifts"], queryFn: api.shifts.open });
+  const open = useQuery({ queryKey: ["open-shifts"], queryFn: api.shifts.open, refetchInterval: 60_000 });
   const requests = useQuery({ queryKey: ["my-requests"], queryFn: api.workforce.myRequests });
   const refresh = () => void queryClient.invalidateQueries();
   const [declining, setDeclining] = useState<MyShift | null>(null);
@@ -59,7 +59,7 @@ export function SchedulePage() {
             <List size="small" dataSource={open.data} locale={{ emptyText: "Không có ca trống." }}
               renderItem={(s) => (
                 <List.Item actions={[<Button key="c" size="middle" type="primary" loading={claim.isPending} onClick={() => claim.mutate(s.shiftId)}>Nhận</Button>]}>
-                  {dayMonth(s.date)} {shiftTypeLabels[s.type]} {time(s.startAt)}–{time(s.endAt)} · {s.branchName.replace("[DEMO DATA] ", "")} ({s.acceptedCount}/{s.requiredStaff})
+                  {dayMonth(s.date)} {shiftTypeLabels[s.type]} {time(s.startAt)}–{time(s.endAt)} · {s.branchName.replace("[DEMO DATA] ", "")} ({s.acceptedCount}/{s.requiredStaff}) {!s.isMyBranch && <Tag color="purple">Chi nhánh khác</Tag>}
                 </List.Item>
               )} />
           </Card>

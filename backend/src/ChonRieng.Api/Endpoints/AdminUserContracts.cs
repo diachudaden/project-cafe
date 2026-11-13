@@ -4,7 +4,7 @@ using System.ComponentModel;
 namespace ChonRieng.Api.Endpoints;
 
 /// <summary>Thông tin an toàn của tài khoản trong danh sách quản trị.</summary>
-public sealed record AdminUserResponse(Guid Id, string Email, string FullName, string? PhoneNumber, DateTimeOffset? LockoutEnd);
+public sealed record AdminUserResponse(Guid Id, string Email, string FullName, string? PhoneNumber, DateTimeOffset? LockoutEnd, IReadOnlyList<string> Roles);
 
 /// <summary>Thông tin an toàn và vai trò của tài khoản dành cho quản trị viên.</summary>
 public sealed record AdminUserDetailResponse(Guid Id, string Email, string FullName, string? PhoneNumber, DateTimeOffset? LockoutEnd, IReadOnlyList<string> Roles);

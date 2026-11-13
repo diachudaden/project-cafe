@@ -112,7 +112,8 @@ public sealed record OpenShiftView(
     DateTimeOffset StartAt,
     DateTimeOffset EndAt,
     int RequiredStaff,
-    int AcceptedCount);
+    int AcceptedCount,
+    [property: Description("Ca thuộc chi nhánh nhân viên đã được gán; ca ở chi nhánh khác vẫn nhận được và sẽ tự gán chi nhánh.")] bool IsMyBranch);
 
 public sealed record CheckInRequest(Guid ShiftId);
 

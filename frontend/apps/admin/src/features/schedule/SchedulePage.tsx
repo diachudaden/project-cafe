@@ -103,7 +103,7 @@ function ShiftCard({ shift, onClick }: { shift: ShiftView; onClick: () => void }
       styles={{ body: { padding: 8 } }}
     >
       <Typography.Text strong>{shiftTypeLabels[shift.type]}</Typography.Text> <Typography.Text type="secondary">{time(shift.startAt)}–{time(shift.endAt)}</Typography.Text>
-      <div><Tag color={phase.color}>{phase.label}</Tag>{shift.isOpen && <Tag color="orange">Ca trống</Tag>}</div>
+      <div><Tag color={phase.color}>{phase.label}</Tag>{shift.isOpen && <Tag color="orange" title={shift.status === "Draft" ? "Nhân viên chỉ thấy ca trống sau khi công bố lịch tuần." : undefined}>{shift.status === "Draft" ? "Ca trống · chưa công bố" : "Ca trống"}</Tag>}</div>
       {shift.assignments.map((a) => (
         <div key={a.id} style={{ fontSize: 12 }}>
           <Tag color={assignmentLabels[a.status].color} style={{ marginRight: 4 }}>{assignmentLabels[a.status].label}</Tag>{a.employeeName.replace("[DEMO DATA] ", "")}

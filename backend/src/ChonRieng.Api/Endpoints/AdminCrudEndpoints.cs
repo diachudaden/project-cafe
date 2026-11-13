@@ -191,7 +191,9 @@ public static class AdminCrudEndpoints
         users.MapGet("/", async (
             int? page,
             int? pageSize,
-            UserManager<User> userManager,
+            string? search,
+            string? role,
+            AppDbContext dbContext,
             CancellationToken cancellationToken) =>
         {
             var currentPage = page ?? 1;
@@ -212,18 +214,48 @@ public static class AdminCrudEndpoints
                     detail: "Số trang yêu cầu vượt quá giới hạn hỗ trợ.");
             }
 
-            var pageUsers = await userManager.Users
-                .AsNoTracking()
-                .OrderBy(user => user.Id)
+            var query = dbContext.Users.AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                // Case-insensitive match on name, email or phone; phone also matches without spaces/dots.
+                var term = search.Trim().ToLower();
+                var digits = new string(term.Where(char.IsDigit).ToArray());
+                query = query.Where(user => user.FullName.ToLower().Contains(term)
+                    || (user.Email != null && user.Email.ToLower().Contains(term))
+                    || (user.PhoneNumber != null && (user.PhoneNumber.Contains(term)
+                        || (digits.Length > 0 && user.PhoneNumber.Replace(" ", "").Replace(".", "").Replace("-", "").Contains(digits)))));
+            }
+
+            var roleNames = (role ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (roleNames.Length > 0)
+            {
+                var roleIds = dbContext.Roles.Where(r => roleNames.Contains(r.Name!)).Select(r => r.Id);
+                query = query.Where(user => dbContext.UserRoles.Any(ur => ur.UserId == user.Id && roleIds.Contains(ur.RoleId)));
+            }
+
+            var rows = await query
+                .OrderBy(user => user.FullName).ThenBy(user => user.Id)
                 .Skip((currentPage - 1) * currentPageSize)
                 .Take(currentPageSize)
-                .Select(user => new AdminUserResponse(user.Id, user.Email ?? "", user.FullName, user.PhoneNumber, user.LockoutEnd))
+                .Select(user => new
+                {
+                    user.Id,
+                    Email = user.Email ?? "",
+                    user.FullName,
+                    user.PhoneNumber,
+                    user.LockoutEnd,
+                    Roles = dbContext.UserRoles.Where(ur => ur.UserId == user.Id)
+                        .Join(dbContext.Roles, ur => ur.RoleId, r => r.Id, (_, r) => r.Name!).ToList(),
+                })
                 .ToArrayAsync(cancellationToken);
+            var pageUsers = rows
+                .Select(user => new AdminUserResponse(user.Id, user.Email, user.FullName, user.PhoneNumber, user.LockoutEnd, user.Roles))
+                .ToArray();
             return Results.Ok(new PageResponse<AdminUserResponse>(currentPage, currentPageSize, pageUsers));
         })
             .WithName("ListUsers")
             .WithSummary("Liệt kê tài khoản")
-            .WithDescription("Trả về danh sách tài khoản có phân trang; không bao gồm mật khẩu, mã băm hoặc trường bảo mật của Identity.")
+            .WithDescription("Trả về danh sách tài khoản có phân trang kèm vai trò; lọc theo search (họ tên, email, số điện thoại) và role (một hoặc nhiều vai trò, phân tách bằng dấu phẩy). Không bao gồm mật khẩu, mã băm hoặc trường bảo mật của Identity.")
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest);
 
         users.MapGet("/{id:guid}", async Task<Results<Ok<AdminUserDetailResponse>, NotFound>> (

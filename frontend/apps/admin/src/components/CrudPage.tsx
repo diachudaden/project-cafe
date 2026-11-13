@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Card, Form, Modal, Popconfirm, Space, Table, type TableColumnsType } from "antd";
 import { ApiError, type CrudResource } from "@cafecr/api-client";
@@ -17,6 +17,10 @@ interface CrudPageProps<T extends { id: string }, TForm, TCreate, TUpdate, TDeta
   toFormValues: (item: T) => TForm | Promise<TForm>;
   toCreate: (values: TForm) => TCreate;
   toUpdate: (values: TForm) => TUpdate;
+  /** Extra list query parameters (filters); changing them goes back to page 1. */
+  listParams?: Record<string, string | string[] | undefined>;
+  /** Filter controls shown above the table. */
+  toolbar?: ReactNode;
 }
 
 // Backend validation keys are PascalCase DTO property names ("Name", "OpenTime").
@@ -32,9 +36,13 @@ export function CrudPage<T extends { id: string }, TForm extends object, TCreate
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<{ mode: "create" } | { mode: "edit"; id: string } | null>(null);
 
+  const paramsKey = JSON.stringify(props.listParams ?? {});
+  useEffect(() => setPage(1), [paramsKey]);
+
   const list = useQuery({
-    queryKey: [queryKey, page],
-    queryFn: () => resource.list(page, PAGE_SIZE),
+    queryKey: [queryKey, page, paramsKey],
+    queryFn: () => resource.list(page, PAGE_SIZE, props.listParams),
+    placeholderData: (previous) => previous,
   });
 
   const save = useMutation({
@@ -98,11 +106,12 @@ export function CrudPage<T extends { id: string }, TForm extends object, TCreate
         </Button>
       }
     >
+      {props.toolbar && <div style={{ marginBottom: 16 }}>{props.toolbar}</div>}
       <Table<T>
         rowKey="id"
         size="middle"
         scroll={{ x: "max-content" }}
-        loading={list.isLoading}
+        loading={list.isFetching}
         dataSource={items}
         pagination={false}
         locale={list.isError ? { emptyText: list.error.message } : undefined}

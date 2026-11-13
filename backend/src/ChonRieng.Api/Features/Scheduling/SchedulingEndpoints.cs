@@ -164,6 +164,12 @@ public static class SchedulingEndpoints
                 (await service.ListEmployeesAsync(CurrentUser.From(user), branchId, ct)).ToHttp())
             .WithName("ListBranchEmployees").WithSummary("Nhân viên của chi nhánh");
 
+        employees.MapGet("/employees", async (ClaimsPrincipal user, WorkforceService service, CancellationToken ct) =>
+                TypedResults.Ok(await service.ListAllEmployeesAsync(CurrentUser.From(user), ct)))
+            .WithName("ListAllEmployees")
+            .WithSummary("Tất cả nhân viên trong phạm vi quản lý")
+            .WithDescription("Admin thấy toàn chuỗi; BranchManager thấy nhân viên thuộc các chi nhánh mình quản lý.");
+
         employees.MapPut("/employees/{employeeId:guid}", async (Guid employeeId, UpdateEmployeeRequest request, ClaimsPrincipal user, WorkforceService service, CancellationToken ct) =>
                 (await service.UpdateEmployeeAsync(CurrentUser.From(user), employeeId, request, ct)).ToHttp())
             .WithName("UpdateEmployee")
