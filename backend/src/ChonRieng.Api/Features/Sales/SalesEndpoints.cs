@@ -23,6 +23,19 @@ public static class SalesEndpoints
             .WithSummary("Gia hạn thêm một lượt")
             .WithDescription("Cộng thời lượng của bảng giá vào giờ kết thúc và cộng giá gia hạn vào cùng hóa đơn.");
 
+        sessions.MapPost("/{sessionId:guid}/items", async (Guid sessionId, AddOnSaleRequest request, ClaimsPrincipal user, AddOnService service, CancellationToken ct) =>
+                (await service.SellCashAsync(CurrentUser.From(user), sessionId, request, ct)).ToHttp())
+            .WithName("SellAddOnItems")
+            .WithSummary("Bán đồ thêm (tiền mặt)")
+            .WithDescription("Thêm các món (mì, trứng, bánh...) vào hóa đơn của lượt đang diễn ra; giá lấy từ thực đơn hiện tại và được lưu lại trên từng dòng. Không ảnh hưởng thời gian ngồi.");
+
+        sessions.MapPost("/{sessionId:guid}/items/payment-request", async (Guid sessionId, AddOnSaleRequest request, ClaimsPrincipal user, PaymentRequestService service, CancellationToken ct) =>
+                (await service.CreateAddOnAsync(CurrentUser.From(user), sessionId, request, ct)).ToHttp())
+            .WithTags("Thanh toán")
+            .WithName("CreateAddOnPaymentRequest")
+            .WithSummary("Tạo QR VietQR cho đồ thêm")
+            .WithDescription("Số tiền do máy chủ tính từ thực đơn; các món được thêm vào hóa đơn khi SePay xác nhận thanh toán.");
+
         sessions.MapPost("/{sessionId:guid}/close", async (Guid sessionId, ClaimsPrincipal user, SessionService service, CancellationToken ct) =>
                 (await service.CloseAsync(CurrentUser.From(user), sessionId, ct)).ToHttp())
             .WithName("CloseSession").WithSummary("Trả chỗ (check-out)");

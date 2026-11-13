@@ -19,6 +19,7 @@ public static class FeatureRegistration
         services.AddScoped<AttendanceService>();
         services.AddScoped<WorkforceService>();
         services.AddScoped<SessionService>();
+        services.AddScoped<AddOnService>();
         services.AddScoped<PaymentRequestService>();
         services.AddScoped<SePayWebhookService>();
         services.AddSingleton<PaymentLogService>();

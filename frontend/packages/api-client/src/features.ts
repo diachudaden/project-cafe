@@ -80,12 +80,17 @@ export interface AvailabilitySlot { isRecurring: boolean; dayOfWeek: string | nu
 export interface AssistantEmployee { employeeId: string; fullName: string; availability: AvailabilitySlot[]; busy: { shiftId: string; branchId: string; startAt: string; endAt: string }[]; hoursThisRange: number }
 
 // ---- Sales ----
+export interface ProductView { id: string; branchId: string | null; name: string; category: string; price: number; isActive: boolean; sortOrder: number }
+export type ProductInput = Omit<ProductView, "id">;
+export interface AddOnLine { productId: string; quantity: number }
+export interface BillItemView { id: string; name: string; unitPrice: number; quantity: number; amount: number; paymentMethod: PaymentMethod; createdAt: string }
 export interface SessionView {
   id: string; branchId: string; seatId: string; seatCode: string; pricePlanId: string; planName: string; startAt: string; endAt: string;
   status: SessionStatus; minutesLeft: number; extensionCount: number;
   customer: { id: string; fullName: string; tier: string } | null;
   bill: { id: string; code: string; total: number; paymentMethod: PaymentMethod; claimed: boolean; createdAt: string };
   pointsAwarded: number;
+  items: BillItemView[];
 }
 export const paymentLogStages = [
   "RequestCreated", "StatusPolled", "WebhookReceived", "WebhookRejected", "WebhookDuplicate", "TransactionRecorded",
@@ -184,6 +189,11 @@ export function createFeatureApi(http: Http) {
       setMaintenance: (seatId: string, maintenance: boolean) => put<SeatView>(`/api/seats/${seatId}/maintenance`, { maintenance }),
       createPlan: (input: PlanInput) => post<PricePlanView>("/api/price-plans", input),
       updatePlan: (id: string, input: PlanInput) => put<PricePlanView>(`/api/price-plans/${id}`, input),
+      products: (branchId: string) => get<ProductView[]>(`/api/branches/${branchId}/products`),
+      allProducts: (branchId: string) => get<ProductView[]>(`/api/branches/${branchId}/products/all`),
+      createProduct: (input: ProductInput) => post<ProductView>("/api/products", input),
+      updateProduct: (id: string, input: ProductInput) => put<ProductView>(`/api/products/${id}`, input),
+      deleteProduct: (id: string) => del(`/api/products/${id}`),
     },
     shifts: {
       list: (branchId: string, from: string, to: string) => get<ShiftView[]>(`/api/shifts${query({ branchId, from, to })}`),
@@ -231,6 +241,7 @@ export function createFeatureApi(http: Http) {
       checkIn: (input: { seatId: string; pricePlanId: string; paymentMethod: PaymentMethod; customerId?: string | null }) => post<SessionView>("/api/sessions", input),
       extend: (id: string) => post<SessionView>(`/api/sessions/${id}/extend`),
       close: (id: string) => post<SessionView>(`/api/sessions/${id}/close`),
+      sellItems: (id: string, items: AddOnLine[]) => post<BillItemView[]>(`/api/sessions/${id}/items`, { items }),
       active: (branchId: string) => get<SessionView[]>(`/api/branches/${branchId}/sessions/active`),
       bill: (code: string) => get<SessionView>(`/api/bills/${encodeURIComponent(code)}`),
       lookupCustomer: (q: string) => get<CustomerLookup[]>(`/api/customers/lookup${query({ q })}`),
@@ -238,6 +249,8 @@ export function createFeatureApi(http: Http) {
     payments: {
       createCheckIn: (input: { seatId: string; pricePlanId: string; customerId?: string | null }) =>
         post<PaymentRequestView>("/api/payments/requests", input),
+      createAddOn: (sessionId: string, items: AddOnLine[]) =>
+        post<PaymentRequestView>(`/api/sessions/${sessionId}/items/payment-request`, { items }),
       createExtension: (sessionId: string) =>
         post<PaymentRequestView>(`/api/sessions/${sessionId}/extend/payment-request`),
       status: (code: string) => get<PaymentRequestStatusView>(`/api/payments/${encodeURIComponent(code)}`),

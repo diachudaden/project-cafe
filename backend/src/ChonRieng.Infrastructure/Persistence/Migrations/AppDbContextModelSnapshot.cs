@@ -159,6 +159,53 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.ToTable("Bills", (string)null);
                 });
 
+            modelBuilder.Entity("ChonRieng.Domain.Entities.BillItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(12,0)");
+
+                    b.Property<Guid>("BillId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte>("PaymentMethod")
+                        .HasColumnType("tinyint");
+
+                    b.Property<Guid?>("PaymentRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(12,0)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BillId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("BillItems", (string)null);
+                });
+
             modelBuilder.Entity("ChonRieng.Domain.Entities.Branch", b =>
                 {
                     b.Property<Guid>("Id")
@@ -493,6 +540,10 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("Items")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
                     b.Property<byte>("Kind")
                         .HasColumnType("tinyint");
 
@@ -725,6 +776,44 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.HasIndex("BranchId");
 
                     b.ToTable("PricePlans", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.Product", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BranchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(12,0)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId", "IsActive");
+
+                    b.ToTable("Products", (string)null);
                 });
 
             modelBuilder.Entity("ChonRieng.Domain.Entities.Seat", b =>
@@ -1355,6 +1444,24 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Navigation("Shift");
                 });
 
+            modelBuilder.Entity("ChonRieng.Domain.Entities.BillItem", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.Bill", "Bill")
+                        .WithMany("Items")
+                        .HasForeignKey("BillId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChonRieng.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Bill");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("ChonRieng.Domain.Entities.Customer", b =>
                 {
                     b.HasOne("ChonRieng.Domain.Entities.User", "User")
@@ -1524,6 +1631,16 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                 {
                     b.HasOne("ChonRieng.Domain.Entities.Branch", "Branch")
                         .WithMany("PricePlans")
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Branch");
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.Product", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.Branch", "Branch")
+                        .WithMany()
                         .HasForeignKey("BranchId")
                         .OnDelete(DeleteBehavior.Restrict);
 
@@ -1742,6 +1859,8 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ChonRieng.Domain.Entities.Bill", b =>
                 {
+                    b.Navigation("Items");
+
                     b.Navigation("PointTransactions");
                 });
 

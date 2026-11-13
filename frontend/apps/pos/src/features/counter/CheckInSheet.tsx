@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Drawer, Input, List, Modal, Radio, Result, Space, Tag, Typography } from "antd";
-import type { CustomerLookup, FloorSeat, PaymentMethod, SessionView } from "@cafecr/api-client";
+import { Button, Drawer, Input, List, Modal, Radio, Result, Select, Space, Tag, Typography } from "antd";
+import type { CustomerLookup, FloorSeat, PaymentMethod, PricePlanView, SessionView } from "@cafecr/api-client";
 import { paymentLabels, seatTypeLabels, tierLabels, time, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
+import { AddOnSheet } from "./AddOnSheet";
 import { PaymentRequestModal } from "./PaymentRequestModal";
+
+const hours = (minutes: number) => `${Number((minutes / 60).toFixed(2))} tiếng`;
+const planLabel = (p: PricePlanView) => `${p.name.replace(/^\[DEMO( ONLY)?\]\s*/, "")} · ${hours(p.durationMinutes)} · ${vnd(p.price)}`;
 
 /** Tap a free seat → choose plan / member / payment → "Thu tiền" (3 taps for a walk-in). */
 export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; seat: FloorSeat; onClose: () => void }) {
@@ -18,6 +22,7 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
   const [members, setMembers] = useState<CustomerLookup[] | null>(null);
   const [member, setMember] = useState<CustomerLookup | null>(null);
   const [done, setDone] = useState<SessionView | null>(null);
+  const [addingItems, setAddingItems] = useState(false);
   const [paymentRequest, setPaymentRequest] = useState<Awaited<ReturnType<typeof api.payments.createCheckIn>> | null>(null);
   const plan = plans.data?.find((p) => p.id === (planId ?? plans.data?.[0]?.id));
 
@@ -54,7 +59,7 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
         branchId={branchId}
         request={paymentRequest}
         title={`Thanh toán check-in ${seat.code}`}
-        description={`${seat.code} · ${plan?.durationMinutes ? `${plan.durationMinutes / 60} tiếng` : "Check-in"}`}
+        description={plan ? `${seat.code} · ${planLabel(plan)}` : `${seat.code} · Check-in`}
         onClose={() => {
           setPaymentRequest(null);
           void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
@@ -63,9 +68,19 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
     );
   }
 
+  if (done && addingItems) {
+    return <AddOnSheet branchId={branchId} sessionId={done.id} seatCode={done.seatCode} onClose={onClose} />;
+  }
+
   if (done) {
     return (
-      <Modal open footer={<Button type="primary" size="large" onClick={onClose}>Xong</Button>} onCancel={onClose}>
+      <Modal open onCancel={onClose}
+        footer={
+          <Space>
+            <Button size="large" onClick={() => setAddingItems(true)}>Thêm đồ ăn / uống</Button>
+            <Button type="primary" size="large" onClick={onClose}>Xong</Button>
+          </Space>
+        }>
         <Result status="success" title={`Đã check-in ${done.seatCode}`}
           subTitle={`${vnd(done.bill.total)} · ${paymentLabels[done.bill.paymentMethod]} · đến ${time(done.endAt)}`}
           extra={
@@ -83,9 +98,24 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
     <Drawer open placement="bottom" height="auto" onClose={onClose} title={`Check-in ${seat.code} · ${seatTypeLabels[seat.type]}`}>
       <Space direction="vertical" style={{ width: "100%" }} size="large">
         <div>
-          <Typography.Text strong>Gói</Typography.Text>
-          <Radio.Group block optionType="button" buttonStyle="solid" value={plan?.id} onChange={(e) => setPlanId(e.target.value)}
-            options={(plans.data ?? []).map((p) => ({ value: p.id, label: `${p.durationMinutes / 60} tiếng – ${vnd(p.price)}` }))} />
+          <Typography.Text strong>Gói ({plans.data?.length ?? 0})</Typography.Text>
+          <Select
+            size="large"
+            showSearch
+            optionFilterProp="label"
+            style={{ width: "100%" }}
+            loading={plans.isLoading}
+            placeholder="Chọn gói"
+            notFoundContent="Chi nhánh chưa có gói nào đang áp dụng."
+            value={plan?.id}
+            onChange={setPlanId}
+            options={(plans.data ?? []).map((p) => ({ value: p.id, label: planLabel(p) }))}
+          />
+          {plan && (
+            <Typography.Text type="secondary">
+              {plan.branchId ? "Giá riêng chi nhánh" : "Giá toàn chuỗi"} · gia hạn {vnd(plan.extendPrice)} / {hours(plan.durationMinutes)}
+            </Typography.Text>
+          )}
         </div>
         <div>
           <Typography.Text strong>Thành viên (tùy chọn)</Typography.Text>

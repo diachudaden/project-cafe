@@ -19,6 +19,8 @@ public sealed class PaymentRequest : Entity
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? PaidAt { get; set; }
     public Guid? BillId { get; set; }
+    /// <summary>AddOn requests only: JSON snapshot of the lines (product id, name, unit price, quantity) being paid for.</summary>
+    public string? Items { get; set; }
     public byte[] RowVersion { get; set; } = [];
 
     public Branch Branch { get; set; } = null!;

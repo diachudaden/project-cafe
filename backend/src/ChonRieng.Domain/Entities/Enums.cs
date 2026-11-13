@@ -53,6 +53,7 @@ public enum PaymentRequestKind : byte
 {
     CheckIn = 1,
     Extension = 2,
+    AddOn = 3,
 }
 
 public enum PaymentRequestStatus : byte

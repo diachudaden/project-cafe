@@ -14,7 +14,8 @@ public sealed class PaymentRequestService(
     IOptions<PaymentOptions> options,
     TimeProvider clock,
     SessionService sessions,
-    PaymentLogService paymentLog)
+    PaymentLogService paymentLog,
+    AddOnService? addOns = null)
 {
     /// <summary>POS polls every few seconds; a poll is logged on status change or at most this often.</summary>
     private static readonly TimeSpan PollLogInterval = TimeSpan.FromSeconds(30);
@@ -52,6 +53,26 @@ public sealed class PaymentRequestService(
 
         await ExpirePendingForSeatAsync(context.Value!.SeatId, ct);
         context = await sessions.PrepareExtensionPaymentAsync(user, sessionId, ct);
+        if (context.Error is not null)
+        {
+            return context.Error;
+        }
+
+        return await CreateAsync(user, context.Value!, ct);
+    }
+
+    public async Task<Result<CreatePaymentRequestResponse>> CreateAddOnAsync(
+        CurrentUser user, Guid sessionId, AddOnSaleRequest request, CancellationToken ct)
+    {
+        var service = addOns ?? new AddOnService(db, clock);
+        var context = await service.PreparePaymentAsync(user, sessionId, request, ct);
+        if (context.Error is not null)
+        {
+            return context.Error;
+        }
+
+        await ExpirePendingForSeatAsync(context.Value!.SeatId, ct);
+        context = await service.PreparePaymentAsync(user, sessionId, request, ct);
         if (context.Error is not null)
         {
             return context.Error;
@@ -163,6 +184,7 @@ public sealed class PaymentRequestService(
             ExpiresAt = now.AddMinutes(_options.HoldMinutes),
             CreatedByUserId = user.UserId,
             CreatedAt = now,
+            Items = context.Items,
         };
 
         db.PaymentRequests.Add(paymentRequest);
@@ -177,7 +199,12 @@ public sealed class PaymentRequestService(
         }
 
         await paymentLog.WriteAsync(new PaymentLogEntry(PaymentLogStage.RequestCreated,
-            paymentRequest.Kind == PaymentRequestKind.CheckIn ? "Tạo mã QR thanh toán check-in." : "Tạo mã QR thanh toán gia hạn.")
+            paymentRequest.Kind switch
+            {
+                PaymentRequestKind.CheckIn => "Tạo mã QR thanh toán check-in.",
+                PaymentRequestKind.AddOn => "Tạo mã QR thanh toán đồ thêm.",
+                _ => "Tạo mã QR thanh toán gia hạn.",
+            })
         {
             Request = paymentRequest,
             Detail = new

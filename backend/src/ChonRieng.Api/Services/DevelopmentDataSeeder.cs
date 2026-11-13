@@ -122,6 +122,7 @@ public static class DevelopmentDataSeeder
         var (branchA, branchB) = (branches[0], branches[1]);
         await EnsureFloorAsync(dbContext, branches, cancellationToken);
         await EnsurePricePlansAsync(dbContext, branches, now, cancellationToken);
+        await EnsureProductsAsync(dbContext, now, cancellationToken);
 
         // Original TASK-005 accounts, unchanged.
         var manager = await EnsureSeedUserAsync(userManager, ManagerEmail, "[DEMO DATA] Branch Manager", BusinessRoles.BranchManager, password);
@@ -288,6 +289,31 @@ public static class DevelopmentDataSeeder
         await EnsurePlanAsync(dbContext, branches[2].Id, "[DEMO ONLY] Gói 4 tiếng chi nhánh C - giá mẫu", 40_000m, 35_000m, null, null, cancellationToken);
         await EnsurePlanAsync(dbContext, branches[3].Id, "[DEMO ONLY] Khuyến mãi đã hết hạn - giá mẫu", 30_000m, 30_000m,
             now.AddMonths(-3), now.AddMonths(-2), cancellationToken);
+    }
+
+    /// <summary>Chain-wide add-on menu (TASK-021); idempotent by name.</summary>
+    private static async Task EnsureProductsAsync(AppDbContext dbContext, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        (string Name, string Category, decimal Price, int Order)[] menu =
+        [
+            ("[DEMO] Mì ly", "Đồ ăn", 15_000m, 1),
+            ("[DEMO] Trứng ốp la", "Đồ ăn", 8_000m, 2),
+            ("[DEMO] Bánh ngọt", "Đồ ăn", 20_000m, 3),
+            ("[DEMO] Nước suối", "Đồ uống", 10_000m, 1),
+            ("[DEMO] Cà phê sữa", "Đồ uống", 25_000m, 2),
+        ];
+        foreach (var item in menu)
+        {
+            if (!await dbContext.Products.AnyAsync(p => p.BranchId == null && p.Name == item.Name, cancellationToken))
+            {
+                dbContext.Products.Add(new Product
+                {
+                    Name = item.Name, Category = item.Category, Price = item.Price, SortOrder = item.Order, IsActive = true, CreatedAt = now,
+                });
+            }
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task EnsurePlanAsync(AppDbContext dbContext, Guid? branchId, string name, decimal price, decimal extendPrice,

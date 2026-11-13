@@ -49,16 +49,18 @@ public sealed class CatalogService(AppDbContext db, TimeProvider clock)
     }
 
     /// <summary>
-    /// Plans valid now for the branch. A branch-specific plan overrides a chain-wide plan
-    /// with the same duration (decision D4).
+    /// Every plan valid now for the branch: the branch's own plans first, then chain-wide ones, each by duration and price.
+    /// (Decision D4 originally kept one plan per duration; branches now sell several plans of the same length,
+    /// e.g. student / member / promo 4-hour plans, so all of them are offered.)
     /// </summary>
     public static IReadOnlyList<PricePlan> ResolveActivePlans(IEnumerable<PricePlan> plans, Guid branchId, DateTimeOffset now)
     {
         return plans
             .Where(p => (p.BranchId is null || p.BranchId == branchId) && IsValidAt(p, now))
-            .GroupBy(p => p.DurationMinutes)
-            .Select(g => g.OrderByDescending(p => p.BranchId is not null).ThenBy(p => p.Price).First())
-            .OrderBy(p => p.DurationMinutes)
+            .OrderByDescending(p => p.BranchId is not null)
+            .ThenBy(p => p.DurationMinutes)
+            .ThenBy(p => p.Price)
+            .ThenBy(p => p.Name)
             .ToList();
     }
 

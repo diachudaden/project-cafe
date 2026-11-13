@@ -432,9 +432,12 @@ public sealed class SePayWebhookService(
         transaction.MatchStatus = PaymentMatchStatus.Matched;
         transaction.Note = "Thanh toán khớp và đã hoàn tất.";
         _pending.Add(new PaymentLogEntry(PaymentLogStage.Settled,
-            paymentRequest.Kind == PaymentRequestKind.CheckIn
-                ? $"Đã tạo bill {outcome.BillCode} cho chỗ {outcome.SeatCode}."
-                : $"Đã gia hạn lượt ngồi, bill {outcome.BillCode}.")
+            paymentRequest.Kind switch
+            {
+                PaymentRequestKind.CheckIn => $"Đã tạo bill {outcome.BillCode} cho chỗ {outcome.SeatCode}.",
+                PaymentRequestKind.AddOn => $"Đã thêm đồ vào bill {outcome.BillCode} ({outcome.SeatCode}).",
+                _ => $"Đã gia hạn lượt ngồi, bill {outcome.BillCode}.",
+            })
         {
             Request = paymentRequest,
             Transaction = transaction,

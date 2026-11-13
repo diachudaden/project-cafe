@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Descriptions, Drawer, Modal, Radio, Space, Typography } from "antd";
+import { Button, Descriptions, Divider, Drawer, List, Modal, Radio, Space, Tag, Typography } from "antd";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { FloorSeat, PaymentMethod } from "@cafecr/api-client";
 import { minutesLeftText, paymentLabels, seatStateStyles, time, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
+import { AddOnSheet } from "./AddOnSheet";
 import { PaymentRequestModal } from "./PaymentRequestModal";
 
 /** One tap to extend or free a seat; money actions always confirm first. */
@@ -15,8 +16,13 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
   const [payment, setPayment] = useState<PaymentMethod>("Cash");
   const [paymentRequest, setPaymentRequest] = useState<Awaited<ReturnType<typeof api.payments.createExtension>> | null>(null);
   const session = seat.session!;
+  const [addingItems, setAddingItems] = useState(false);
   const plans = useQuery({ queryKey: ["active-plans", branchId], queryFn: () => api.catalog.activePlans(branchId) });
-  const extendPrice = plans.data?.[0]?.extendPrice;
+  // The bill view carries the session's own plan and its add-on lines.
+  const bill = useQuery({ queryKey: ["seat-bill", session.billCode], queryFn: () => api.sessions.bill(session.billCode) });
+  const sessionPlan = plans.data?.find((p) => p.id === bill.data?.pricePlanId);
+  const extendPrice = sessionPlan?.extendPrice;
+  const extendHours = sessionPlan ? `${Number((sessionPlan.durationMinutes / 60).toFixed(2))} tiếng` : "1 lượt";
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
     void queryClient.invalidateQueries({ queryKey: ["current-shift"] });
@@ -38,6 +44,10 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
   });
   const style = seatStateStyles[seat.state];
 
+  if (addingItems) {
+    return <AddOnSheet branchId={branchId} sessionId={session.sessionId} seatCode={seat.code} onClose={() => { setAddingItems(false); void bill.refetch(); }} />;
+  }
+
   if (paymentRequest) {
     return <PaymentRequestModal
       branchId={branchId}
@@ -57,9 +67,24 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
       <Descriptions column={1} size="small" items={[
         { label: "Thời gian", children: `${time(session.startAt)} → ${time(session.endAt)} (${minutesLeftText(session.minutesLeft)})` },
         { label: "Khách", children: session.customerName ?? "Khách lẻ" },
-        { label: "Bill", children: `${session.billCode} · ${vnd(session.billTotal)}` },
+        { label: "Gói", children: bill.data?.planName.replace(/^\[DEMO( ONLY)?\]\s*/, "") ?? "…" },
+        { label: "Bill", children: `${session.billCode} · ${vnd(bill.data?.bill.total ?? session.billTotal)}` },
       ]} />
+      {(bill.data?.items.length ?? 0) > 0 && (
+        <>
+          <Divider orientation="left" plain style={{ margin: "8px 0" }}>Đồ thêm</Divider>
+          <List size="small" dataSource={bill.data!.items}
+            renderItem={(i) => (
+              <List.Item extra={<Tag>{paymentLabels[i.paymentMethod]}</Tag>}>
+                {i.quantity} × {i.name.replace(/^\[DEMO\]\s*/, "")} · {vnd(i.amount)} <Typography.Text type="secondary">({time(i.createdAt)})</Typography.Text>
+              </List.Item>
+            )} />
+        </>
+      )}
       <Space direction="vertical" style={{ width: "100%", marginTop: 16 }}>
+        <Button block size="large" style={{ height: 56 }} onClick={() => setAddingItems(true)}>
+          Thêm đồ ăn / uống (mì, trứng, bánh…)
+        </Button>
         <div>
           <Typography.Text strong>Thanh toán gia hạn</Typography.Text>
           <Radio.Group block optionType="button" buttonStyle="solid" value={payment} onChange={(event) => setPayment(event.target.value)}
@@ -72,8 +97,8 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
           </Button>
         ) : (
           <Button type="primary" block size="large" style={{ height: 56 }} loading={extend.isPending}
-            onClick={() => Modal.confirm({ title: `Gia hạn thêm 4 tiếng${extendPrice ? ` (+${vnd(extendPrice)})` : ""}?`, okText: "Đã thu tiền", cancelText: "Hủy", onOk: () => extend.mutateAsync() })}>
-            Gia hạn thêm 4 tiếng{extendPrice ? ` (+${vnd(extendPrice)})` : ""}
+            onClick={() => Modal.confirm({ title: `Gia hạn thêm ${extendHours}${extendPrice != null ? ` (+${vnd(extendPrice)})` : ""}?`, okText: "Đã thu tiền", cancelText: "Hủy", onOk: () => extend.mutateAsync() })}>
+            Gia hạn thêm {extendHours}{extendPrice != null ? ` (+${vnd(extendPrice)})` : ""}
           </Button>
         )}
         <Button block size="large" style={{ height: 56 }} loading={close.isPending}

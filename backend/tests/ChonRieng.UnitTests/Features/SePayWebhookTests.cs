@@ -289,6 +289,80 @@ public sealed class SePayWebhookTests : IDisposable
         Assert.Equal(40_000, closingPreview.Value.VietQrTotal);
     }
 
+    [Fact]
+    public async Task Cash_add_on_items_go_on_the_session_bill_with_snapshot_prices()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var sessions = new SessionService(_db, _clock);
+        var session = (await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null), default)).Value!;
+        var (noodle, egg, inactive, foreign) = await SeedMenuAsync(branch);
+        var addOns = new AddOnService(_db, _clock);
+
+        var sold = await addOns.SellCashAsync(manager, session.Id,
+            new AddOnSaleRequest([new(noodle.Id, 2), new(egg.Id, 1), new(noodle.Id, 1)]), default);
+
+        Assert.True(sold.IsSuccess);
+        var bill = await _db.Bills.SingleAsync();
+        Assert.Equal(45_000 + 3 * 15_000 + 8_000, bill.Total);
+        Assert.Equal(bill.Total, bill.CashPaidTotal);
+        var lines = await _db.BillItems.OrderBy(i => i.Name).ToListAsync();
+        Assert.Equal(2, lines.Count);
+        Assert.Equal((3, 45_000m), (lines.Single(l => l.ProductId == noodle.Id).Quantity, lines.Single(l => l.ProductId == noodle.Id).Amount));
+
+        // Later menu changes do not touch the sold line.
+        noodle.Price = 99_000;
+        await _db.SaveChangesAsync();
+        Assert.Equal(15_000, (await _db.BillItems.SingleAsync(l => l.ProductId == noodle.Id)).UnitPrice);
+        var view = (await sessions.ActiveAsync(manager, branch.Id, default)).Value!.Single();
+        Assert.Equal(2, view.Items.Count);
+
+        Assert.False((await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(inactive.Id, 1)]), default)).IsSuccess);
+        Assert.False((await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(foreign.Id, 1)]), default)).IsSuccess);
+        Assert.False((await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(egg.Id, 0)]), default)).IsSuccess);
+        await sessions.CloseAsync(manager, session.Id, default);
+        Assert.False((await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(egg.Id, 1)]), default)).IsSuccess);
+    }
+
+    [Fact]
+    public async Task Vietqr_add_on_items_are_added_when_sepay_confirms()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var sessions = new SessionService(_db, _clock);
+        var session = (await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null), default)).Value!;
+        var (noodle, egg, _, _) = await SeedMenuAsync(branch);
+
+        var created = await new PaymentRequestService(_db, Options.Create(_options), _clock, sessions, TestPaymentLog.For(_db, _clock))
+            .CreateAddOnAsync(manager, session.Id, new AddOnSaleRequest([new(noodle.Id, 1), new(egg.Id, 2)]), default);
+        Assert.True(created.IsSuccess);
+        Assert.Equal(31_000, created.Value!.Amount);
+        Assert.Empty(await _db.BillItems.ToListAsync());
+
+        var paymentRequest = await _db.PaymentRequests.SingleAsync();
+        var body = Payload("tx-add-on", AccountNumber, paymentRequest.Code, 31_000);
+        var timestamp = Timestamp();
+        await SendAsync(body, timestamp, Sign(timestamp, body));
+
+        Assert.Equal(PaymentRequestStatus.Paid, paymentRequest.Status);
+        var bill = await _db.Bills.SingleAsync();
+        Assert.Equal(45_000 + 31_000, bill.Total);
+        Assert.Equal(31_000, bill.VietQrPaidTotal);
+        Assert.Equal(PaymentMethod.Mixed, bill.PaymentMethod);
+        Assert.Equal(2, await _db.BillItems.CountAsync(i => i.PaymentMethod == PaymentMethod.VietQr && i.PaymentRequestId == paymentRequest.Id));
+        Assert.Equal(PaymentLogLevel.Info, (await _db.PaymentLogs.SingleAsync(l => l.Stage == PaymentLogStage.Settled)).Level);
+    }
+
+    private async Task<(Product Noodle, Product Egg, Product Inactive, Product Foreign)> SeedMenuAsync(Branch branch)
+    {
+        var otherBranch = new Branch { Name = "Other", Address = "y", Is24h = true, OpenTime = new TimeOnly(0, 0), CloseTime = new TimeOnly(0, 0) };
+        var noodle = new Product { Name = "Mì ly", Category = "Đồ ăn", Price = 15_000 };
+        var egg = new Product { BranchId = branch.Id, Name = "Trứng", Category = "Đồ ăn", Price = 8_000 };
+        var inactive = new Product { Name = "Ngừng bán", Category = "Đồ ăn", Price = 1_000, IsActive = false };
+        var foreign = new Product { BranchId = otherBranch.Id, Name = "Món chi nhánh khác", Category = "Đồ ăn", Price = 1_000 };
+        _db.AddRange(otherBranch, noodle, egg, inactive, foreign);
+        await _db.SaveChangesAsync();
+        return (noodle, egg, inactive, foreign);
+    }
+
     private async Task CreateCheckInRequestAsync(CurrentUser manager, Seat seat, PricePlan plan)
     {
         var result = await new PaymentRequestService(
@@ -384,14 +458,16 @@ public sealed class SePayWebhookTests : IDisposable
         await SendAsync(body, timestamp, Sign(timestamp, body));
         await payments.GetStatusAsync(paymentRequest.Code, default);
 
+        // The test clock is frozen, so rows written in the same step share a timestamp; compare the steps, not their order.
         var stages = await _db.PaymentLogs.AsNoTracking().Where(l => l.PaymentCode == paymentRequest.Code || l.PaymentRequestId == paymentRequest.Id)
-            .OrderBy(l => l.OccurredAt).ThenBy(l => l.Id).Select(l => l.Stage).ToListAsync();
+            .Select(l => l.Stage).ToListAsync();
         Assert.Equal(
-            [
+            new[]
+            {
                 PaymentLogStage.RequestCreated, PaymentLogStage.StatusPolled, PaymentLogStage.TransactionRecorded,
                 PaymentLogStage.CodeMatched, PaymentLogStage.Settled, PaymentLogStage.StatusPolled,
-            ],
-            stages);
+            }.Order(),
+            stages.Order());
         var settled = await _db.PaymentLogs.SingleAsync(l => l.Stage == PaymentLogStage.Settled);
         Assert.Equal((await _db.Bills.SingleAsync()).Code, settled.BillCode);
         Assert.Equal(20_000, settled.ElapsedMs);

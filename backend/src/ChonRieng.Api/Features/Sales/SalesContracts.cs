@@ -35,7 +35,8 @@ public sealed record SessionView(
     int ExtensionCount,
     SessionCustomer? Customer,
     SessionBill Bill,
-    [property: Description("Điểm khách được cộng trong thao tác này (nếu có).")] int PointsAwarded);
+    [property: Description("Điểm khách được cộng trong thao tác này (nếu có).")] int PointsAwarded,
+    [property: Description("Đồ thêm (mì, trứng, bánh...) đã bán trên hóa đơn này.")] IReadOnlyList<BillItemView> Items);
 
 public sealed record CustomerLookupResult(Guid CustomerId, string FullName, string Tier, int Points, string? MemberCode);
 

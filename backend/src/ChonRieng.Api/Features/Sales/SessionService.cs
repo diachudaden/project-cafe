@@ -260,6 +260,11 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         CancellationToken ct)
     {
         var now = clock.GetUtcNow();
+        if (paymentRequest.Kind == PaymentRequestKind.AddOn)
+        {
+            return await new AddOnService(db, clock).SettleAsync(paymentRequest, ct);
+        }
+
         if (paymentRequest.Kind == PaymentRequestKind.CheckIn)
         {
             var originalSeat = await db.Seats.Include(s => s.Zone)
@@ -517,11 +522,14 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
                 Extensions = s.Extensions.Count(),
                 Customer = s.Customer != null ? new SessionCustomer(s.Customer.Id, s.Customer.User.FullName, s.Customer.Tier) : null,
                 Bill = new SessionBill(s.Bill!.Id, s.Bill.Code, s.Bill.Total, s.Bill.PaymentMethod, s.Bill.ClaimedByCustomerId != null, s.Bill.CreatedAt),
+                Items = s.Bill.Items.OrderBy(i => i.CreatedAt)
+                    .Select(i => new BillItemView(i.Id, i.Name, i.UnitPrice, i.Quantity, i.Amount, i.PaymentMethod, i.CreatedAt))
+                    .ToList(),
             })
             .ToListAsync(ct);
 
         return rows.Select(r => new SessionView(r.Id, r.BranchId, r.SeatId, r.SeatCode, r.PricePlanId, r.PlanName, r.StartAt, r.EndAt,
-            r.Status, (int)Math.Floor((r.EndAt - now).TotalMinutes), r.Extensions, r.Customer, r.Bill, pointsAwarded)).ToList();
+            r.Status, (int)Math.Floor((r.EndAt - now).TotalMinutes), r.Extensions, r.Customer, r.Bill, pointsAwarded, r.Items)).ToList();
     }
 
     private static ServiceError SeatTaken() => ServiceError.Conflict("Chỗ đã có người", "Chỗ này không còn trống; hãy chọn chỗ khác.");
@@ -536,7 +544,8 @@ public sealed record PaymentRequestContext(
     Guid? CustomerId,
     Guid? SessionId,
     Guid ShiftId,
-    decimal Amount);
+    decimal Amount,
+    string? Items = null);
 
 public sealed record PaymentSettlementOutcome(
     bool Settled,

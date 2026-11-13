@@ -21,4 +21,5 @@ public sealed class Bill : Entity
     public Session Session { get; set; } = null!;
     public Customer? ClaimedByCustomer { get; set; }
     public ICollection<PointTransaction> PointTransactions { get; } = new List<PointTransaction>();
+    public ICollection<BillItem> Items { get; } = new List<BillItem>();
 }

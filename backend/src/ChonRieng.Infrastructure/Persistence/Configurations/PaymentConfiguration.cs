@@ -12,6 +12,7 @@ internal sealed class PaymentRequestConfiguration : IEntityTypeConfiguration<Pay
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Code).HasMaxLength(20).IsRequired();
         builder.Property(x => x.Amount).HasColumnType("decimal(12,0)");
+        builder.Property(x => x.Items).HasMaxLength(4000);
         builder.Property(x => x.Status).HasConversion<byte>();
         builder.Property(x => x.Kind).HasConversion<byte>();
         builder.Property(x => x.RowVersion).IsRowVersion();

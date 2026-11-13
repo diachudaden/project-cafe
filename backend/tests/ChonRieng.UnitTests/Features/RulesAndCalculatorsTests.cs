@@ -105,15 +105,16 @@ public sealed class RulesAndCalculatorsTests
     }
 
     [Fact]
-    public void Branch_plan_overrides_chain_plan_and_expired_plans_are_ignored()
+    public void All_valid_plans_are_offered_branch_first_and_expired_or_foreign_plans_are_ignored()
     {
         var now = At(10, 12);
         var chain = new PricePlan { Name = "chain", DurationMinutes = 240, Price = 45_000 };
         var branchA = new PricePlan { BranchId = BranchA, Name = "A", DurationMinutes = 240, Price = 40_000 };
+        var studentA = new PricePlan { BranchId = BranchA, Name = "A student", DurationMinutes = 240, Price = 30_000 };
         var expired = new PricePlan { BranchId = BranchB, Name = "old", DurationMinutes = 240, Price = 1_000, ValidTo = now.AddDays(-1) };
 
-        Assert.Same(branchA, Assert.Single(CatalogService.ResolveActivePlans([chain, branchA, expired], BranchA, now)));
-        Assert.Same(chain, Assert.Single(CatalogService.ResolveActivePlans([chain, branchA, expired], BranchB, now)));
+        Assert.Equal([studentA, branchA, chain], CatalogService.ResolveActivePlans([chain, branchA, expired, studentA], BranchA, now));
+        Assert.Same(chain, Assert.Single(CatalogService.ResolveActivePlans([chain, branchA, expired, studentA], BranchB, now)));
     }
 
     [Fact]

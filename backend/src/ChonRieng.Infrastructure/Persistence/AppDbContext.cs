@@ -21,6 +21,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<SessionExtension> SessionExtensions => Set<SessionExtension>();
     public DbSet<Bill> Bills => Set<Bill>();
+    public DbSet<BillItem> BillItems => Set<BillItem>();
+    public DbSet<Product> Products => Set<Product>();
     public DbSet<PaymentRequest> PaymentRequests => Set<PaymentRequest>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<PaymentLog> PaymentLogs => Set<PaymentLog>();

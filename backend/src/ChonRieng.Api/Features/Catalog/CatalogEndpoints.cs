@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ChonRieng.Api.Authorization;
 using ChonRieng.Api.Features.Common;
+using ChonRieng.Api.Features.Sales;
 
 namespace ChonRieng.Api.Features.Catalog;
 
@@ -29,7 +30,7 @@ public static class CatalogEndpoints
             .AllowAnonymous()
             .WithName("GetActivePricePlans")
             .WithSummary("Bảng giá đang áp dụng")
-            .WithDescription("Công khai. Bảng giá còn hiệu lực; bảng giá riêng của chi nhánh thay thế bảng giá toàn chuỗi cùng thời lượng.");
+            .WithDescription("Công khai. Tất cả bảng giá còn hiệu lực của chi nhánh: bảng giá riêng của chi nhánh trước, sau đó bảng giá toàn chuỗi.");
 
         var scoped = app.MapGroup("/api/branches/{branchId:guid}").WithTags("Chi nhánh & chỗ ngồi").RequireBranchScope();
 
@@ -43,6 +44,18 @@ public static class CatalogEndpoints
                 (await service.ListManagedPlansAsync(CurrentUser.From(user), branchId, ct)).ToHttp())
             .WithName("ListManagedPricePlans")
             .WithSummary("Tất cả bảng giá của chi nhánh (kể cả hết hạn)");
+
+        scoped.MapGet("/products", async (Guid branchId, ClaimsPrincipal user, AddOnService service, CancellationToken ct) =>
+                (await service.MenuAsync(CurrentUser.From(user), branchId, ct)).ToHttp())
+            .WithName("ListBranchProducts")
+            .WithSummary("Thực đơn đồ thêm đang bán")
+            .WithDescription("Món đang bán tại chi nhánh (gồm món toàn chuỗi), nhóm theo Category; dùng cho POS.");
+
+        scoped.MapGet("/products/all", async (Guid branchId, ClaimsPrincipal user, AddOnService service, CancellationToken ct) =>
+                (await service.ManagedAsync(CurrentUser.From(user), branchId, ct)).ToHttp())
+            .RequireManagement()
+            .WithName("ListManagedProducts")
+            .WithSummary("Tất cả món đồ thêm (kể cả đã ngừng bán)");
 
         scoped.MapPost("/zones", async (Guid branchId, ZoneRequest request, ClaimsPrincipal user, CatalogService service, CancellationToken ct) =>
                 (await service.CreateZoneAsync(CurrentUser.From(user), branchId, request, ct)).ToHttp(z => TypedResults.Created($"/api/zones/{z.Id}", z)))
@@ -83,6 +96,22 @@ public static class CatalogEndpoints
             .WithName("CreatePricePlan")
             .WithSummary("Tạo bảng giá")
             .WithDescription("BranchManager tạo bảng giá cho chi nhánh mình; bảng giá toàn chuỗi (branchId = null) chỉ Admin.");
+
+        manage.MapPost("/products", async (ProductRequest request, ClaimsPrincipal user, AddOnService service, CancellationToken ct) =>
+                (await service.CreateAsync(CurrentUser.From(user), request, ct)).ToHttp(p => TypedResults.Created($"/api/products/{p.Id}", p)))
+            .WithName("CreateProduct")
+            .WithSummary("Thêm món đồ thêm")
+            .WithDescription("BranchManager thêm món cho chi nhánh mình; món toàn chuỗi (branchId = null) chỉ Admin.");
+
+        manage.MapPut("/products/{productId:guid}", async (Guid productId, ProductRequest request, ClaimsPrincipal user, AddOnService service, CancellationToken ct) =>
+                (await service.UpdateAsync(CurrentUser.From(user), productId, request, ct)).ToHttp())
+            .WithName("UpdateProduct").WithSummary("Sửa món / ngừng bán");
+
+        manage.MapDelete("/products/{productId:guid}", async (Guid productId, ClaimsPrincipal user, AddOnService service, CancellationToken ct) =>
+                (await service.DeleteAsync(CurrentUser.From(user), productId, ct)).ToHttp(_ => TypedResults.NoContent()))
+            .WithName("DeleteProduct")
+            .WithSummary("Xóa món")
+            .WithDescription("Món đã từng bán chỉ bị chuyển sang ngừng bán để giữ lịch sử hóa đơn.");
 
         manage.MapPut("/price-plans/{planId:guid}", async (Guid planId, PricePlanRequest request, ClaimsPrincipal user, CatalogService service, CancellationToken ct) =>
                 (await service.UpdatePlanAsync(CurrentUser.From(user), planId, request, ct)).ToHttp())

@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.6.1",
     "@cafecr/api-client": "*",
     "@cafecr/ui": "*",
     "@tanstack/react-query": "^5.62.0",
