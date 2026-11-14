@@ -38,6 +38,18 @@ dotnet ef database update \
   --startup-project backend/src/ChonRieng.Api
 ```
 
+### After every deploy that contains a migration
+
+The deploy workflow (`docker compose up --build`) does **not** migrate the database. When the deployed commit adds a file under `backend/src/ChonRieng.Infrastructure/Persistence/Migrations`, run against the server database (after a backup):
+
+```bash
+dotnet ef database update --project backend/src/ChonRieng.Infrastructure --startup-project backend/src/ChonRieng.Api
+```
+
+Until then, features using the new tables fail (e.g. without `AddOnItems` the POS menu "Thêm đồ" and bill lookups return 500). The API logs an **Error** at startup listing pending migrations, and `GET /api/health` returns `Degraded` with their names (`Healthy` when up to date, `503 Unhealthy` when the database is unreachable).
+
+Add-on items (đồ thêm) are business data, not migration data: create them in Web Quản lý → **Bảng giá** → "Đồ thêm" (chain-wide items Admin only), or use the development seed for demo items. The POS shows "Chi nhánh chưa có món nào đang bán." until at least one active item exists for the branch or chain-wide.
+
 The latest migration, `RoleWorkflows`, adds the columns and indexes used by the role workflows (one active session per seat, bill/point timestamps, member codes, closing review, expense reversals, attendance approval). Review migration files under `backend/src/ChonRieng.Infrastructure/Persistence/Migrations` and confirm the target database before updating it. Do not apply migrations to shared or production databases without review and a backup.
 
 ## Optional development seed
