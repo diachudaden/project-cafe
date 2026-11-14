@@ -28,14 +28,14 @@ public sealed class PaymentRequestService(
         CreateCheckInPaymentRequest request,
         CancellationToken ct)
     {
-        var context = await sessions.PrepareCheckInPaymentAsync(user, request.SeatId, request.PricePlanId, request.CustomerId, ct);
+        var context = await sessions.PrepareCheckInPaymentAsync(user, request.SeatId, request.PricePlanId, request.CustomerId, ct, request.Items);
         if (context.Error is not null)
         {
             return context.Error;
         }
 
         await ExpirePendingForSeatAsync(request.SeatId, ct);
-        context = await sessions.PrepareCheckInPaymentAsync(user, request.SeatId, request.PricePlanId, request.CustomerId, ct);
+        context = await sessions.PrepareCheckInPaymentAsync(user, request.SeatId, request.PricePlanId, request.CustomerId, ct, request.Items);
         if (context.Error is not null)
         {
             return context.Error;
@@ -234,6 +234,9 @@ public sealed class PaymentRequestService(
                 paymentRequest.ShiftId,
                 createdBy = user.UserId,
                 paymentRequest.ExpiresAt,
+                items = AddOnService.TryReadSnapshot(paymentRequest.Items, out var lines) && lines.Count > 0
+                    ? lines.Select(l => new { l.Name, l.Quantity, l.UnitPrice, l.Amount })
+                    : null,
             },
         });
 
@@ -353,7 +356,8 @@ public sealed class PaymentRequestService(
 public sealed record CreateCheckInPaymentRequest(
     Guid SeatId,
     Guid PricePlanId,
-    Guid? CustomerId);
+    Guid? CustomerId,
+    [property: System.ComponentModel.DataAnnotations.MaxLength(AddOnService.MaxLines), Description("Đồ thêm mua cùng lúc check-in (tùy chọn). Số tiền QR = giá gói + đồ thêm do máy chủ tính; danh sách món và đơn giá được lưu lại lúc tạo QR và dùng khi SePay xác nhận (đổi giá sau đó không ảnh hưởng).")] IReadOnlyList<AddOnLineRequest>? Items = null);
 
 public sealed record CreatePaymentRequestResponse(string Code, decimal Amount, string QrUrl, DateTimeOffset ExpiresAt);
 

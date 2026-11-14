@@ -333,6 +333,35 @@ public sealed class RoleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Staff_menu_loads_and_check_in_with_items_is_one_bill_through_http()
+    {
+        // TASK-026: the POS menu (500 on SQL Server before the fix) and add-ons bought with the check-in.
+        var staff = await ClientAsync("staff01.demo@cafecr.invalid");
+        var admin = await ClientAsync("admin01.demo@cafecr.invalid");
+        var branchC = await BranchIdAsync("Chi nhánh C");
+        var menu = await staff.GetFromJsonAsync<JsonElement>($"/api/branches/{await BranchIdAsync("Chi nhánh A")}/products", Json);
+        Assert.True(menu.GetArrayLength() > 0);
+        var product = (await admin.GetFromJsonAsync<JsonElement>($"/api/branches/{branchC}/products", Json))[0];
+        var floor = await admin.GetFromJsonAsync<JsonElement>($"/api/branches/{branchC}/floor", Json);
+        var seatId = floor.GetProperty("zones").EnumerateArray().SelectMany(z => z.GetProperty("seats").EnumerateArray())
+            .Last(s => s.GetProperty("state").GetString() == "Available").GetProperty("id").GetGuid();
+        var plan = (await admin.GetFromJsonAsync<JsonElement>($"/api/branches/{branchC}/price-plans", Json))[0];
+        var planId = plan.GetProperty("id").GetGuid();
+
+        var invalid = await admin.PostAsJsonAsync("/api/sessions",
+            new { seatId, pricePlanId = planId, paymentMethod = "Cash", items = new[] { new { productId = Guid.NewGuid(), quantity = 1 } } }, Json);
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.Contains("Có món không còn bán tại chi nhánh này.", await invalid.Content.ReadAsStringAsync());
+
+        var checkIn = await admin.PostAsJsonAsync("/api/sessions",
+            new { seatId, pricePlanId = planId, paymentMethod = "Cash", items = new[] { new { productId = product.GetProperty("id").GetGuid(), quantity = 2 } } }, Json);
+        Assert.Equal(HttpStatusCode.Created, checkIn.StatusCode);
+        var session = await checkIn.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal(plan.GetProperty("price").GetDecimal() + 2 * product.GetProperty("price").GetDecimal(), session.GetProperty("bill").GetProperty("total").GetDecimal());
+        Assert.Equal(2, session.GetProperty("items")[0].GetProperty("quantity").GetInt32());
+    }
+
+    [Fact]
     public async Task Receipt_pdf_is_a_branch_scoped_attachment_with_the_bill_code()
     {
         var (branchA, branchC) = (await BranchIdAsync("Chi nhánh A"), await BranchIdAsync("Chi nhánh C"));

@@ -71,7 +71,7 @@ public sealed class ReceiptPdfTests
         Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
         using var document = PdfDocument.Open(pdf);
         var page = Assert.Single(document.GetPages());
-        fonts = page.Letters.Select(l => l.FontName).ToHashSet();
+        fonts = page.Letters.Select(l => l.FontName ?? "").ToHashSet();
         widthPt = page.Width;
         return Nfc(string.Join(" ", page.GetWords().Select(w => w.Text)));
     }

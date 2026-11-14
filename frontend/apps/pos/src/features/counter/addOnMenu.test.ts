@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProductView } from "@cafecr/api-client";
 import { ApiError } from "@cafecr/api-client";
-import { ALL_CATEGORIES, errorDiagnostics, filterMenu, menuState } from "./addOnMenu";
+import { ALL_CATEGORIES, cartLines, changeCart, checkInTotals, errorDiagnostics, filterMenu, menuState } from "./addOnMenu";
 
 const p = (id: string, name: string, category: string): ProductView =>
   ({ id, branchId: null, name, category, price: 10000, isActive: true, sortOrder: 0 }) as ProductView;
@@ -48,5 +48,28 @@ describe("menuState", () => {
   it("lists matches and flags searching", () => {
     const state = menuState({ ...base, term: "tra" });
     expect(state.kind === "list" && state.searching && names(state.items)).toEqual(["3"]);
+  });
+});
+
+describe("check-in with add-ons (TASK-026)", () => {
+  const priced = [{ ...p("1", "Mì ly", "Đồ ăn"), price: 15000 }, { ...p("2", "Trứng", "Đồ ăn"), price: 8000 }];
+
+  it("adds the plan price and the add-on subtotal into one total", () => {
+    const lines = cartLines({ "1": 2, "2": 1 }, priced);
+    expect(checkInTotals(45000, lines)).toEqual({ plan: 45000, addOns: 38000, count: 3, total: 83000 });
+  });
+
+  it("is just the plan price without add-ons, and 0 before a plan is chosen", () => {
+    expect(checkInTotals(45000, [])).toEqual({ plan: 45000, addOns: 0, count: 0, total: 45000 });
+    expect(checkInTotals(undefined, cartLines({ "1": 1 }, priced)).total).toBe(15000);
+  });
+
+  it("drops zero quantities and products no longer on the menu", () => {
+    expect(cartLines({ "1": 0, "2": 1, gone: 3 }, priced).map((l) => l.productId)).toEqual(["2"]);
+  });
+
+  it("clamps quantities to 0–99", () => {
+    expect(changeCart({ "1": 99 }, "1", 1)["1"]).toBe(99);
+    expect(changeCart({}, "1", -1)["1"]).toBe(0);
   });
 });

@@ -8,7 +8,8 @@ public sealed record CheckInSessionRequest(
     Guid SeatId,
     Guid PricePlanId,
     [property: Description("Cash hoặc VietQr (giả lập, không có cổng thanh toán thật).")] PaymentMethod PaymentMethod,
-    [property: Description("Khách thành viên (tùy chọn). Nếu có, điểm được cộng tự động.")] Guid? CustomerId);
+    [property: Description("Khách thành viên (tùy chọn). Nếu có, điểm được cộng tự động.")] Guid? CustomerId,
+    [property: MaxLength(AddOnService.MaxLines), Description("Đồ thêm mua cùng lúc check-in (tùy chọn, tối đa 30 dòng, số lượng 1–99). Giá lấy từ thực đơn của chi nhánh tại máy chủ; tổng bill = giá gói + đồ thêm, điểm thành viên cộng một lần trên tổng.")] IReadOnlyList<AddOnLineRequest>? Items = null);
 
 public sealed record SessionCustomer(Guid Id, string FullName, string Tier);
 

@@ -49,6 +49,13 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             return ServiceError.Invalid("PricePlanId", "Bảng giá không áp dụng cho chi nhánh này hoặc đã hết hiệu lực.");
         }
 
+        // Add-ons bought with the check-in (TASK-026): priced from the menu here, one bill, one payment.
+        var lines = await new AddOnService(db, clock).PriceLinesAsync(branchId, request.Items, required: false, ct);
+        if (lines.Error is not null)
+        {
+            return lines.Error;
+        }
+
         var shift = await ResolveShiftAsync(user, branchId, now, ct);
         if (shift.Error is not null)
         {
@@ -65,6 +72,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             }
         }
 
+        var total = plan.Price + lines.Value!.Sum(l => l.Amount);
         var session = new Session
         {
             SeatId = seat.Id,
@@ -80,14 +88,15 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             BranchId = branchId,
             ShiftId = shift.Value,
             SessionId = session.Id,
-            Total = plan.Price,
-            CashPaidTotal = request.PaymentMethod == PaymentMethod.Cash ? plan.Price : 0,
-            VietQrPaidTotal = request.PaymentMethod == PaymentMethod.VietQr ? plan.Price : 0,
+            Total = total,
+            CashPaidTotal = request.PaymentMethod == PaymentMethod.Cash ? total : 0,
+            VietQrPaidTotal = request.PaymentMethod == PaymentMethod.VietQr ? total : 0,
             PaymentMethod = request.PaymentMethod,
             CreatedAt = now,
         };
         db.Sessions.Add(session);
         db.Bills.Add(bill);
+        db.BillItems.AddRange(AddOnService.NewItems(bill, lines.Value!, request.PaymentMethod, null, user.UserId, now));
 
         var points = 0;
         if (customer is not null)
@@ -119,7 +128,8 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         Guid seatId,
         Guid pricePlanId,
         Guid? customerId,
-        CancellationToken ct)
+        CancellationToken ct,
+        IReadOnlyList<AddOnLineRequest>? items = null)
     {
         var seat = await db.Seats.Include(s => s.Zone).SingleOrDefaultAsync(s => s.Id == seatId, ct);
         if (seat is null || !user.CanAccessBranch(seat.Zone.BranchId))
@@ -151,6 +161,19 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             return ServiceError.Invalid("PricePlanId", "Bảng giá không áp dụng cho chi nhánh này hoặc đã hết hiệu lực.");
         }
 
+        // Add-ons in the same QR (TASK-026): amount = plan + lines, lines snapshotted for settlement.
+        var lines = await new AddOnService(db, clock).PriceLinesAsync(seat.Zone.BranchId, items, required: false, ct);
+        if (lines.Error is not null)
+        {
+            return lines.Error;
+        }
+
+        var snapshot = AddOnService.Snapshot(lines.Value!);
+        if (snapshot.Error is not null)
+        {
+            return snapshot.Error;
+        }
+
         var shift = await ResolveShiftAsync(user, seat.Zone.BranchId, now, ct);
         if (shift.Error is not null)
         {
@@ -171,7 +194,8 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             customerId,
             null,
             shift.Value,
-            plan.Price);
+            plan.Price + lines.Value!.Sum(l => l.Amount),
+            snapshot.Value);
     }
 
     public async Task<Result<PaymentRequestContext>> PrepareExtensionPaymentAsync(
@@ -278,7 +302,13 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             var originalSeat = await db.Seats.Include(s => s.Zone)
                 .SingleOrDefaultAsync(s => s.Id == paymentRequest.SeatId, ct);
             var plan = await db.PricePlans.SingleOrDefaultAsync(p => p.Id == paymentRequest.PricePlanId, ct);
-            if (originalSeat is null || plan is null || paymentRequest.Amount != plan.Price)
+            // Add-on lines and their prices come from the snapshot taken when the QR was created (TASK-026).
+            if (!AddOnService.TryReadSnapshot(paymentRequest.Items, out var addOns))
+            {
+                return PaymentSettlementOutcome.NeedsAttention("Danh sách đồ thêm của yêu cầu không hợp lệ.");
+            }
+
+            if (originalSeat is null || plan is null || paymentRequest.Amount != plan.Price + addOns.Sum(l => l.Amount))
             {
                 return PaymentSettlementOutcome.NeedsAttention("Chỗ hoặc bảng giá không còn hợp lệ.");
             }
@@ -338,6 +368,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
 
             db.Sessions.Add(session);
             db.Bills.Add(bill);
+            db.BillItems.AddRange(AddOnService.NewItems(bill, addOns, PaymentMethod.VietQr, paymentRequest.Id, paymentRequest.CreatedByUserId, now));
             paymentRequest.SeatId = seat.Id;
             paymentRequest.SessionId = session.Id;
             paymentRequest.BillId = bill.Id;
