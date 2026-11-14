@@ -7,6 +7,7 @@ import { api } from "../../api";
 import { useNotify } from "../useNotify";
 import { isPaymentTerminal } from "./paymentStatus";
 import { PaymentDoneResult } from "./PaymentDoneModal";
+import { PrintBillButton } from "./PrintBillButton";
 
 function remainingTime(expiresAt: string, now: number): string {
   const seconds = Math.max(0, Math.ceil((Date.parse(expiresAt) - now) / 1000));
@@ -156,7 +157,10 @@ export function PaymentRequestModal({
       width={460}
       title={title}
       footer={terminal
-        ? <Button type="primary" onClick={close}>Đóng</Button>
+        ? <Space>
+            {paymentStatus === "Paid" && session.data && <PrintBillButton billCode={session.data.bill.code} />}
+            <Button type="primary" onClick={close}>Đóng</Button>
+          </Space>
         : <Button danger loading={cancel.isPending} onClick={cancelRequest}>Hủy yêu cầu</Button>}
       closable={terminal}
       maskClosable={terminal}

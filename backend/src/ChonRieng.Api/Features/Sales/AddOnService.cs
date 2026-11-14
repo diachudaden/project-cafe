@@ -35,7 +35,7 @@ public sealed record AddOnSaleResponse(
     [property: Description("Điểm thành viên được cộng cho lần bán này (0 nếu khách lẻ).")] int PointsAwarded,
     [property: Description("Tên thành viên được cộng điểm, null nếu khách lẻ.")] string? CustomerName);
 
-public sealed record AddOnSaleRequest([property: Required, MinLength(1), MaxLength(30)] IReadOnlyList<AddOnLineRequest> Items);
+public sealed record AddOnSaleRequest([property: Required, MinLength(1), MaxLength(AddOnService.MaxLines)] IReadOnlyList<AddOnLineRequest> Items);
 
 public sealed record BillItemView(Guid Id, string Name, decimal UnitPrice, int Quantity, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset CreatedAt);
 
@@ -48,7 +48,17 @@ public sealed record AddOnLine(Guid ProductId, string Name, decimal UnitPrice, i
 /// <summary>Add-on items (đồ thêm) sold on an active session's bill, and the menu they come from.</summary>
 public sealed class AddOnService(AppDbContext db, TimeProvider clock)
 {
-    private static readonly JsonSerializerOptions LineJson = new(JsonSerializerDefaults.Web);
+    /// <summary>Max add-on lines per sale / check-in (TASK-026).</summary>
+    public const int MaxLines = 30;
+
+    /// <summary>Length of <c>PaymentRequests.Items</c> (nvarchar(4000)).</summary>
+    public const int MaxSnapshotLength = 4000;
+
+    // Vietnamese stays unescaped (1 char instead of \uXXXX) so a 30-line snapshot fits the column; reading is unchanged.
+    private static readonly JsonSerializerOptions LineJson = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     // ---- Menu ----
 
@@ -186,24 +196,20 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
             return lines.Error;
         }
 
+        var snapshot = Snapshot(lines.Value!);
+        if (snapshot.Error is not null)
+        {
+            return snapshot.Error;
+        }
+
         return new PaymentRequestContext(PaymentRequestKind.AddOn, s.Seat.Zone.BranchId, s.SeatId, s.Seat.Type, s.PricePlanId, s.CustomerId, s.Id,
-            s.Bill!.ShiftId, lines.Value!.Sum(l => l.Amount), JsonSerializer.Serialize(lines.Value, LineJson));
+            s.Bill!.ShiftId, lines.Value!.Sum(l => l.Amount), snapshot.Value);
     }
 
     /// <summary>Called when SePay confirms an AddOn request; amounts come from the snapshot taken at request time.</summary>
     public async Task<PaymentSettlementOutcome> SettleAsync(PaymentRequest paymentRequest, CancellationToken ct)
     {
-        List<AddOnLine>? lines;
-        try
-        {
-            lines = paymentRequest.Items is null ? null : JsonSerializer.Deserialize<List<AddOnLine>>(paymentRequest.Items, LineJson);
-        }
-        catch (JsonException)
-        {
-            lines = null;
-        }
-
-        if (lines is not { Count: > 0 } || lines.Sum(l => l.Amount) != paymentRequest.Amount)
+        if (!TryReadSnapshot(paymentRequest.Items, out var lines) || lines.Count == 0 || lines.Sum(l => l.Amount) != paymentRequest.Amount)
         {
             return PaymentSettlementOutcome.NeedsAttention("Danh sách đồ thêm của yêu cầu không hợp lệ.");
         }
@@ -229,19 +235,7 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
         Bill bill, string seatCode, IReadOnlyList<AddOnLine> lines, PaymentMethod method, Guid? paymentRequestId, Guid? userId,
         DateTimeOffset now, CancellationToken ct)
     {
-        var items = lines.Select(l => new BillItem
-        {
-            BillId = bill.Id,
-            ProductId = l.ProductId,
-            Name = l.Name,
-            UnitPrice = l.UnitPrice,
-            Quantity = l.Quantity,
-            Amount = l.Amount,
-            PaymentMethod = method,
-            PaymentRequestId = paymentRequestId,
-            CreatedByUserId = userId,
-            CreatedAt = now,
-        }).ToList();
+        var items = NewItems(bill, lines, method, paymentRequestId, userId, now);
         db.BillItems.AddRange(items);
 
         var total = items.Sum(i => i.Amount);
@@ -270,20 +264,35 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
         return new AddedToBill(items, 0, null);
     }
 
-    /// <summary>Prices the requested lines from the current menu: active, sold at this branch, sensible quantities.</summary>
-    private async Task<Result<IReadOnlyList<AddOnLine>>> PriceLinesAsync(Guid branchId, AddOnSaleRequest request, CancellationToken ct)
+    private Task<Result<IReadOnlyList<AddOnLine>>> PriceLinesAsync(Guid branchId, AddOnSaleRequest request, CancellationToken ct) =>
+        PriceLinesAsync(branchId, request.Items, required: true, ct);
+
+    /// <summary>
+    /// Prices the requested lines from the current menu: active, sold at this branch (or chain-wide), at most
+    /// <see cref="MaxLines"/> lines, quantities 1–99. Prices always come from the database, never from the client.
+    /// With <paramref name="required"/> false, no items means an empty list (check-in without add-ons).
+    /// </summary>
+    internal async Task<Result<IReadOnlyList<AddOnLine>>> PriceLinesAsync(
+        Guid branchId, IReadOnlyList<AddOnLineRequest>? items, bool required, CancellationToken ct)
     {
-        if (request.Items is not { Count: > 0 })
+        if (items is not { Count: > 0 })
         {
-            return ServiceError.Invalid("Items", "Chọn ít nhất một món.");
+            return required
+                ? ServiceError.Invalid("Items", "Chọn ít nhất một món.")
+                : Result<IReadOnlyList<AddOnLine>>.From([]);
         }
 
-        if (request.Items.Any(i => i.Quantity is < 1 or > 99))
+        if (items.Count > MaxLines)
+        {
+            return ServiceError.Invalid("Items", $"Tối đa {MaxLines} dòng món mỗi lần.");
+        }
+
+        if (items.Any(i => i.Quantity is < 1 or > 99))
         {
             return ServiceError.Invalid("Items", "Số lượng mỗi món từ 1 đến 99.");
         }
 
-        var wanted = request.Items.GroupBy(i => i.ProductId).Select(g => (ProductId: g.Key, Quantity: g.Sum(i => i.Quantity))).ToList();
+        var wanted = items.GroupBy(i => i.ProductId).Select(g => (ProductId: g.Key, Quantity: g.Sum(i => i.Quantity))).ToList();
         var ids = wanted.Select(w => w.ProductId).ToList();
         var products = await db.Products.AsNoTracking()
             .Where(p => ids.Contains(p.Id) && p.IsActive && (p.BranchId == null || p.BranchId == branchId))
@@ -362,6 +371,58 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
         product.Price = r.Price;
         product.IsActive = r.IsActive;
         product.SortOrder = r.SortOrder;
+    }
+
+    /// <summary>Bill lines for already priced add-ons (no points: the caller awards them once for its total).</summary>
+    internal static List<BillItem> NewItems(
+        Bill bill, IEnumerable<AddOnLine> lines, PaymentMethod method, Guid? paymentRequestId, Guid? userId, DateTimeOffset now) =>
+        lines.Select(l => new BillItem
+        {
+            BillId = bill.Id,
+            ProductId = l.ProductId,
+            Name = l.Name,
+            UnitPrice = l.UnitPrice,
+            Quantity = l.Quantity,
+            Amount = l.Amount,
+            PaymentMethod = method,
+            PaymentRequestId = paymentRequestId,
+            CreatedByUserId = userId,
+            CreatedAt = now,
+        }).ToList();
+
+    /// <summary>JSON snapshot stored on a payment request; null for no lines; 400 if it would not fit the column.</summary>
+    internal static Result<string?> Snapshot(IReadOnlyList<AddOnLine> lines)
+    {
+        if (lines.Count == 0)
+        {
+            return Result<string?>.From(null);
+        }
+
+        var json = JsonSerializer.Serialize(lines, LineJson);
+        return json.Length <= MaxSnapshotLength
+            ? Result<string?>.From(json)
+            : ServiceError.Invalid("Items", "Danh sách món quá dài cho một mã QR; hãy bớt món hoặc thanh toán đồ thêm sau.");
+    }
+
+    /// <summary>Reads a snapshot: null/empty JSON → no lines (true); malformed JSON or a bad line → false.</summary>
+    internal static bool TryReadSnapshot(string? json, out List<AddOnLine> lines)
+    {
+        lines = [];
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return true;
+        }
+
+        try
+        {
+            lines = JsonSerializer.Deserialize<List<AddOnLine>>(json, LineJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        return lines.All(l => l.Quantity is >= 1 and <= 99 && l.UnitPrice >= 0 && !string.IsNullOrWhiteSpace(l.Name));
     }
 
     private static ProductView ToView(Product p) => new(p.Id, p.BranchId, p.Name, p.Category, p.Price, p.IsActive, p.SortOrder);

@@ -9,6 +9,7 @@ import { useNotify } from "../useNotify";
 import { AddOnSheet } from "./AddOnSheet";
 import { PaymentRequestModal } from "./PaymentRequestModal";
 import { PaymentDoneModal, type PaymentDone } from "./PaymentDoneModal";
+import { PrintBillButton } from "./PrintBillButton";
 
 /** One tap to extend or free a seat; money actions always confirm first. */
 export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string; seat: FloorSeat; onClose: () => void }) {
@@ -107,9 +108,12 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
         </>
       )}
       <Space direction="vertical" style={{ width: "100%", marginTop: 16 }}>
-        <Button block size="large" style={{ height: 56 }} onClick={() => setAddingItems(true)}>
-          Thêm đồ ăn / uống (mì, trứng, bánh…)
-        </Button>
+        <Space.Compact block>
+          <Button block size="large" style={{ height: 56 }} onClick={() => setAddingItems(true)}>
+            Thêm đồ ăn / uống (mì, trứng, bánh…)
+          </Button>
+          <PrintBillButton billCode={session.billCode} size="large" style={{ height: 56 }} />
+        </Space.Compact>
         <div>
           <Typography.Text strong>Thanh toán gia hạn</Typography.Text>
           <Radio.Group block optionType="button" buttonStyle="solid" value={payment} onChange={(event) => setPayment(event.target.value)}

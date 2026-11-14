@@ -22,7 +22,7 @@ function RequireCustomer({ children }: { children: ReactNode }) {
   const { state } = useAuth();
   const location = useLocation();
   if (state.status === "loading") return <Spin style={{ display: "block", marginTop: 80 }} />;
-  if (state.status === "signedOut") return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (state.status === "signedOut") return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   return <>{children}</>;
 }
 

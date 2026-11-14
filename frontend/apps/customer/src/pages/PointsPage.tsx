@@ -3,6 +3,7 @@ import { Card, List, Progress, Statistic, Tag, Typography } from "antd";
 import { dateTime, tierLabels, vnd } from "@cafecr/ui";
 import { api } from "../api";
 import { PointsDeltaBadge, useAnimatedPoints } from "../components/PointsDelta";
+import { BillRow } from "../components/BillRow";
 
 const thresholds: Record<string, number> = { Silver: 500_000, Gold: 2_000_000 };
 
@@ -30,9 +31,9 @@ export function PointsPage() {
       <Card title="Lịch sử điểm" style={{ marginTop: 16 }}>
         <List dataSource={p?.history} locale={{ emptyText: "Chưa có giao dịch điểm." }}
           renderItem={(h) => (
-            <List.Item extra={<b style={{ color: h.points >= 0 ? "#389e0d" : "#cf1322" }}>{h.points >= 0 ? "+" : ""}{h.points}</b>}>
-              <List.Item.Meta title={h.reason} description={dateTime(h.createdAt)} />
-            </List.Item>
+            <BillRow billCode={h.billCode} extra={<b style={{ color: h.points >= 0 ? "#389e0d" : "#cf1322" }}>{h.points >= 0 ? "+" : ""}{h.points}</b>}>
+              <List.Item.Meta title={h.reason} description={h.billCode ? `${dateTime(h.createdAt)} · Bill ${h.billCode}` : dateTime(h.createdAt)} />
+            </BillRow>
           )} />
       </Card>
     </div>

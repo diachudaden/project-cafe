@@ -260,17 +260,20 @@ export function createFeatureApi(http: Http) {
       setMyAvailability: (slots: AvailabilitySlot[]) => put<AvailabilitySlot[]>("/api/me/availability", slots),
     },
     sessions: {
-      checkIn: (input: { seatId: string; pricePlanId: string; paymentMethod: PaymentMethod; customerId?: string | null }) => post<SessionView>("/api/sessions", input),
+      /** `items`: add-ons bought with the check-in (TASK-026); priced by the server, one bill and one payment. */
+      checkIn: (input: { seatId: string; pricePlanId: string; paymentMethod: PaymentMethod; customerId?: string | null; items?: AddOnLine[] }) => post<SessionView>("/api/sessions", input),
       extend: (id: string) => post<SessionView>(`/api/sessions/${id}/extend`),
       close: (id: string) => post<SessionView>(`/api/sessions/${id}/close`),
       sellItems: (id: string, items: AddOnLine[]) => post<AddOnSaleResult>(`/api/sessions/${id}/items`, { items }),
       active: (branchId: string) => get<SessionView[]>(`/api/branches/${branchId}/sessions/active`),
       recentClosed: (branchId: string, hours = 2) => get<RecentClosedSession[]>(`/api/branches/${branchId}/sessions/recent-closed${query({ hours })}`),
       bill: (code: string) => get<SessionView>(`/api/bills/${encodeURIComponent(code)}`),
+      /** 80 mm receipt PDF (TASK-026), fetched with the auth header. */
+      receiptPdf: (code: string) => http.download(`/api/bills/${encodeURIComponent(code)}/receipt.pdf`),
       lookupCustomer: (q: string) => get<CustomerLookup[]>(`/api/customers/lookup${query({ q })}`),
     },
     payments: {
-      createCheckIn: (input: { seatId: string; pricePlanId: string; customerId?: string | null }) =>
+      createCheckIn: (input: { seatId: string; pricePlanId: string; customerId?: string | null; items?: AddOnLine[] }) =>
         post<PaymentRequestView>("/api/payments/requests", input),
       createAddOn: (sessionId: string, items: AddOnLine[]) =>
         post<PaymentRequestView>(`/api/sessions/${sessionId}/items/payment-request`, { items }),

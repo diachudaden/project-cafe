@@ -20,6 +20,11 @@ public static class FeatureRegistration
         services.AddScoped<WorkforceService>();
         services.AddScoped<SessionService>();
         services.AddScoped<AddOnService>();
+        services.AddScoped<ReceiptService>();
+        services.AddOptions<ReceiptOptions>()
+            .BindConfiguration(ReceiptOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddScoped<PaymentRequestService>();
         services.AddScoped<SePayWebhookService>();
         services.AddSingleton<PaymentLogService>();

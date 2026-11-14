@@ -332,6 +332,73 @@ public sealed class RoleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync("/api/payment-logs/TTZZZZZZZZ")).StatusCode);
     }
 
+    [Fact]
+    public async Task Staff_menu_loads_and_check_in_with_items_is_one_bill_through_http()
+    {
+        // TASK-026: the POS menu (500 on SQL Server before the fix) and add-ons bought with the check-in.
+        var staff = await ClientAsync("staff01.demo@cafecr.invalid");
+        var admin = await ClientAsync("admin01.demo@cafecr.invalid");
+        var branchC = await BranchIdAsync("Chi nhánh C");
+        var menu = await staff.GetFromJsonAsync<JsonElement>($"/api/branches/{await BranchIdAsync("Chi nhánh A")}/products", Json);
+        Assert.True(menu.GetArrayLength() > 0);
+        var product = (await admin.GetFromJsonAsync<JsonElement>($"/api/branches/{branchC}/products", Json))[0];
+        var floor = await admin.GetFromJsonAsync<JsonElement>($"/api/branches/{branchC}/floor", Json);
+        var seatId = floor.GetProperty("zones").EnumerateArray().SelectMany(z => z.GetProperty("seats").EnumerateArray())
+            .Last(s => s.GetProperty("state").GetString() == "Available").GetProperty("id").GetGuid();
+        var plan = (await admin.GetFromJsonAsync<JsonElement>($"/api/branches/{branchC}/price-plans", Json))[0];
+        var planId = plan.GetProperty("id").GetGuid();
+
+        var invalid = await admin.PostAsJsonAsync("/api/sessions",
+            new { seatId, pricePlanId = planId, paymentMethod = "Cash", items = new[] { new { productId = Guid.NewGuid(), quantity = 1 } } }, Json);
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.Contains("Có món không còn bán tại chi nhánh này.", await invalid.Content.ReadAsStringAsync());
+
+        var checkIn = await admin.PostAsJsonAsync("/api/sessions",
+            new { seatId, pricePlanId = planId, paymentMethod = "Cash", items = new[] { new { productId = product.GetProperty("id").GetGuid(), quantity = 2 } } }, Json);
+        Assert.Equal(HttpStatusCode.Created, checkIn.StatusCode);
+        var session = await checkIn.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal(plan.GetProperty("price").GetDecimal() + 2 * product.GetProperty("price").GetDecimal(), session.GetProperty("bill").GetProperty("total").GetDecimal());
+        Assert.Equal(2, session.GetProperty("items")[0].GetProperty("quantity").GetInt32());
+    }
+
+    [Fact]
+    public async Task Receipt_pdf_is_a_branch_scoped_attachment_with_the_bill_code()
+    {
+        var (branchA, branchC) = (await BranchIdAsync("Chi nhánh A"), await BranchIdAsync("Chi nhánh C"));
+        string codeA, codeC;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            codeA = await db.Bills.Where(b => b.BranchId == branchA && b.ClaimedByCustomerId == null).Select(b => b.Code).FirstAsync();
+            codeC = await db.Bills.Where(b => b.BranchId == branchC).Select(b => b.Code).FirstAsync();
+        }
+
+        var staff = await ClientAsync("staff01.demo@cafecr.invalid");
+        var response = await staff.GetAsync($"/api/bills/{codeA}/receipt.pdf");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("attachment", response.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.Equal($"bill-{codeA}.pdf", response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        var pdf = await response.Content.ReadAsByteArrayAsync();
+        using (var document = UglyToad.PdfPig.PdfDocument.Open(pdf))
+        {
+            var words = string.Join(" ", document.GetPages().SelectMany(p => p.GetWords()).Select(w => w.Text)).Normalize(NormalizationForm.FormC);
+            Assert.Contains(codeA, words);
+            Assert.Contains("Quét để tích điểm".Normalize(NormalizationForm.FormC), words);
+        }
+
+        // Another branch's bill is invisible to this staff member; Admin sees every branch; customers are not workforce.
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"/api/bills/{codeC}/receipt.pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await (await ClientAsync("admin01.demo@cafecr.invalid")).GetAsync($"/api/bills/{codeC}/receipt.pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await (await ClientAsync("customer05.demo@cafecr.invalid")).GetAsync($"/api/bills/{codeA}/receipt.pdf")).StatusCode);
+
+        var swagger = await factory.CreateClient().GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json", Json);
+        var operation = swagger.GetProperty("paths").GetProperty("/api/bills/{code}/receipt.pdf").GetProperty("get");
+        Assert.True(operation.GetProperty("responses").GetProperty("200").GetProperty("content").TryGetProperty("application/pdf", out _));
+        Assert.Equal("In hóa đơn (PDF khổ 80 mm)", operation.GetProperty("summary").GetString());
+    }
+
     private static DateOnly Today => DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7)).DateTime);
 
     private async Task<JsonElement> LoginAsync(string email)

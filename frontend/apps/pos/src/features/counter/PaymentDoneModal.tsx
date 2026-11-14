@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Button, Modal, Result, Space, Tag, Typography } from "antd";
 import type { PaymentMethod } from "@cafecr/api-client";
 import { displayName, paymentLabels, time, vnd } from "@cafecr/ui";
+import { PrintBillButton } from "./PrintBillButton";
 
 export interface PaymentDone {
   /** What was paid for: "Check-in", "Gia hạn", "Đồ thêm". */
@@ -21,7 +22,8 @@ export interface PaymentDone {
 export function PaymentDoneModal({ done, onClose, actions }: { done: PaymentDone; onClose: () => void; actions?: ReactNode }) {
   return (
     <Modal open onCancel={onClose} footer={
-      <Space>
+      <Space wrap>
+        <PrintBillButton billCode={done.billCode} size="large" />
         {actions}
         <Button type="primary" size="large" onClick={onClose} autoFocus>Xong</Button>
       </Space>

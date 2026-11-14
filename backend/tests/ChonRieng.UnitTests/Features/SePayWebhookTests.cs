@@ -381,6 +381,130 @@ public sealed class SePayWebhookTests : IDisposable
         Assert.Equal(StatusCodes.Status404NotFound, denied.Error!.Status);
     }
 
+    // ---- TASK-026: add-ons bought together with the check-in (one bill, one payment) ----
+
+    [Fact]
+    public async Task Cash_check_in_with_items_writes_one_bill_and_awards_points_once_on_the_total()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (noodle, egg, _, _) = await SeedMenuAsync(branch);
+        var (user, member) = await SeedMemberAsync();
+
+        var result = await new SessionService(_db, _clock).CheckInAsync(manager,
+            new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, member.Id, [new(noodle.Id, 2), new(egg.Id, 1)]), default);
+
+        Assert.True(result.IsSuccess);
+        var bill = await _db.Bills.SingleAsync();
+        Assert.Equal(45_000 + 2 * 15_000 + 8_000, bill.Total);
+        Assert.Equal(bill.Total, bill.CashPaidTotal);
+        Assert.Equal(PaymentMethod.Cash, bill.PaymentMethod);
+        var items = await _db.BillItems.OrderBy(i => i.Name).ToListAsync();
+        Assert.Equal(["Mì ly", "Trứng"], items.Select(i => i.Name));
+        Assert.All(items, i => Assert.Equal((bill.Id, PaymentMethod.Cash, manager.UserId), (i.BillId, i.PaymentMethod, i.CreatedByUserId!.Value)));
+        Assert.Equal(2, result.Value!.Items.Count);
+
+        var points = Assert.Single(await _db.PointTransactions.ToListAsync());
+        Assert.Equal(83, points.Points);
+        Assert.Equal(83, result.Value.PointsAwarded);
+        Assert.Single(await PaymentNotificationsFor(user));
+    }
+
+    [Fact]
+    public async Task Vietqr_check_in_with_items_settles_session_bill_and_items_from_the_snapshot()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (noodle, egg, _, _) = await SeedMenuAsync(branch);
+        var (user, member) = await SeedMemberAsync();
+
+        var created = await Payments().CreateCheckInAsync(manager,
+            new CreateCheckInPaymentRequest(seat.Id, plan.Id, member.Id, [new(noodle.Id, 1), new(egg.Id, 2)]), default);
+
+        Assert.True(created.IsSuccess);
+        Assert.Equal(45_000 + 15_000 + 16_000, created.Value!.Amount);
+        var paymentRequest = await _db.PaymentRequests.SingleAsync();
+        Assert.Contains("Mì ly", paymentRequest.Items); // stored unescaped, fits nvarchar(4000)
+        using (var detail = System.Text.Json.JsonDocument.Parse((await _db.PaymentLogs.SingleAsync(l => l.Stage == PaymentLogStage.RequestCreated)).Detail!))
+        {
+            Assert.Equal(["Mì ly", "Trứng"], detail.RootElement.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("name").GetString()).Order());
+        }
+
+        Assert.Empty(await _db.Sessions.ToListAsync());
+        Assert.Empty(await _db.BillItems.ToListAsync());
+
+        // A menu price change after the QR was shown does not change what the customer pays for.
+        noodle.Price = 99_000;
+        await _db.SaveChangesAsync();
+        var body = Payload("tx-check-in-items", AccountNumber, paymentRequest.Code, 76_000);
+        var timestamp = Timestamp();
+        await SendAsync(body, timestamp, Sign(timestamp, body));
+
+        Assert.Equal(PaymentRequestStatus.Paid, paymentRequest.Status);
+        var bill = await _db.Bills.SingleAsync();
+        Assert.Equal((76_000m, 76_000m, 0m, PaymentMethod.VietQr), (bill.Total, bill.VietQrPaidTotal, bill.CashPaidTotal, bill.PaymentMethod));
+        var items = await _db.BillItems.ToListAsync();
+        Assert.Equal(2, items.Count);
+        Assert.Equal(15_000, items.Single(i => i.ProductId == noodle.Id).UnitPrice);
+        Assert.All(items, i => Assert.Equal((bill.Id, PaymentMethod.VietQr, paymentRequest.Id), (i.BillId, i.PaymentMethod, i.PaymentRequestId!.Value)));
+        Assert.Equal(76, Assert.Single(await _db.PointTransactions.ToListAsync()).Points);
+        Assert.Single(await PaymentNotificationsFor(user));
+        Assert.Equal(76, (await Payments().GetStatusAsync(paymentRequest.Code, default)).Value!.PointsAwarded);
+    }
+
+    [Fact]
+    public async Task Vietqr_check_in_with_a_corrupt_items_snapshot_needs_attention_and_creates_nothing()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (noodle, _, _, _) = await SeedMenuAsync(branch);
+        Assert.True((await Payments().CreateCheckInAsync(manager, new CreateCheckInPaymentRequest(seat.Id, plan.Id, null, [new(noodle.Id, 1)]), default)).IsSuccess);
+        var paymentRequest = await _db.PaymentRequests.SingleAsync();
+        paymentRequest.Items = "{not json";
+        await _db.SaveChangesAsync();
+
+        var body = Payload("tx-check-in-corrupt", AccountNumber, paymentRequest.Code, 60_000);
+        var timestamp = Timestamp();
+        await SendAsync(body, timestamp, Sign(timestamp, body));
+
+        Assert.Equal(PaymentRequestStatus.NeedsAttention, paymentRequest.Status);
+        Assert.Empty(await _db.Sessions.ToListAsync());
+        Assert.Empty(await _db.Bills.ToListAsync());
+        Assert.Empty(await _db.BillItems.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Check_in_items_are_validated_with_400_and_nothing_is_created()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (noodle, _, inactive, foreign) = await SeedMenuAsync(branch);
+        var sessions = new SessionService(_db, _clock);
+        IReadOnlyList<AddOnLineRequest>[] invalid =
+        [
+            [new(inactive.Id, 1)],
+            [new(foreign.Id, 1)],
+            [new(Guid.NewGuid(), 1)],
+            [new(noodle.Id, 0)],
+            [new(noodle.Id, 100)],
+            [new(noodle.Id, 60), new(noodle.Id, 40)],
+            Enumerable.Range(0, 31).Select(_ => new AddOnLineRequest(noodle.Id, 1)).ToList(),
+        ];
+
+        foreach (var items in invalid)
+        {
+            var cash = await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null, items), default);
+            Assert.Equal(StatusCodes.Status400BadRequest, cash.Error?.Status);
+            Assert.True(cash.Error!.Errors!.ContainsKey("Items"));
+            var qr = await Payments().CreateCheckInAsync(manager, new CreateCheckInPaymentRequest(seat.Id, plan.Id, null, items), default);
+            Assert.Equal(StatusCodes.Status400BadRequest, qr.Error?.Status);
+        }
+
+        Assert.Empty(await _db.Sessions.ToListAsync());
+        Assert.Empty(await _db.Bills.ToListAsync());
+        Assert.Empty(await _db.PaymentRequests.ToListAsync());
+
+        // No items keeps the old behaviour: plan price only.
+        Assert.Equal(45_000, (await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null, []), default)).Value!.Bill.Total);
+        Assert.Empty(await _db.BillItems.ToListAsync());
+    }
+
     [Theory]
     [InlineData(BusinessRoles.Staff)]
     [InlineData(BusinessRoles.BranchManager)]
