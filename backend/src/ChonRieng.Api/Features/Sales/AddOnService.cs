@@ -28,6 +28,13 @@ public sealed record ProductRequest(
 
 public sealed record AddOnLineRequest(Guid ProductId, [property: Range(1, 99)] int Quantity);
 
+public sealed record AddOnSaleResponse(
+    IReadOnlyList<BillItemView> Items,
+    string BillCode,
+    [property: Description("Tổng hóa đơn sau khi thêm đồ.")] decimal BillTotal,
+    [property: Description("Điểm thành viên được cộng cho lần bán này (0 nếu khách lẻ).")] int PointsAwarded,
+    [property: Description("Tên thành viên được cộng điểm, null nếu khách lẻ.")] string? CustomerName);
+
 public sealed record AddOnSaleRequest([property: Required, MinLength(1), MaxLength(30)] IReadOnlyList<AddOnLineRequest> Items);
 
 public sealed record BillItemView(Guid Id, string Name, decimal UnitPrice, int Quantity, decimal Amount, PaymentMethod PaymentMethod, DateTimeOffset CreatedAt);
@@ -126,7 +133,7 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
     // ---- Selling ----
 
     /// <summary>Cash sale: lines go on the session's bill immediately.</summary>
-    public async Task<Result<IReadOnlyList<BillItemView>>> SellCashAsync(CurrentUser user, Guid sessionId, AddOnSaleRequest request, CancellationToken ct)
+    public async Task<Result<AddOnSaleResponse>> SellCashAsync(CurrentUser user, Guid sessionId, AddOnSaleRequest request, CancellationToken ct)
     {
         var session = await ActiveSessionAsync(user, sessionId, ct);
         if (session.Error is not null)
@@ -140,7 +147,7 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
             return lines.Error;
         }
 
-        var items = await AddToBillAsync(session.Value.Bill!, lines.Value!, PaymentMethod.Cash, null, user.UserId, ct);
+        var sale = await AddToBillAsync(session.Value.Bill!, session.Value.Seat.Code, lines.Value!, PaymentMethod.Cash, null, user.UserId, clock.GetUtcNow(), ct);
         // Include the session row in the save so its Status/EndAt concurrency tokens are checked: a seat
         // auto-released a moment ago (TASK-024) must not receive new items.
         db.Entry(session.Value).Property(s => s.Status).IsModified = true;
@@ -154,7 +161,8 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
             return SessionService.SessionChanged();
         }
 
-        return Result<IReadOnlyList<BillItemView>>.From(items.Select(ToView).ToList());
+        var bill = session.Value.Bill!;
+        return new AddOnSaleResponse(sale.Items.Select(ToView).ToList(), bill.Code, bill.Total, sale.PointsAwarded, sale.CustomerName);
     }
 
     /// <summary>VietQR: computes the amount server-side and snapshots the lines on the payment request.</summary>
@@ -207,16 +215,20 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
             return PaymentSettlementOutcome.NeedsAttention(SessionService.EndedReason(session));
         }
 
-        await AddToBillAsync(session.Bill, lines, PaymentMethod.VietQr, paymentRequest.Id, paymentRequest.CreatedByUserId, ct);
+        // One timestamp for the lines, the points and PaidAt, so the POS can find this payment's points.
+        var now = clock.GetUtcNow();
+        await AddToBillAsync(session.Bill, session.Seat.Code, lines, PaymentMethod.VietQr, paymentRequest.Id, paymentRequest.CreatedByUserId, now, ct);
         paymentRequest.BillId = session.Bill.Id;
-        paymentRequest.PaidAt = clock.GetUtcNow();
+        paymentRequest.PaidAt = now;
         return new PaymentSettlementOutcome(true, null, session.Bill.Id, session.Bill.Code, session.Seat.Code, session.Id);
     }
 
-    private async Task<List<BillItem>> AddToBillAsync(
-        Bill bill, IReadOnlyList<AddOnLine> lines, PaymentMethod method, Guid? paymentRequestId, Guid? userId, CancellationToken ct)
+    private sealed record AddedToBill(List<BillItem> Items, int PointsAwarded, string? CustomerName);
+
+    private async Task<AddedToBill> AddToBillAsync(
+        Bill bill, string seatCode, IReadOnlyList<AddOnLine> lines, PaymentMethod method, Guid? paymentRequestId, Guid? userId,
+        DateTimeOffset now, CancellationToken ct)
     {
-        var now = clock.GetUtcNow();
         var items = lines.Select(l => new BillItem
         {
             BillId = bill.Id,
@@ -248,16 +260,14 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
 
         if (bill.ClaimedByCustomerId is { } customerId && total > 0)
         {
-            var customer = await db.Customers.SingleAsync(c => c.Id == customerId, ct);
-            db.PointTransactions.Add(Loyalty.Award(customer, bill, total, now, $"Đồ thêm hóa đơn {bill.Code}"));
-            if (method == PaymentMethod.VietQr)
-            {
-                db.Notify(customer.UserId, Notifier.PaymentReceived, "Thanh toán đồ thêm thành công",
-                    $"Đã nhận {total:N0}đ cho đồ thêm.", "/pay", now);
-            }
+            var customer = await db.Customers.Include(c => c.User).SingleAsync(c => c.Id == customerId, ct);
+            var tx = Loyalty.Award(customer, bill, total, now, $"Đồ thêm hóa đơn {bill.Code}");
+            db.PointTransactions.Add(tx);
+            db.PaymentCompleted(customer, bill, seatCode, PaymentKind.AddOn, total, method, tx.Points, now);
+            return new AddedToBill(items, tx.Points, customer.User.FullName);
         }
 
-        return items;
+        return new AddedToBill(items, 0, null);
     }
 
     /// <summary>Prices the requested lines from the current menu: active, sold at this branch, sensible quantities.</summary>

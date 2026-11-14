@@ -172,7 +172,7 @@ public sealed class DomainSchemaModelTests
 
         var migrations = db.Database.GetMigrations().ToArray();
 
-        Assert.Equal(8, migrations.Length);
+        Assert.Equal(9, migrations.Length);
         Assert.EndsWith("_InitialCafeCrSchema", migrations[0], StringComparison.Ordinal);
         Assert.EndsWith("_AddRefreshTokenExpiry", migrations[1], StringComparison.Ordinal);
         Assert.EndsWith("_RoleWorkflows", migrations[2], StringComparison.Ordinal);
@@ -181,5 +181,6 @@ public sealed class DomainSchemaModelTests
         Assert.EndsWith("_PaymentLogs", migrations[5], StringComparison.Ordinal);
         Assert.EndsWith("_AddOnItems", migrations[6], StringComparison.Ordinal);
         Assert.EndsWith("_SessionCloseReason", migrations[7], StringComparison.Ordinal);
+        Assert.EndsWith("_NotificationPaymentLinks", migrations[8], StringComparison.Ordinal);
     }
 }

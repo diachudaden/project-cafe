@@ -69,4 +69,27 @@ public sealed record MyPointsResponse(
 
 public sealed record MyBill(string Code, string BranchName, decimal Total, DateTimeOffset CreatedAt, DateTimeOffset? ClaimedAt, int Points);
 
+public sealed record MyBillExtension(DateTimeOffset CreatedAt, int AddedMinutes, decimal Price);
+
+public sealed record MyBillPoints(int Points, string Reason, DateTimeOffset CreatedAt);
+
+public sealed record MyBillDetail(
+    string Code,
+    string BranchName,
+    string SeatCode,
+    string PlanName,
+    DateTimeOffset StartAt,
+    [property: Description("Giờ kết thúc (đã gồm các lần gia hạn).")] DateTimeOffset EndAt,
+    SessionStatus SessionStatus,
+    [property: Description("Manual / AutoReleased khi lượt đã kết thúc.")] SessionCloseReason? CloseReason,
+    IReadOnlyList<MyBillExtension> Extensions,
+    [property: Description("Đồ thêm đã mua trên hóa đơn.")] IReadOnlyList<BillItemView> Items,
+    decimal CashPaidTotal,
+    decimal VietQrPaidTotal,
+    decimal Total,
+    PaymentMethod PaymentMethod,
+    [property: Description("Các lần cộng điểm của hóa đơn này.")] IReadOnlyList<MyBillPoints> Points,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ClaimedAt);
+
 public sealed record MyActiveSession(Guid SessionId, string BranchName, string SeatCode, DateTimeOffset StartAt, DateTimeOffset EndAt, int MinutesLeft);

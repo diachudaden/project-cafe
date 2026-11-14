@@ -407,6 +407,160 @@ public sealed class SePayWebhookTests : IDisposable
         Assert.Empty(await _db.SessionExtensions.ToListAsync());
     }
 
+    // ---- TASK-025: payment completion notifications ----
+
+    private async Task<(User User, Customer Customer)> SeedMemberAsync(string email = "n@test.invalid", string code = "CRNOTI01")
+    {
+        var user = new User { UserName = email, Email = email, FullName = "Khách " + code };
+        var customer = new Customer { UserId = user.Id, Tier = Loyalty.Bronze, MemberCode = code };
+        _db.AddRange(user, customer);
+        await _db.SaveChangesAsync();
+        return (user, customer);
+    }
+
+    private static CurrentUser AsCustomer(User user) =>
+        new(user.Id, new HashSet<string> { BusinessRoles.Customer }, BranchAccessScope.ForBranches(new HashSet<Guid>()));
+
+    private PaymentRequestService Payments() =>
+        new(_db, Options.Create(_options), _clock, new SessionService(_db, _clock), TestPaymentLog.For(_db, _clock));
+
+    private Task<List<Notification>> PaymentNotificationsFor(User user) =>
+        _db.Notifications.AsNoTracking().Where(n => n.UserId == user.Id && n.Type == Notifier.PaymentReceived)
+            .OrderBy(n => n.CreatedAt).ThenBy(n => n.Title).ToListAsync();
+
+    /// <summary>Pays the latest pending request through the signed SePay webhook.</summary>
+    private async Task<PaymentRequest> PayLatestRequestAsync(string txId)
+    {
+        _db.ChangeTracker.Clear();
+        var request = await _db.PaymentRequests.Where(r => r.Status == PaymentRequestStatus.Pending).SingleAsync();
+        var body = Payload(txId, AccountNumber, request.Code, request.Amount);
+        var timestamp = Timestamp();
+        await SendAsync(body, timestamp, Sign(timestamp, body));
+        _db.ChangeTracker.Clear();
+        return await _db.PaymentRequests.AsNoTracking().SingleAsync(r => r.Id == request.Id);
+    }
+
+    private static void AssertPaymentNotification(Notification n, string billCode, string amount, int points, int balance)
+    {
+        Assert.Equal($"/bills/{billCode}", n.Link);
+        Assert.Contains(amount, n.Body);
+        Assert.Contains(billCode, n.Body);
+        Assert.Contains($"+{points} điểm", n.Body);
+        Assert.Contains($"số dư {balance} điểm", n.Body);
+    }
+
+    [Fact]
+    public async Task Cash_payments_notify_the_member_once_each_with_amount_points_and_balance()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (user, member) = await SeedMemberAsync();
+        var (noodle, _, _, _) = await SeedMenuAsync(branch);
+        var sessions = new SessionService(_db, _clock);
+
+        var checkedIn = (await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, member.Id), default)).Value!;
+        var list = await PaymentNotificationsFor(user);
+        AssertPaymentNotification(Assert.Single(list), checkedIn.Bill.Code, "45.000đ (Tiền mặt)", 45, 45);
+
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.True((await sessions.ExtendAsync(manager, checkedIn.Id, default)).IsSuccess);
+        list = await PaymentNotificationsFor(user);
+        Assert.Equal(2, list.Count);
+        AssertPaymentNotification(list[1], checkedIn.Bill.Code, "40.000đ (Tiền mặt)", 40, 85);
+        Assert.Contains("gia hạn", list[1].Body);
+
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        var sale = (await new AddOnService(_db, _clock).SellCashAsync(manager, checkedIn.Id, new AddOnSaleRequest([new(noodle.Id, 1)]), default)).Value!;
+        Assert.Equal(15, sale.PointsAwarded);
+        Assert.Equal(user.FullName, sale.CustomerName);
+        Assert.Equal(checkedIn.Bill.Code, sale.BillCode);
+        list = await PaymentNotificationsFor(user);
+        Assert.Equal(3, list.Count);
+        AssertPaymentNotification(list[2], checkedIn.Bill.Code, "15.000đ (Tiền mặt)", 15, 100);
+    }
+
+    [Fact]
+    public async Task Vietqr_payments_notify_the_member_once_each_and_report_points_to_the_pos()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (user, member) = await SeedMemberAsync();
+        var (noodle, _, _, _) = await SeedMenuAsync(branch);
+
+        Assert.True((await Payments().CreateCheckInAsync(manager, new CreateCheckInPaymentRequest(seat.Id, plan.Id, member.Id), default)).IsSuccess);
+        var checkInRequest = await PayLatestRequestAsync("tx-noti-checkin");
+        var billCode = (await _db.Bills.AsNoTracking().SingleAsync()).Code;
+        AssertPaymentNotification(Assert.Single(await PaymentNotificationsFor(user)), billCode, "45.000đ (VietQR)", 45, 45);
+        var status = (await Payments().GetStatusAsync(checkInRequest.Code, default)).Value!;
+        Assert.Equal((45, user.FullName), (status.PointsAwarded, status.CustomerName));
+
+        var sessionId = (await _db.Sessions.AsNoTracking().SingleAsync()).Id;
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.True((await Payments().CreateExtensionAsync(manager, sessionId, default)).IsSuccess);
+        var extensionRequest = await PayLatestRequestAsync("tx-noti-extension");
+        var list = await PaymentNotificationsFor(user);
+        Assert.Equal(2, list.Count);
+        AssertPaymentNotification(list[1], billCode, "40.000đ (VietQR)", 40, 85);
+        Assert.Equal(40, (await Payments().GetStatusAsync(extensionRequest.Code, default)).Value!.PointsAwarded);
+
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.True((await Payments().CreateAddOnAsync(manager, sessionId, new AddOnSaleRequest([new(noodle.Id, 2)]), default)).IsSuccess);
+        var addOnRequest = await PayLatestRequestAsync("tx-noti-addon");
+        list = await PaymentNotificationsFor(user);
+        Assert.Equal(3, list.Count);
+        AssertPaymentNotification(list[2], billCode, "30.000đ (VietQR)", 30, 115);
+        Assert.Equal(30, (await Payments().GetStatusAsync(addOnRequest.Code, default)).Value!.PointsAwarded);
+    }
+
+    [Fact]
+    public async Task Walk_in_payments_create_no_notification()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (noodle, _, _, _) = await SeedMenuAsync(branch);
+        var sessions = new SessionService(_db, _clock);
+
+        var checkedIn = (await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null), default)).Value!;
+        Assert.True((await sessions.ExtendAsync(manager, checkedIn.Id, default)).IsSuccess);
+        var sale = (await new AddOnService(_db, _clock).SellCashAsync(manager, checkedIn.Id, new AddOnSaleRequest([new(noodle.Id, 1)]), default)).Value!;
+        Assert.Equal((0, (string?)null), (sale.PointsAwarded, sale.CustomerName));
+        Assert.True((await Payments().CreateExtensionAsync(manager, checkedIn.Id, default)).IsSuccess);
+        var paid = await PayLatestRequestAsync("tx-walkin-extension");
+
+        Assert.Equal(PaymentRequestStatus.Paid, paid.Status);
+        Assert.Empty(await _db.Notifications.ToListAsync());
+        Assert.Equal(0, (await Payments().GetStatusAsync(paid.Code, default)).Value!.PointsAwarded);
+    }
+
+    [Fact]
+    public async Task Claim_notifies_points_and_later_payments_notify_the_claimer_and_bill_detail_is_owner_only()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (owner, _) = await SeedMemberAsync("owner@test.invalid", "CROWNER1");
+        var (stranger, _) = await SeedMemberAsync("other@test.invalid", "CROTHER1");
+        var sessions = new SessionService(_db, _clock);
+        var loyalty = new LoyaltyService(_db, _clock);
+        var checkedIn = (await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null), default)).Value!;
+        var code = checkedIn.Bill.Code;
+
+        Assert.Equal(404, (await loyalty.BillDetailAsync(AsCustomer(owner), code, default)).Error!.Status); // not claimed yet
+
+        Assert.True((await loyalty.ClaimAsync(AsCustomer(owner), code, default)).IsSuccess);
+        var claimed = await _db.Notifications.AsNoTracking().SingleAsync(n => n.Type == Notifier.PointsEarned);
+        Assert.Equal(owner.Id, claimed.UserId);
+        Assert.Equal($"/bills/{code}", claimed.Link);
+        Assert.Contains("+45 điểm", claimed.Body);
+        Assert.Contains(seat.Code, claimed.Body);
+
+        // Points for a later extension go to whoever claimed the bill, so they get the notification too.
+        _db.ChangeTracker.Clear();
+        Assert.True((await sessions.ExtendAsync(manager, checkedIn.Id, default)).IsSuccess);
+        AssertPaymentNotification(Assert.Single(await PaymentNotificationsFor(owner)), code, "40.000đ", 40, 85);
+
+        var detail = (await loyalty.BillDetailAsync(AsCustomer(owner), code.ToLowerInvariant(), default)).Value!;
+        Assert.Equal((seat.Code, branch.Name, 85_000m, 85_000m), (detail.SeatCode, detail.BranchName, detail.Total, detail.CashPaidTotal));
+        Assert.Single(detail.Extensions);
+        Assert.Equal(new[] { 45, 40 }, detail.Points.Select(p => p.Points));
+        Assert.Equal(404, (await loyalty.BillDetailAsync(AsCustomer(stranger), code, default)).Error!.Status);
+    }
+
     // ---- TASK-024: auto-release overdue seats ----
 
     private SessionAutoReleaseService AutoRelease(int graceMinutes = 10, AppDbContext? db = null) =>

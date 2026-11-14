@@ -1,4 +1,5 @@
 using ChonRieng.Api.Features.Common;
+using ChonRieng.Api.Features.Engagement;
 using ChonRieng.Domain.Entities;
 using ChonRieng.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,7 @@ public sealed class LoyaltyService(AppDbContext db, TimeProvider clock)
         }
 
         var normalized = Loyalty.NormalizeCode(code);
-        var bill = await db.Bills.SingleOrDefaultAsync(b => b.Code == normalized, ct);
+        var bill = await db.Bills.Include(b => b.Session).ThenInclude(s => s.Seat).SingleOrDefaultAsync(b => b.Code == normalized, ct);
         if (bill is null)
         {
             return ServiceError.NotFound("Mã bill không đúng. Hãy kiểm tra lại 8 ký tự trên hóa đơn.");
@@ -37,6 +38,7 @@ public sealed class LoyaltyService(AppDbContext db, TimeProvider clock)
         bill.ClaimedAt = now;
         var tx = Loyalty.Award(customer, bill, bill.Total, now, $"Tích điểm hóa đơn {bill.Code}");
         db.PointTransactions.Add(tx);
+        db.PointsClaimed(customer, bill, bill.Session?.Seat?.Code, tx.Points, now);
         try
         {
             await db.SaveChangesAsync(ct);
@@ -90,6 +92,35 @@ public sealed class LoyaltyService(AppDbContext db, TimeProvider clock)
             .Take(100)
             .Select(b => new MyBill(b.Code, b.Branch.Name, b.Total, b.CreatedAt, b.ClaimedAt, b.PointTransactions.Sum(p => p.Points)))
             .ToListAsync(ct);
+
+    /// <summary>One bill of the signed-in customer (claimed by them); NotFound for anyone else's bill.</summary>
+    public async Task<Result<MyBillDetail>> BillDetailAsync(CurrentUser user, string code, CancellationToken ct)
+    {
+        var normalized = Loyalty.NormalizeCode(code);
+        var detail = await db.Bills.AsNoTracking()
+            .Where(b => b.Code == normalized && b.ClaimedByCustomer != null && b.ClaimedByCustomer.UserId == user.UserId)
+            .Select(b => new MyBillDetail(
+                b.Code,
+                b.Branch.Name,
+                b.Session.Seat.Code,
+                b.Session.PricePlan.Name,
+                b.Session.StartAt,
+                b.Session.EndAt,
+                b.Session.Status,
+                b.Session.CloseReason,
+                b.Session.Extensions.OrderBy(e => e.CreatedAt).Select(e => new MyBillExtension(e.CreatedAt, e.AddedMinutes, e.Price)).ToList(),
+                b.Items.OrderBy(i => i.CreatedAt)
+                    .Select(i => new BillItemView(i.Id, i.Name, i.UnitPrice, i.Quantity, i.Amount, i.PaymentMethod, i.CreatedAt)).ToList(),
+                b.CashPaidTotal,
+                b.VietQrPaidTotal,
+                b.Total,
+                b.PaymentMethod,
+                b.PointTransactions.OrderBy(p => p.CreatedAt).Select(p => new MyBillPoints(p.Points, p.Reason, p.CreatedAt)).ToList(),
+                b.CreatedAt,
+                b.ClaimedAt))
+            .SingleOrDefaultAsync(ct);
+        return detail is null ? ServiceError.NotFound("Không tìm thấy hóa đơn của bạn.") : detail;
+    }
 
     public async Task<MyActiveSession?> CurrentSessionAsync(CurrentUser user, CancellationToken ct)
     {
