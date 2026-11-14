@@ -3,6 +3,7 @@ using System.Text;
 using ChonRieng.Api.Endpoints;
 using ChonRieng.Api.Features;
 using ChonRieng.Api.Features.Common;
+using ChonRieng.Api.Features.Health;
 using ChonRieng.Api.Authorization;
 using ChonRieng.Api.Middleware;
 using ChonRieng.Api.Services;
@@ -152,6 +153,10 @@ await using (var scope = app.Services.CreateAsyncScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
         .CreateLogger("RoleBootstrapper");
     await RoleBootstrapper.InitializeAsync(scope.ServiceProvider, app.Configuration, logger);
+    await DatabaseHealth.LogStartupStatusAsync(
+        scope.ServiceProvider,
+        scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseHealth"),
+        app.Lifetime.ApplicationStopping);
 
     if (seedDevelopmentData)
     {
@@ -181,6 +186,7 @@ app.MapGet("/", () => Results.Redirect("/swagger"));
 app.MapAuthEndpoints();
 app.MapAdminCrudEndpoints();
 app.MapFeatureEndpoints();
+app.MapHealthEndpoints();
 
 app.Run();
 
