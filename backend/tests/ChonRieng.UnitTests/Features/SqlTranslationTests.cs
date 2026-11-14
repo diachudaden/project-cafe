@@ -31,7 +31,7 @@ public sealed class SqlTranslationTests
         "branches", "availability", "plans", "managed-plans", "shifts", "my-shifts", "open-shifts", "attendance", "current-shift",
         "active-sessions", "customer-lookup", "my-bills", "my-session", "closings", "expenses", "payroll", "requests", "my-requests",
         "employees", "assistant", "revenue", "profit-loss", "occupancy", "compare", "dashboard",
-        "auto-release", "recent-closed", "my-bill-detail",
+        "auto-release", "recent-closed", "my-bill-detail", "menu", "managed-products",
     ];
 
     [Theory]
@@ -87,6 +87,9 @@ public sealed class SqlTranslationTests
                 Assert.Contains(interceptor.Commands, c => c.Contains("UPDATE", StringComparison.Ordinal) && c.Contains("[EndAt] <=", StringComparison.Ordinal));
             },
             "my-bill-detail" => () => new LoyaltyService(db, clock).BillDetailAsync(Admin, "ABCD1234", default),
+            // TASK-026: POS menu (500 on production) and the admin list that worked.
+            "menu" => () => new AddOnService(db, clock).MenuAsync(Admin, BranchId, default),
+            "managed-products" => () => new AddOnService(db, clock).ManagedAsync(Admin, BranchId, default),
             "recent-closed" => () => new SessionService(db, clock).RecentClosedAsync(Admin, BranchId, 2, default),
             _ => throw new ArgumentOutOfRangeException(nameof(name)),
         };

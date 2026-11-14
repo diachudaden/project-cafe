@@ -95,7 +95,8 @@ export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchI
       break;
     case "error":
       body = (
-        <Alert type="error" showIcon message="Không tải được thực đơn" description={view.message}
+        <Alert type="error" showIcon message="Không tải được thực đơn"
+          description={<>{view.message}{view.diagnostics && <div><Typography.Text type="secondary" copyable style={{ fontSize: 12 }}>{view.diagnostics}</Typography.Text></div>}</>}
           action={<Button onClick={() => void products.refetch()} loading={products.isFetching}>Thử lại</Button>} />
       );
       break;

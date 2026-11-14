@@ -14,6 +14,8 @@ export interface ProblemDetails {
   detail?: string;
   errors?: Record<string, string[]>;
   violations?: RuleViolation[];
+  /** Added by ASP.NET Core to every ProblemDetails; quote it when reporting a server error. */
+  traceId?: string;
 }
 
 export class ApiError extends Error {
@@ -23,6 +25,7 @@ export class ApiError extends Error {
     readonly fieldErrors: Record<string, string[]> = {},
     readonly violations: RuleViolation[] = [],
     readonly title?: string,
+    readonly traceId?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -55,7 +58,7 @@ async function toApiError(response: Response): Promise<ApiError> {
     problem.title ??
     "Yêu cầu không thành công.";
 
-  return new ApiError(response.status, message, fieldErrors, problem.violations ?? [], problem.title);
+  return new ApiError(response.status, message, fieldErrors, problem.violations ?? [], problem.title, problem.traceId);
 }
 
 export interface HttpOptions {
