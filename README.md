@@ -52,6 +52,17 @@ Add-on items (đồ thêm) are business data, not migration data: create them in
 
 The latest migration, `RoleWorkflows`, adds the columns and indexes used by the role workflows (one active session per seat, bill/point timestamps, member codes, closing review, expense reversals, attendance approval). Review migration files under `backend/src/ChonRieng.Infrastructure/Persistence/Migrations` and confirm the target database before updating it. Do not apply migrations to shared or production databases without review and a backup.
 
+### Seat auto-release (TASK-024)
+
+The API frees seats whose session is overdue by more than a grace period and was not extended (`CloseReason = AutoReleased`). Settings (environment, `compose.yaml` passes them through with these defaults):
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `Sessions__AutoReleaseGraceMinutes` | `10` | Minutes past the paid end time before release; `0` disables it (0–240, validated at startup). |
+| `Sessions__AutoReleaseIntervalSeconds` | `60` | How often the check runs (10–3600). |
+
+Requires migration `SessionCloseReason`; `GET /api/health` lists it as pending until it is applied.
+
 ## Optional development seed
 
 The seed command inserts demo data only when explicitly requested. It is allowed only in the `Development` or `Testing` environment; normal API startup never seeds demo records. It does not apply migrations, delete records, or reset the database. First apply the reviewed migrations to an isolated local database and configure the bootstrap Admin and `DevelopmentSeed__Password` in the ignored root `.env`.
