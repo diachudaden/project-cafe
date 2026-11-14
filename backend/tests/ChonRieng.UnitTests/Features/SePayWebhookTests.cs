@@ -381,6 +381,27 @@ public sealed class SePayWebhookTests : IDisposable
         Assert.Equal(StatusCodes.Status404NotFound, denied.Error!.Status);
     }
 
+    [Theory]
+    [InlineData(BusinessRoles.Staff)]
+    [InlineData(BusinessRoles.BranchManager)]
+    [InlineData(BusinessRoles.Admin)]
+    public async Task Menu_works_for_every_pos_role(string role)
+    {
+        // TASK-026 regression: the menu 500'd for every role on SQL Server (see SqlTranslationTests "menu").
+        var (_, branch, _, _, _) = await SeedCheckInAsync();
+        var (noodle, egg, _, _) = await SeedMenuAsync(branch);
+        var user = new CurrentUser(
+            Guid.CreateVersion7(),
+            new HashSet<string> { role },
+            role == BusinessRoles.Admin ? BranchAccessScope.Global : BranchAccessScope.ForBranches(new HashSet<Guid> { branch.Id }));
+
+        var menu = await new AddOnService(_db, _clock).MenuAsync(user, branch.Id, default);
+
+        Assert.True(menu.IsSuccess);
+        Assert.Equal(new[] { egg.Id, noodle.Id }.Order(), menu.Value!.Select(p => p.Id).Order());
+        Assert.All(menu.Value!, p => Assert.True(p.IsActive));
+    }
+
     [Fact]
     public async Task Add_on_sales_never_change_the_session_end()
     {

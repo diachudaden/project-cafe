@@ -60,7 +60,7 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
             return ServiceError.NotFound();
         }
 
-        return Result<IReadOnlyList<ProductView>>.From(await Products(branchId).Where(p => p.IsActive).ToListAsync(ct));
+        return Result<IReadOnlyList<ProductView>>.From(await Products(branchId, activeOnly: true).ToListAsync(ct));
     }
 
     /// <summary>All products (inactive too) for the management screen.</summary>
@@ -320,9 +320,12 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
         return session;
     }
 
-    private IQueryable<ProductView> Products(Guid branchId) =>
+    // Filters must run on Product, before the projection: EF Core cannot translate a predicate on a
+    // constructor-built ProductView (that was the POS menu 500 on SQL Server, TASK-026).
+    private IQueryable<ProductView> Products(Guid branchId, bool activeOnly = false) =>
         db.Products.AsNoTracking()
             .Where(p => p.BranchId == null || p.BranchId == branchId)
+            .Where(p => !activeOnly || p.IsActive)
             .OrderBy(p => p.Category).ThenBy(p => p.SortOrder).ThenBy(p => p.Name)
             .Select(p => new ProductView(p.Id, p.BranchId, p.Name, p.Category, p.Price, p.IsActive, p.SortOrder));
 
