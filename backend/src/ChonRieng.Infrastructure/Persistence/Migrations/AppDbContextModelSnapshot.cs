@@ -850,13 +850,20 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<byte?>("CloseReason")
+                        .HasColumnType("tinyint");
+
                     b.Property<DateTimeOffset?>("ClosedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ClosedByUserId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("CustomerId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTimeOffset>("EndAt")
+                        .IsConcurrencyToken()
                         .HasColumnType("datetimeoffset");
 
                     b.Property<Guid>("PricePlanId")
@@ -869,6 +876,7 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<byte>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("tinyint");
 
                     b.HasKey("Id");
@@ -883,6 +891,8 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasFilter("[Status] = 1");
 
                     b.HasIndex("SeatId", "Status");
+
+                    b.HasIndex("Status", "EndAt");
 
                     b.ToTable("Sessions", (string)null);
                 });

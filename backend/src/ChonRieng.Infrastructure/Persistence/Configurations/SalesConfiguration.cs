@@ -10,8 +10,15 @@ internal sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
     {
         builder.ToTable("Sessions");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.Status).HasConversion<byte>();
+        // Status and EndAt are concurrency tokens: every tracked write (extend, close, add-on sale, VietQR
+        // settlement) only succeeds if the row is still in the state it read, so it cannot overwrite an
+        // auto-release (TASK-024) or a concurrent extension.
+        builder.Property(x => x.Status).HasConversion<byte>().IsConcurrencyToken();
+        builder.Property(x => x.EndAt).IsConcurrencyToken();
+        builder.Property(x => x.CloseReason).HasConversion<byte?>();
         builder.HasIndex(x => new { x.SeatId, x.Status });
+        // Auto-release worker: active sessions by end time.
+        builder.HasIndex(x => new { x.Status, x.EndAt });
         // At most one active session per seat; protects against two POS tablets selling the same seat.
         builder.HasIndex(x => x.SeatId)
             .IsUnique()

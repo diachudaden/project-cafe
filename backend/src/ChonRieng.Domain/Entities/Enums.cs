@@ -42,6 +42,13 @@ public enum SessionStatus : byte
     Closed = 3,
 }
 
+/// <summary>Who ended a session: staff pressing "Trả chỗ", or the system after the grace period (TASK-024).</summary>
+public enum SessionCloseReason : byte
+{
+    Manual = 1,
+    AutoReleased = 2,
+}
+
 public enum PaymentMethod : byte
 {
     Cash = 1,
