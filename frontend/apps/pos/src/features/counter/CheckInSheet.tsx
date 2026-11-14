@@ -2,14 +2,14 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Drawer, Input, List, Modal, Radio, Result, Select, Space, Tag, Typography } from "antd";
 import type { CustomerLookup, FloorSeat, PaymentMethod, PricePlanView, SessionView } from "@cafecr/api-client";
-import { paymentLabels, seatTypeLabels, tierLabels, time, vnd } from "@cafecr/ui";
+import { displayName, paymentLabels, seatTypeLabels, tierLabels, time, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
 import { AddOnSheet } from "./AddOnSheet";
 import { PaymentRequestModal } from "./PaymentRequestModal";
 
 const hours = (minutes: number) => `${Number((minutes / 60).toFixed(2))} tiếng`;
-const planLabel = (p: PricePlanView) => `${p.name.replace(/^\[DEMO( ONLY)?\]\s*/, "")} · ${hours(p.durationMinutes)} · ${vnd(p.price)}`;
+const planLabel = (p: PricePlanView) => `${displayName(p.name)} · ${hours(p.durationMinutes)} · ${vnd(p.price)}`;
 
 /** Tap a free seat → choose plan / member / payment → "Thu tiền" (3 taps for a walk-in). */
 export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; seat: FloorSeat; onClose: () => void }) {
