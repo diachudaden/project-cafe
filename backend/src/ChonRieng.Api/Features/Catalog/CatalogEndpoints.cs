@@ -38,7 +38,7 @@ public static class CatalogEndpoints
                 (await service.GetFloorAsync(CurrentUser.From(user), branchId, ct)).ToHttp())
             .WithName("GetBranchFloor")
             .WithSummary("Sơ đồ chỗ ngồi realtime")
-            .WithDescription("Trạng thái từng chỗ: Available (trống), Occupied, EndingSoon (còn ≤ 15 phút), Overdue (quá giờ), Maintenance. Dùng cho màn hình Quầy của POS.");
+            .WithDescription("Trạng thái từng chỗ: Available (trống), Occupied, EndingSoon (còn ≤ 15 phút), Overdue (quá giờ), Maintenance. Dùng cho màn hình Quầy của POS. Lượt quá giờ quá thời gian ân hạn (Sessions:AutoReleaseGraceMinutes) sẽ được hệ thống tự trả chỗ; xem session.autoReleaseAt.");
 
         scoped.MapGet("/price-plans/all", async (Guid branchId, ClaimsPrincipal user, CatalogService service, CancellationToken ct) =>
                 (await service.ListManagedPlansAsync(CurrentUser.From(user), branchId, ct)).ToHttp())

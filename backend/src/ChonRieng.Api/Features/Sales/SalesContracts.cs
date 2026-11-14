@@ -36,7 +36,18 @@ public sealed record SessionView(
     SessionCustomer? Customer,
     SessionBill Bill,
     [property: Description("Điểm khách được cộng trong thao tác này (nếu có).")] int PointsAwarded,
-    [property: Description("Đồ thêm (mì, trứng, bánh...) đã bán trên hóa đơn này.")] IReadOnlyList<BillItemView> Items);
+    [property: Description("Đồ thêm (mì, trứng, bánh...) đã bán trên hóa đơn này.")] IReadOnlyList<BillItemView> Items,
+    [property: Description("Lý do kết thúc: Manual (nhân viên trả chỗ) hoặc AutoReleased (hệ thống tự trả chỗ khi quá giờ). null khi đang diễn ra.")] SessionCloseReason? CloseReason = null);
+
+public sealed record RecentClosedSession(
+    Guid SessionId,
+    string SeatCode,
+    [property: Description("Giờ kết thúc đã trả tiền.")] DateTimeOffset EndAt,
+    [property: Description("Thời điểm trả chỗ.")] DateTimeOffset ClosedAt,
+    [property: Description("Manual = nhân viên trả chỗ; AutoReleased = hệ thống tự trả chỗ.")] SessionCloseReason? CloseReason,
+    string? CustomerName,
+    string BillCode,
+    decimal BillTotal);
 
 public sealed record CustomerLookupResult(Guid CustomerId, string FullName, string Tier, int Points, string? MemberCode);
 

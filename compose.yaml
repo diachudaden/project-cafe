@@ -27,6 +27,9 @@ services:
       Payment__WebhookSecret: ${Payment__WebhookSecret:?Set Payment__WebhookSecret in .env to the SePay HMAC secret}
       Payment__TimestampToleranceSeconds: ${Payment__TimestampToleranceSeconds:-300}
       Payment__ValidateOnStart: ${Payment__ValidateOnStart:-true}
+      # Auto-release overdue seats (TASK-024): minutes past EndAt before the system frees the seat; 0 = off.
+      Sessions__AutoReleaseGraceMinutes: ${Sessions__AutoReleaseGraceMinutes:-10}
+      Sessions__AutoReleaseIntervalSeconds: ${Sessions__AutoReleaseIntervalSeconds:-60}
     # Bound to localhost only: the public entry point is the web (nginx) service.
     # Swagger stays reachable from this machine (or an SSH tunnel on EC2).
     ports:

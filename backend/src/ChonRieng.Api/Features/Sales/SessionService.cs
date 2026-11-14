@@ -251,7 +251,13 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             points = tx.Points;
         }
 
-        await db.SaveChangesAsync(ct);
+        // Status/EndAt are concurrency tokens: if the seat was auto-released (or extended by someone else)
+        // after we read it, nothing is saved or charged.
+        if (!await TrySaveAsync(ct))
+        {
+            return SessionChanged();
+        }
+
         return (await GetAsync(session.Id, points, ct))!;
     }
 
@@ -349,7 +355,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             .SingleOrDefaultAsync(s => s.Id == sessionId, ct);
         if (existingSession is null || existingSession.Status != SessionStatus.Active || existingSession.Bill is null)
         {
-            return PaymentSettlementOutcome.NeedsAttention("Lượt ngồi đã kết thúc hoặc không còn hóa đơn.");
+            return PaymentSettlementOutcome.NeedsAttention(EndedReason(existingSession));
         }
 
         var extensionPlan = await db.PricePlans.SingleOrDefaultAsync(p => p.Id == paymentRequest.PricePlanId, ct);
@@ -407,7 +413,13 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         // Expired = the customer stayed past the paid time (decision D7); Closed = left in time.
         session.Status = now > session.EndAt ? SessionStatus.Expired : SessionStatus.Closed;
         session.ClosedAt = now;
-        await db.SaveChangesAsync(ct);
+        session.CloseReason = SessionCloseReason.Manual;
+        session.ClosedByUserId = user.UserId;
+        if (!await TrySaveAsync(ct))
+        {
+            return SessionChanged();
+        }
+
         return (await GetAsync(session.Id, 0, ct))!;
     }
 
@@ -419,6 +431,32 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         }
 
         return Result<IReadOnlyList<SessionView>>.From(await Query(db.Sessions.Where(s => s.Status == SessionStatus.Active && s.Seat.Zone.BranchId == branchId), 0, ct));
+    }
+
+    /// <summary>Sessions of the branch that ended in the last <paramref name="hours"/> hours, newest first (POS "Vừa trả chỗ").</summary>
+    public async Task<Result<IReadOnlyList<RecentClosedSession>>> RecentClosedAsync(CurrentUser user, Guid branchId, int hours, CancellationToken ct)
+    {
+        if (!user.CanAccessBranch(branchId))
+        {
+            return ServiceError.NotFound();
+        }
+
+        var since = clock.GetUtcNow().AddHours(-Math.Clamp(hours, 1, 24));
+        var rows = await db.Sessions.AsNoTracking()
+            .Where(s => s.Status != SessionStatus.Active && s.Seat.Zone.BranchId == branchId && s.ClosedAt != null && s.ClosedAt >= since)
+            .OrderByDescending(s => s.ClosedAt)
+            .Take(50)
+            .Select(s => new RecentClosedSession(
+                s.Id,
+                s.Seat.Code,
+                s.EndAt,
+                s.ClosedAt!.Value,
+                s.CloseReason,
+                s.Customer != null ? s.Customer.User.FullName : null,
+                s.Bill != null ? s.Bill.Code : "",
+                s.Bill != null ? s.Bill.Total : 0))
+            .ToListAsync(ct);
+        return Result<IReadOnlyList<RecentClosedSession>>.From(rows);
     }
 
     public async Task<Result<SessionView>> GetByBillCodeAsync(CurrentUser user, string code, CancellationToken ct)
@@ -519,6 +557,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
                 s.StartAt,
                 s.EndAt,
                 s.Status,
+                s.CloseReason,
                 Extensions = s.Extensions.Count(),
                 Customer = s.Customer != null ? new SessionCustomer(s.Customer.Id, s.Customer.User.FullName, s.Customer.Tier) : null,
                 Bill = new SessionBill(s.Bill!.Id, s.Bill.Code, s.Bill.Total, s.Bill.PaymentMethod, s.Bill.ClaimedByCustomerId != null, s.Bill.CreatedAt),
@@ -529,7 +568,30 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             .ToListAsync(ct);
 
         return rows.Select(r => new SessionView(r.Id, r.BranchId, r.SeatId, r.SeatCode, r.PricePlanId, r.PlanName, r.StartAt, r.EndAt,
-            r.Status, (int)Math.Floor((r.EndAt - now).TotalMinutes), r.Extensions, r.Customer, r.Bill, pointsAwarded, r.Items)).ToList();
+            r.Status, (int)Math.Floor((r.EndAt - now).TotalMinutes), r.Extensions, r.Customer, r.Bill, pointsAwarded, r.Items, r.CloseReason)).ToList();
+    }
+
+    /// <summary>NeedsAttention text for a payment that arrives after its session ended.</summary>
+    internal static string EndedReason(Session? session) =>
+        session?.CloseReason == SessionCloseReason.AutoReleased
+            ? "Lượt ngồi đã được hệ thống tự trả (quá giờ không gia hạn); cần xử lý thủ công."
+            : "Lượt ngồi đã kết thúc hoặc không còn hóa đơn.";
+
+    internal static ServiceError SessionChanged() =>
+        ServiceError.Conflict("Lượt ngồi đã thay đổi", "Lượt ngồi vừa được gia hạn hoặc trả chỗ (có thể do hệ thống tự trả). Hãy tải lại sơ đồ.");
+
+    private async Task<bool> TrySaveAsync(CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            db.ChangeTracker.Clear();
+            return false;
+        }
     }
 
     private static ServiceError SeatTaken() => ServiceError.Conflict("Chỗ đã có người", "Chỗ này không còn trống; hãy chọn chỗ khác.");
