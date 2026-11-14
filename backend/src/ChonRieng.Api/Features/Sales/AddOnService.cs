@@ -141,7 +141,19 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
         }
 
         var items = await AddToBillAsync(session.Value.Bill!, lines.Value!, PaymentMethod.Cash, null, user.UserId, ct);
-        await db.SaveChangesAsync(ct);
+        // Include the session row in the save so its Status/EndAt concurrency tokens are checked: a seat
+        // auto-released a moment ago (TASK-024) must not receive new items.
+        db.Entry(session.Value).Property(s => s.Status).IsModified = true;
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            db.ChangeTracker.Clear();
+            return SessionService.SessionChanged();
+        }
+
         return Result<IReadOnlyList<BillItemView>>.From(items.Select(ToView).ToList());
     }
 
@@ -192,7 +204,7 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
             .SingleOrDefaultAsync(s => s.Id == paymentRequest.SessionId, ct);
         if (session?.Bill is null || session.Status != SessionStatus.Active)
         {
-            return PaymentSettlementOutcome.NeedsAttention("Lượt ngồi đã kết thúc hoặc không còn hóa đơn.");
+            return PaymentSettlementOutcome.NeedsAttention(SessionService.EndedReason(session));
         }
 
         await AddToBillAsync(session.Bill, lines, PaymentMethod.VietQr, paymentRequest.Id, paymentRequest.CreatedByUserId, ct);

@@ -1,11 +1,13 @@
 using ChonRieng.Api.Features.Common;
 using ChonRieng.Domain.Entities;
 using ChonRieng.Infrastructure.Persistence;
+using ChonRieng.Api.Features.Sales;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ChonRieng.Api.Features.Catalog;
 
-public sealed class CatalogService(AppDbContext db, TimeProvider clock)
+public sealed class CatalogService(AppDbContext db, TimeProvider clock, IOptions<SessionReleaseOptions>? sessionOptions = null)
 {
     public const int EndingSoonMinutes = 15;
 
@@ -116,7 +118,8 @@ public sealed class CatalogService(AppDbContext db, TimeProvider clock)
                     : minutesLeft <= EndingSoonMinutes ? SeatLiveState.EndingSoon
                     : SeatLiveState.Occupied;
                 return new FloorSeat(seat.Id, seat.Code, seat.Type, state,
-                    new SeatSessionInfo(s.Id, s.StartAt, s.EndAt, minutesLeft, s.CustomerName, s.BillCode, s.BillTotal));
+                    new SeatSessionInfo(s.Id, s.StartAt, s.EndAt, minutesLeft, s.CustomerName, s.BillCode, s.BillTotal,
+                        (sessionOptions?.Value ?? new SessionReleaseOptions()).AutoReleaseAt(s.EndAt)));
             }
 
             if (heldSeatIds.Contains(seat.Id))

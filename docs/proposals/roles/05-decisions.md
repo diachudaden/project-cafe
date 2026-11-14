@@ -10,7 +10,7 @@ The task files (TASK-006…010) say not to guess these product rules. Each has a
 | D4 | Pricing | MVP: one 4-hour plan + extension price per branch (branch overrides global). Day/night/weekend pricing **later** (needs migration + pricing strategy) | Reference wants time-band pricing; the schema has no columns for it | |
 | D5 | When the bill is created | At **check-in** (payment upfront); extension adds to the **same bill** | Reference: "mua lượt", extension "cộng vào cùng một bill" | |
 | D6 | Walk-in customers | Allowed (customer optional); attaching a member at check-in gives points automatically | Reference | |
-| D7 | Overdue sessions | Shown red on the POS; staff decide to extend or close. No automatic charge, no background job | Simplest correct behaviour | |
+| D7 | Overdue sessions | Shown red on the POS; staff decide to extend or close. No automatic charge. **Superseded in part by D30** (automatic release after a grace period) | Simplest correct behaviour | ✏️ D30 |
 | D8 | Points & tiers | 1.000đ = 1 point (floor); claim once, within 7 days; tiers by TotalSpent: Đồng < 500.000đ ≤ Bạc < 2.000.000đ ≤ Vàng | Reference gives the ratio and the 7 days, but not the thresholds | |
 | D9 | Point redemption ("Đổi điểm") | **Later** (needs a rewards table and rules) | Not in the schema | |
 | D10 | Who finalizes payroll | Manager generates and adjusts for their branch; **only Admin finalizes** | Money + legal sensitivity | |
@@ -33,6 +33,7 @@ The task files (TASK-006…010) say not to guess these product rules. Each has a
 | D27 | Realtime contract | Emit `PaymentReceived`, `PaymentNeedsAttention`, `PaymentExpired`, `PrintReceipt`, and `PaymentStatusChanged` over SignalR `/hubs/pos` with camelCase payloads | Required for immediate POS and customer feedback without changing the `Bill` model | ✅ |
 | D28 | Customer notification | When a member bill is paid, send a `payment.received` notification through the existing `Notifier` pipeline | The member experience should update as soon as the payment is finalized | ✅ |
 | D29 | Configuration | Require `Payment__*` settings with fail-fast validation on startup and include them in Docker Compose environment values | Prevents silent misconfiguration and keeps the demo environment runnable in Testing mode | ✅ |
+| D30 | Auto-release overdue seats (TASK-024) | A background job closes a session overdue by more than `Sessions__AutoReleaseGraceMinutes` (default 10, `0` = off, max 240) as `Expired` with `CloseReason = AutoReleased` (staff "Trả chỗ" records `Manual` + the staff member). **Skipped** while the session has a Pending, unexpired VietQR request (extension or add-on). No charge for the overdue time; bill and payments unchanged. Each release is a conditional update (`Status = Active AND EndAt <= now − grace`); `Status`/`EndAt` are concurrency tokens, so a concurrent extension, close or add-on wins or gets a 409. A VietQR payment that arrives after release goes to NeedsAttention ("Lượt ngồi đã được hệ thống tự trả"). Members get a `session.auto_released` notification. POS shows a countdown and a "Vừa trả chỗ" list | Staff no longer free every overdue seat by hand; the grace period and the pending-payment skip protect customers who are extending | ✅ |
 
 ## Questions without a default
 

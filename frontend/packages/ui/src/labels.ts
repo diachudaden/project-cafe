@@ -1,5 +1,5 @@
 import type {
-  AssignmentStatus, ClosingStatus, PaymentMethod, Role, SeatLiveState, SeatType, ShiftPhase, ShiftRequestType, ShiftType,
+  AssignmentStatus, ClosingStatus, PaymentMethod, Role, SeatLiveState, SeatType, SessionCloseReason, ShiftPhase, ShiftRequestType, ShiftType,
 } from "@cafecr/api-client";
 
 export const roleLabels: Record<Role, string> = {
@@ -72,4 +72,9 @@ export const tierLabels: Record<string, { label: string; color: string }> = {
 
 export const dayOfWeekLabels: Record<string, string> = {
   Monday: "Thứ 2", Tuesday: "Thứ 3", Wednesday: "Thứ 4", Thursday: "Thứ 5", Friday: "Thứ 6", Saturday: "Thứ 7", Sunday: "Chủ nhật",
+};
+
+export const closeReasonLabels: Record<SessionCloseReason, { label: string; color: string }> = {
+  Manual: { label: "Nhân viên trả chỗ", color: "default" },
+  AutoReleased: { label: "Hệ thống tự trả chỗ", color: "orange" },
 };

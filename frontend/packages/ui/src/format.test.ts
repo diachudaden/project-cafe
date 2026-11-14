@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, minutesLeftText, vnd, vnIso, weekStart } from "./format";
+import { addDays, autoReleaseText, minutesLeftText, vnd, vnIso, weekStart } from "./format";
 
 describe("format", () => {
   it("formats money like 45.000đ", () => {
@@ -12,6 +12,13 @@ describe("format", () => {
     expect(weekStart("2026-11-02")).toBe("2026-11-02");
     expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
     expect(vnIso("2026-11-02", "08:00")).toBe("2026-11-02T08:00:00+07:00");
+  });
+
+  it("counts down to the automatic seat release", () => {
+    const now = Date.parse("2026-11-14T10:00:00+07:00");
+    expect(autoReleaseText("2026-11-14T10:07:30+07:00", now)).toBe("Tự trả chỗ sau 8 phút");
+    expect(autoReleaseText("2026-11-14T10:00:00+07:00", now)).toBe("Sắp tự trả chỗ");
+    expect(autoReleaseText(null, now)).toBeNull();
   });
 
   it("describes remaining time in Vietnamese", () => {

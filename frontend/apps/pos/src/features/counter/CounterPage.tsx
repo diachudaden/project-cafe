@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Card, Empty, List, Space, Spin, Tag, Typography } from "antd";
 import type { FloorSeat } from "@cafecr/api-client";
-import { addDays, minutesLeftText, seatStateStyles, seatTypeLabels, shiftTypeLabels, time, todayVn } from "@cafecr/ui";
+import { addDays, autoReleaseText, closeReasonLabels, displayName, minutesLeftText, seatStateStyles, seatTypeLabels, shiftTypeLabels, time, todayVn, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useCurrentShift } from "../../PosLayout";
 import { useNotify } from "../useNotify";
@@ -90,15 +90,54 @@ function Floor({ branchId }: { branchId: string }) {
                   <div style={{ fontSize: 18, fontWeight: 700 }}>{seat.code}</div>
                   <div>{seatTypeLabels[seat.type]}</div>
                   <div>{seat.session ? minutesLeftText(seat.session.minutesLeft) : style.label}</div>
-                  {seat.session?.customerName && <div style={{ fontSize: 12 }}>{seat.session.customerName.replace("[DEMO DATA] ", "")}</div>}
+                  {seat.state === "Overdue" && autoReleaseText(seat.session?.autoReleaseAt) && (
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>{autoReleaseText(seat.session?.autoReleaseAt)}</div>
+                  )}
+                  {seat.session?.customerName && <div style={{ fontSize: 12 }}>{displayName(seat.session.customerName)}</div>}
                 </button>
               );
             })}
           </div>
         </Card>
       ))}
+      <RecentlyClosed branchId={branchId} />
       {checkIn && <CheckInSheet branchId={branchId} seat={checkIn} onClose={() => setCheckIn(null)} />}
       {actions && <SeatActionsSheet branchId={branchId} seat={actions} onClose={() => setActions(null)} />}
     </Space>
+  );
+}
+
+/** Seats freed in the last 2 hours, so staff can see which ones the system released by itself. */
+function RecentlyClosed({ branchId }: { branchId: string }) {
+  const recent = useQuery({
+    queryKey: ["recent-closed", branchId],
+    queryFn: () => api.sessions.recentClosed(branchId, 2),
+    refetchInterval: 30_000,
+  });
+  const rows = recent.data ?? [];
+  if (recent.isError || rows.length === 0) return null;
+  const auto = rows.filter((r) => r.closeReason === "AutoReleased").length;
+
+  return (
+    <Card size="small" title={`Vừa trả chỗ (2 giờ qua) · ${rows.length}${auto ? ` · ${auto} tự trả` : ""}`}>
+      <List
+        size="small"
+        dataSource={rows.slice(0, 8)}
+        renderItem={(r) => {
+          const reason = r.closeReason ? closeReasonLabels[r.closeReason] : null;
+          return (
+            <List.Item extra={<Typography.Text type="secondary">{time(r.closedAt)}</Typography.Text>}>
+              <Space wrap size={6}>
+                <Typography.Text strong>{r.seatCode}</Typography.Text>
+                {reason && <Tag color={reason.color} style={{ margin: 0 }}>{reason.label}</Tag>}
+                <Typography.Text type="secondary">
+                  {r.customerName ? `${displayName(r.customerName)} · ` : ""}bill {r.billCode} · {vnd(r.billTotal)}
+                </Typography.Text>
+              </Space>
+            </List.Item>
+          );
+        }}
+      />
+    </Card>
   );
 }

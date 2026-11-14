@@ -31,6 +31,7 @@ public sealed class SqlTranslationTests
         "branches", "availability", "plans", "managed-plans", "shifts", "my-shifts", "open-shifts", "attendance", "current-shift",
         "active-sessions", "customer-lookup", "my-bills", "my-session", "closings", "expenses", "payroll", "requests", "my-requests",
         "employees", "assistant", "revenue", "profit-loss", "occupancy", "compare", "dashboard",
+        "auto-release", "recent-closed",
     ];
 
     [Theory]
@@ -75,6 +76,17 @@ public sealed class SqlTranslationTests
             "occupancy" => () => reports.OccupancyAsync(Admin, BranchId, ReportPeriod.Week, Today, default),
             "compare" => () => reports.CompareBranchesAsync(Admin, ReportPeriod.Year, Today, default),
             "dashboard" => () => reports.DashboardAsync(Admin, null, default),
+            // Candidate query + the conditional ExecuteUpdate (TASK-024).
+            "auto-release" => async () =>
+            {
+                var release = new SessionAutoReleaseService(db, clock,
+                    Microsoft.Extensions.Options.Options.Create(new SessionReleaseOptions()),
+                    Microsoft.Extensions.Logging.Abstractions.NullLogger<SessionAutoReleaseService>.Instance);
+                await release.FindCandidatesAsync(clock.GetUtcNow(), default);
+                Assert.False(await release.TryReleaseAsync(new AutoReleaseCandidate(Guid.NewGuid(), clock.GetUtcNow(), "A-01", "B", null), clock.GetUtcNow(), default));
+                Assert.Contains(interceptor.Commands, c => c.Contains("UPDATE", StringComparison.Ordinal) && c.Contains("[EndAt] <=", StringComparison.Ordinal));
+            },
+            "recent-closed" => () => new SessionService(db, clock).RecentClosedAsync(Admin, BranchId, 2, default),
             _ => throw new ArgumentOutOfRangeException(nameof(name)),
         };
 
@@ -110,6 +122,13 @@ public sealed class SqlTranslationTests
             }
 
             return ValueTask.FromResult(InterceptionResult<DbDataReader>.SuppressWithResult(table.CreateDataReader()));
+        }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            Commands.Add(command.CommandText);
+            return ValueTask.FromResult(InterceptionResult<int>.SuppressWithResult(0));
         }
 
         public ValueTask<InterceptionResult> ConnectionOpeningAsync(DbConnection connection, ConnectionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default) =>

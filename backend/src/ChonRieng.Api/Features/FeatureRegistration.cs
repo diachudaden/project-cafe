@@ -26,6 +26,12 @@ public static class FeatureRegistration
         services.AddScoped<PaymentLogQueryService>();
         services.AddHttpContextAccessor();
         services.AddHostedService<PaymentRequestExpiryWorker>();
+        services.AddOptions<SessionReleaseOptions>()
+            .BindConfiguration(SessionReleaseOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddScoped<SessionAutoReleaseService>();
+        services.AddHostedService<SessionAutoReleaseWorker>();
         services.AddScoped<LoyaltyService>();
         services.AddScoped<FinanceService>();
         services.AddScoped<ReportService>();

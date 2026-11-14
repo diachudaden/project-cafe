@@ -2,8 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Descriptions, Divider, Drawer, List, Modal, Radio, Space, Tag, Typography } from "antd";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { FloorSeat, PaymentMethod } from "@cafecr/api-client";
-import { displayName, minutesLeftText, paymentLabels, seatStateStyles, time, vnd } from "@cafecr/ui";
+import { ApiError, type FloorSeat, type PaymentMethod } from "@cafecr/api-client";
+import { autoReleaseText, displayName, minutesLeftText, paymentLabels, seatStateStyles, time, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
 import { AddOnSheet } from "./AddOnSheet";
@@ -26,11 +26,17 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
     void queryClient.invalidateQueries({ queryKey: ["current-shift"] });
+    void queryClient.invalidateQueries({ queryKey: ["recent-closed", branchId] });
+  };
+  // 409 = the session changed meanwhile (e.g. the system auto-released the seat): show why, reload the floor, close.
+  const failAndRefresh = (error: unknown) => {
+    notify.fail(error);
+    if (error instanceof ApiError && error.status === 409) { refresh(); onClose(); }
   };
   const extend = useMutation({
     mutationFn: () => api.sessions.extend(session.sessionId),
     onSuccess: (s) => { notify.ok(`Đã gia hạn ${s.seatCode} đến ${time(s.endAt)}. Bill ${s.bill.code}: ${vnd(s.bill.total)}.`); refresh(); onClose(); },
-    onError: notify.fail,
+    onError: failAndRefresh,
   });
   const createPaymentRequest = useMutation({
     mutationFn: () => api.payments.createExtension(session.sessionId),
@@ -40,7 +46,7 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
   const close = useMutation({
     mutationFn: () => api.sessions.close(session.sessionId),
     onSuccess: () => { notify.ok(`${seat.code} đã trống.`); refresh(); onClose(); },
-    onError: notify.fail,
+    onError: failAndRefresh,
   });
   const style = seatStateStyles[seat.state];
 
@@ -66,6 +72,9 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
     <Drawer open placement="bottom" height="auto" onClose={onClose} title={`${seat.code} · ${style.label}`}>
       <Descriptions column={1} size="small" items={[
         { label: "Thời gian", children: `${time(session.startAt)} → ${time(session.endAt)} (${minutesLeftText(session.minutesLeft)})` },
+        ...(seat.state === "Overdue" && autoReleaseText(session.autoReleaseAt)
+          ? [{ label: "Tự trả chỗ", children: <Typography.Text type="warning">{autoReleaseText(session.autoReleaseAt)} ({time(session.autoReleaseAt)}) nếu không gia hạn</Typography.Text> }]
+          : []),
         { label: "Khách", children: session.customerName ?? "Khách lẻ" },
         { label: "Gói", children: (bill.data ? displayName(bill.data.planName) : "…") },
         { label: "Bill", children: `${session.billCode} · ${vnd(bill.data?.bill.total ?? session.billTotal)}` },

@@ -46,6 +46,14 @@ public static class SalesEndpoints
             .RequireAuthorization("BranchScope")
             .WithName("ListActiveSessions").WithSummary("Lượt ngồi đang diễn ra của chi nhánh");
 
+        app.MapGet("/api/branches/{branchId:guid}/sessions/recent-closed", async (Guid branchId, int? hours, ClaimsPrincipal user, SessionService service, CancellationToken ct) =>
+                (await service.RecentClosedAsync(CurrentUser.From(user), branchId, hours ?? 2, ct)).ToHttp())
+            .WithTags("Lượt ngồi (POS)")
+            .RequireAuthorization("BranchScope")
+            .WithName("ListRecentClosedSessions")
+            .WithSummary("Lượt ngồi vừa trả chỗ")
+            .WithDescription("Lượt ngồi đã kết thúc trong `hours` giờ gần nhất (mặc định 2, tối đa 24), mới nhất trước, tối đa 50 lượt. closeReason cho biết nhân viên trả chỗ (Manual) hay hệ thống tự trả chỗ khi quá giờ (AutoReleased).");
+
         var pos = app.MapGroup("/api").WithTags("Lượt ngồi (POS)").RequireWorkforce();
 
         pos.MapGet("/bills/{code}", async (string code, ClaimsPrincipal user, SessionService service, CancellationToken ct) =>

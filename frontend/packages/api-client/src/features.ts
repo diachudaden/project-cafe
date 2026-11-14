@@ -9,6 +9,11 @@ export type ShiftStatus = "Draft" | "Published";
 export type ShiftPhase = "Draft" | "Published" | "InProgress" | "Closed" | "Approved";
 export type AssignmentStatus = "Offered" | "Accepted" | "Declined";
 export type SessionStatus = "Active" | "Expired" | "Closed";
+export type SessionCloseReason = "Manual" | "AutoReleased";
+export interface RecentClosedSession {
+  sessionId: string; seatCode: string; endAt: string; closedAt: string; closeReason: SessionCloseReason | null;
+  customerName: string | null; billCode: string; billTotal: number;
+}
 export type PaymentMethod = "Cash" | "VietQr" | "Mixed";
 export type PaymentRequestStatus = "Pending" | "Paid" | "Expired" | "Cancelled" | "NeedsAttention";
 export type ShiftRequestType = "Swap" | "Leave" | "Drop";
@@ -27,7 +32,11 @@ export interface PricePlanView {
   id: string; branchId: string | null; name: string; durationMinutes: number; price: number; extendPrice: number;
   validFrom: string | null; validTo: string | null; isActive: boolean;
 }
-export interface SeatSessionInfo { sessionId: string; startAt: string; endAt: string; minutesLeft: number; customerName: string | null; billCode: string; billTotal: number }
+export interface SeatSessionInfo {
+  sessionId: string; startAt: string; endAt: string; minutesLeft: number; customerName: string | null; billCode: string; billTotal: number;
+  /** When the system frees the seat if it is not extended (EndAt + grace); null when auto-release is off. */
+  autoReleaseAt?: string | null;
+}
 export interface FloorSeat { id: string; code: string; type: SeatType; state: SeatLiveState; session: SeatSessionInfo | null }
 export interface FloorZone { id: string; name: string; seats: FloorSeat[] }
 export interface Floor { branchId: string; branchName: string; zones: FloorZone[] }
@@ -86,7 +95,7 @@ export interface AddOnLine { productId: string; quantity: number }
 export interface BillItemView { id: string; name: string; unitPrice: number; quantity: number; amount: number; paymentMethod: PaymentMethod; createdAt: string }
 export interface SessionView {
   id: string; branchId: string; seatId: string; seatCode: string; pricePlanId: string; planName: string; startAt: string; endAt: string;
-  status: SessionStatus; minutesLeft: number; extensionCount: number;
+  status: SessionStatus; minutesLeft: number; extensionCount: number; closeReason?: SessionCloseReason | null;
   customer: { id: string; fullName: string; tier: string } | null;
   bill: { id: string; code: string; total: number; paymentMethod: PaymentMethod; claimed: boolean; createdAt: string };
   pointsAwarded: number;
@@ -243,6 +252,7 @@ export function createFeatureApi(http: Http) {
       close: (id: string) => post<SessionView>(`/api/sessions/${id}/close`),
       sellItems: (id: string, items: AddOnLine[]) => post<BillItemView[]>(`/api/sessions/${id}/items`, { items }),
       active: (branchId: string) => get<SessionView[]>(`/api/branches/${branchId}/sessions/active`),
+      recentClosed: (branchId: string, hours = 2) => get<RecentClosedSession[]>(`/api/branches/${branchId}/sessions/recent-closed${query({ hours })}`),
       bill: (code: string) => get<SessionView>(`/api/bills/${encodeURIComponent(code)}`),
       lookupCustomer: (q: string) => get<CustomerLookup[]>(`/api/customers/lookup${query({ q })}`),
     },

@@ -56,7 +56,8 @@ public sealed record SeatSessionInfo(
     [property: Description("Số phút còn lại; âm nếu quá giờ.")] int MinutesLeft,
     string? CustomerName,
     string BillCode,
-    decimal BillTotal);
+    decimal BillTotal,
+    [property: Description("Thời điểm hệ thống sẽ tự trả chỗ nếu không gia hạn (EndAt + thời gian ân hạn); null khi tắt tính năng.")] DateTimeOffset? AutoReleaseAt = null);
 
 public sealed record FloorSeat(Guid Id, string Code, SeatType Type, SeatLiveState State, SeatSessionInfo? Session);
 

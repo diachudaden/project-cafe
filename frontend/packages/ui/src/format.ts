@@ -33,5 +33,12 @@ export const monthStart = (date: string) => dayjs(date).startOf("month").format(
 /** "2026-11-02" + "08:00" → ISO with +07:00 offset. */
 export const vnIso = (date: string, hhmm: string) => `${date}T${hhmm.length === 5 ? hhmm + ":00" : hhmm}+07:00`;
 
+/** Countdown to the automatic seat release (TASK-024); null when auto-release is off. */
+export const autoReleaseText = (autoReleaseAt: string | null | undefined, now: number = Date.now()) => {
+  if (!autoReleaseAt) return null;
+  const minutes = Math.ceil((Date.parse(autoReleaseAt) - now) / 60_000);
+  return minutes > 0 ? `Tự trả chỗ sau ${minutes} phút` : "Sắp tự trả chỗ";
+};
+
 export const minutesLeftText = (minutes: number) =>
   minutes < 0 ? `Quá giờ ${Math.abs(minutes)} phút` : minutes < 60 ? `Còn ${minutes} phút` : `Còn ${Math.floor(minutes / 60)} giờ ${minutes % 60} phút`;
