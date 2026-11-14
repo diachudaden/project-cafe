@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using ChonRieng.Api.Features.Common;
 using ChonRieng.Api.Services;
@@ -100,13 +101,31 @@ public sealed class PaymentRequestService(
         }
 
         await LogPollAsync(paymentRequest, ct);
+        var (points, customerName) = await PointsForPaymentAsync(paymentRequest, ct);
         return new PaymentRequestStatusResponse(
             paymentRequest.Code,
             paymentRequest.Amount,
             paymentRequest.Status,
             paymentRequest.ExpiresAt,
             paymentRequest.PaidAt,
-            paymentRequest.Bill?.Code);
+            paymentRequest.Bill?.Code,
+            points,
+            customerName);
+    }
+
+    /// <summary>Points written by this payment's settlement (same bill, same timestamp as <c>PaidAt</c>).</summary>
+    private async Task<(int Points, string? CustomerName)> PointsForPaymentAsync(PaymentRequest paymentRequest, CancellationToken ct)
+    {
+        if (paymentRequest.Status != PaymentRequestStatus.Paid || paymentRequest.BillId is not { } billId || paymentRequest.PaidAt is not { } paidAt)
+        {
+            return (0, null);
+        }
+
+        var rows = await db.PointTransactions.AsNoTracking()
+            .Where(p => p.BillId == billId && p.CreatedAt == paidAt)
+            .Select(p => new { p.Points, p.Customer.User.FullName })
+            .ToListAsync(ct);
+        return rows.Count == 0 ? (0, null) : (rows.Sum(r => r.Points), rows[0].FullName);
     }
 
     public async Task<Result<Done>> CancelAsync(CurrentUser user, string code, CancellationToken ct)
@@ -344,4 +363,6 @@ public sealed record PaymentRequestStatusResponse(
     PaymentRequestStatus Status,
     DateTimeOffset ExpiresAt,
     DateTimeOffset? PaidAt,
-    string? BillCode);
+    string? BillCode,
+    [property: Description("Điểm thành viên được cộng cho lần thanh toán này (0 nếu khách lẻ hoặc chưa thanh toán).")] int PointsAwarded = 0,
+    [property: Description("Tên thành viên được cộng điểm, null nếu khách lẻ.")] string? CustomerName = null);

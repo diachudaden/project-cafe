@@ -31,7 +31,7 @@ public sealed class SqlTranslationTests
         "branches", "availability", "plans", "managed-plans", "shifts", "my-shifts", "open-shifts", "attendance", "current-shift",
         "active-sessions", "customer-lookup", "my-bills", "my-session", "closings", "expenses", "payroll", "requests", "my-requests",
         "employees", "assistant", "revenue", "profit-loss", "occupancy", "compare", "dashboard",
-        "auto-release", "recent-closed",
+        "auto-release", "recent-closed", "my-bill-detail",
     ];
 
     [Theory]
@@ -86,6 +86,7 @@ public sealed class SqlTranslationTests
                 Assert.False(await release.TryReleaseAsync(new AutoReleaseCandidate(Guid.NewGuid(), clock.GetUtcNow(), "A-01", "B", null), clock.GetUtcNow(), default));
                 Assert.Contains(interceptor.Commands, c => c.Contains("UPDATE", StringComparison.Ordinal) && c.Contains("[EndAt] <=", StringComparison.Ordinal));
             },
+            "my-bill-detail" => () => new LoyaltyService(db, clock).BillDetailAsync(Admin, "ABCD1234", default),
             "recent-closed" => () => new SessionService(db, clock).RecentClosedAsync(Admin, BranchId, 2, default),
             _ => throw new ArgumentOutOfRangeException(nameof(name)),
         };

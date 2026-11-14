@@ -8,6 +8,7 @@ import { api } from "../../api";
 import { useNotify } from "../useNotify";
 import { AddOnSheet } from "./AddOnSheet";
 import { PaymentRequestModal } from "./PaymentRequestModal";
+import { PaymentDoneModal, type PaymentDone } from "./PaymentDoneModal";
 
 /** One tap to extend or free a seat; money actions always confirm first. */
 export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string; seat: FloorSeat; onClose: () => void }) {
@@ -17,6 +18,7 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
   const [paymentRequest, setPaymentRequest] = useState<Awaited<ReturnType<typeof api.payments.createExtension>> | null>(null);
   const session = seat.session!;
   const [addingItems, setAddingItems] = useState(false);
+  const [paid, setPaid] = useState<PaymentDone | null>(null);
   const plans = useQuery({ queryKey: ["active-plans", branchId], queryFn: () => api.catalog.activePlans(branchId) });
   // The bill view carries the session's own plan and its add-on lines.
   const bill = useQuery({ queryKey: ["seat-bill", session.billCode], queryFn: () => api.sessions.bill(session.billCode) });
@@ -27,6 +29,7 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
     void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
     void queryClient.invalidateQueries({ queryKey: ["current-shift"] });
     void queryClient.invalidateQueries({ queryKey: ["recent-closed", branchId] });
+    void queryClient.invalidateQueries({ queryKey: ["seat-bill"] });
   };
   // 409 = the session changed meanwhile (e.g. the system auto-released the seat): show why, reload the floor, close.
   const failAndRefresh = (error: unknown) => {
@@ -35,7 +38,15 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
   };
   const extend = useMutation({
     mutationFn: () => api.sessions.extend(session.sessionId),
-    onSuccess: (s) => { notify.ok(`Đã gia hạn ${s.seatCode} đến ${time(s.endAt)}. Bill ${s.bill.code}: ${vnd(s.bill.total)}.`); refresh(); onClose(); },
+    onSuccess: (s) => {
+      refresh();
+      setPaid({
+        what: "Gia hạn", seatCode: s.seatCode, method: "Cash", billCode: s.bill.code, billTotal: s.bill.total, endAt: s.endAt,
+        // The server charged the plan's extension price; fall back to the bill difference if plans did not load.
+        amount: extendPrice ?? s.bill.total - (bill.data?.bill.total ?? session.billTotal),
+        customerName: s.customer?.fullName, pointsAwarded: s.pointsAwarded,
+      });
+    },
     onError: failAndRefresh,
   });
   const createPaymentRequest = useMutation({
@@ -50,12 +61,17 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
   });
   const style = seatStateStyles[seat.state];
 
+  if (paid) {
+    return <PaymentDoneModal done={paid} onClose={onClose} />;
+  }
+
   if (addingItems) {
     return <AddOnSheet branchId={branchId} sessionId={session.sessionId} seatCode={seat.code} onClose={() => { setAddingItems(false); void bill.refetch(); }} />;
   }
 
   if (paymentRequest) {
     return <PaymentRequestModal
+        what="Gia hạn"
       branchId={branchId}
       request={paymentRequest}
       title={`Thanh toán gia hạn ${seat.code}`}

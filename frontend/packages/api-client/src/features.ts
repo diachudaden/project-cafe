@@ -93,6 +93,17 @@ export interface ProductView { id: string; branchId: string | null; name: string
 export type ProductInput = Omit<ProductView, "id">;
 export interface AddOnLine { productId: string; quantity: number }
 export interface BillItemView { id: string; name: string; unitPrice: number; quantity: number; amount: number; paymentMethod: PaymentMethod; createdAt: string }
+/** Cash add-on sale result: the bill after the sale and the member points it earned. */
+export interface AddOnSaleResult { items: BillItemView[]; billCode: string; billTotal: number; pointsAwarded: number; customerName: string | null }
+export interface MyBillDetail {
+  code: string; branchName: string; seatCode: string; planName: string; startAt: string; endAt: string;
+  sessionStatus: SessionStatus; closeReason: SessionCloseReason | null;
+  extensions: { createdAt: string; addedMinutes: number; price: number }[];
+  items: BillItemView[];
+  cashPaidTotal: number; vietQrPaidTotal: number; total: number; paymentMethod: PaymentMethod;
+  points: { points: number; reason: string; createdAt: string }[];
+  createdAt: string; claimedAt: string | null;
+}
 export interface SessionView {
   id: string; branchId: string; seatId: string; seatCode: string; pricePlanId: string; planName: string; startAt: string; endAt: string;
   status: SessionStatus; minutesLeft: number; extensionCount: number; closeReason?: SessionCloseReason | null;
@@ -135,6 +146,8 @@ export interface PaymentTrace {
 export interface PaymentRequestView { code: string; amount: number; qrUrl: string; expiresAt: string }
 export interface PaymentRequestStatusView {
   code: string; amount: number; status: PaymentRequestStatus; expiresAt: string; paidAt: string | null; billCode: string | null;
+  /** Member points earned by this payment (0 for walk-ins). */
+  pointsAwarded?: number; customerName?: string | null;
 }
 export interface CustomerLookup { customerId: string; fullName: string; tier: string; points: number; memberCode: string | null }
 export interface ClaimResult { code: string; total: number; pointsEarned: number; balance: number; tier: string }
@@ -250,7 +263,7 @@ export function createFeatureApi(http: Http) {
       checkIn: (input: { seatId: string; pricePlanId: string; paymentMethod: PaymentMethod; customerId?: string | null }) => post<SessionView>("/api/sessions", input),
       extend: (id: string) => post<SessionView>(`/api/sessions/${id}/extend`),
       close: (id: string) => post<SessionView>(`/api/sessions/${id}/close`),
-      sellItems: (id: string, items: AddOnLine[]) => post<BillItemView[]>(`/api/sessions/${id}/items`, { items }),
+      sellItems: (id: string, items: AddOnLine[]) => post<AddOnSaleResult>(`/api/sessions/${id}/items`, { items }),
       active: (branchId: string) => get<SessionView[]>(`/api/branches/${branchId}/sessions/active`),
       recentClosed: (branchId: string, hours = 2) => get<RecentClosedSession[]>(`/api/branches/${branchId}/sessions/recent-closed${query({ hours })}`),
       bill: (code: string) => get<SessionView>(`/api/bills/${encodeURIComponent(code)}`),
@@ -277,6 +290,7 @@ export function createFeatureApi(http: Http) {
       claim: (code: string) => post<ClaimResult>("/api/me/bills/claim", { code }),
       points: () => get<MyPoints>("/api/me/points"),
       bills: () => get<MyBill[]>("/api/me/bills"),
+      bill: (code: string) => get<MyBillDetail>(`/api/me/bills/${encodeURIComponent(code)}`),
       session: () => get<MyActiveSession | undefined>("/api/me/session").then((v) => v ?? null),
     },
     finance: {

@@ -27,6 +27,7 @@ public static class SalesEndpoints
                 (await service.SellCashAsync(CurrentUser.From(user), sessionId, request, ct)).ToHttp())
             .WithName("SellAddOnItems")
             .WithSummary("Bán đồ thêm (tiền mặt)")
+            .Produces<AddOnSaleResponse>()
             .WithDescription("Thêm các món (mì, trứng, bánh...) vào hóa đơn của lượt đang diễn ra; giá lấy từ thực đơn hiện tại và được lưu lại trên từng dòng. Không ảnh hưởng thời gian ngồi.");
 
         sessions.MapPost("/{sessionId:guid}/items/payment-request", async (Guid sessionId, AddOnSaleRequest request, ClaimsPrincipal user, PaymentRequestService service, CancellationToken ct) =>
@@ -82,6 +83,12 @@ public static class SalesEndpoints
         me.MapGet("/bills", (ClaimsPrincipal user, LoyaltyService service, CancellationToken ct) =>
                 service.BillsAsync(CurrentUser.From(user), ct))
             .WithName("MyBills").WithSummary("Hóa đơn đã tích điểm");
+
+        me.MapGet("/bills/{code}", async (string code, ClaimsPrincipal user, LoyaltyService service, CancellationToken ct) =>
+                (await service.BillDetailAsync(CurrentUser.From(user), code, ct)).ToHttp())
+            .WithName("MyBillDetail")
+            .WithSummary("Chi tiết một hóa đơn của tôi")
+            .WithDescription("Chỉ trả hóa đơn đã tích điểm cho chính tài khoản đang đăng nhập (404 nếu không phải của bạn): chỗ, gói, giờ ngồi, các lần gia hạn, đồ thêm, tiền mặt/VietQR, tổng tiền và các lần cộng điểm.");
 
         me.MapGet("/session", async (ClaimsPrincipal user, LoyaltyService service, CancellationToken ct) =>
                 await service.CurrentSessionAsync(CurrentUser.From(user), ct) is { } s ? Results.Ok(s) : Results.NoContent())

@@ -98,6 +98,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             var tx = Loyalty.Award(customer, bill, bill.Total, now, $"Tích điểm hóa đơn {bill.Code}");
             db.PointTransactions.Add(tx);
             points = tx.Points;
+            db.PaymentCompleted(customer, bill, seat.Code, PaymentKind.CheckIn, bill.Total, request.PaymentMethod, tx.Points, now);
         }
 
         try
@@ -249,6 +250,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             var tx = Loyalty.Award(customer, session.Bill, extension.Price, now, $"Gia hạn hóa đơn {session.Bill.Code}");
             db.PointTransactions.Add(tx);
             points = tx.Points;
+            db.PaymentCompleted(customer, session.Bill, session.Seat.Code, PaymentKind.Extension, extension.Price, PaymentMethod.Cash, tx.Points, now);
         }
 
         // Status/EndAt are concurrency tokens: if the seat was auto-released (or extended by someone else)
@@ -329,9 +331,9 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             {
                 bill.ClaimedByCustomerId = customer.Id;
                 bill.ClaimedAt = now;
-                db.PointTransactions.Add(Loyalty.Award(customer, bill, bill.Total, now, $"Tích điểm hóa đơn {bill.Code}"));
-                db.Notify(customer.UserId, Notifier.PaymentReceived, "Thanh toán thành công",
-                    $"Đã nhận thanh toán cho chỗ {seat.Code}.", "/pay", now);
+                var tx = Loyalty.Award(customer, bill, bill.Total, now, $"Tích điểm hóa đơn {bill.Code}");
+                db.PointTransactions.Add(tx);
+                db.PaymentCompleted(customer, bill, seat.Code, PaymentKind.CheckIn, bill.Total, PaymentMethod.VietQr, tx.Points, now);
             }
 
             db.Sessions.Add(session);
@@ -379,10 +381,11 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         if (existingSession.Bill.ClaimedByCustomerId is { } claimedCustomerId)
         {
             var customer = await db.Customers.SingleAsync(c => c.Id == claimedCustomerId, ct);
-            db.PointTransactions.Add(Loyalty.Award(customer, existingSession.Bill, paymentRequest.Amount, now,
-                $"Gia hạn hóa đơn {existingSession.Bill.Code}"));
-            db.Notify(customer.UserId, Notifier.PaymentReceived, "Thanh toán gia hạn thành công",
-                $"Đã nhận thanh toán gia hạn cho chỗ {existingSession.Seat.Code}.", "/pay", now);
+            var tx = Loyalty.Award(customer, existingSession.Bill, paymentRequest.Amount, now,
+                $"Gia hạn hóa đơn {existingSession.Bill.Code}");
+            db.PointTransactions.Add(tx);
+            db.PaymentCompleted(customer, existingSession.Bill, existingSession.Seat.Code, PaymentKind.Extension,
+                paymentRequest.Amount, PaymentMethod.VietQr, tx.Points, now);
         }
 
         paymentRequest.BillId = existingSession.Bill.Id;
