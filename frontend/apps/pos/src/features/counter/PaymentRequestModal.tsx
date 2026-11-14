@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Modal, Result, Space, Spin, Tag, Typography } from "antd";
 import type { PaymentRequestView } from "@cafecr/api-client";
-import { errorText, time, vnd } from "@cafecr/ui";
+import { errorText, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
 import { isPaymentTerminal } from "./paymentStatus";
+import { PaymentDoneResult } from "./PaymentDoneModal";
 
 function remainingTime(expiresAt: string, now: number): string {
   const seconds = Math.max(0, Math.ceil((Date.parse(expiresAt) - now) / 1000));
@@ -17,12 +18,15 @@ export function PaymentRequestModal({
   request,
   title,
   description,
+  what,
   onClose,
 }: {
   branchId: string;
   request: PaymentRequestView;
   title: string;
   description: string;
+  /** What is being paid for, shown on the success screen: "Check-in", "Gia hạn", "Đồ thêm". */
+  what: "Check-in" | "Gia hạn" | "Đồ thêm";
   onClose: () => void;
 }) {
   const notify = useNotify();
@@ -101,18 +105,17 @@ export function PaymentRequestModal({
     );
   } else if (paymentStatus === "Paid") {
     content = session.data ? (
-      <Result
-        status="success"
-        title="Thanh toán thành công"
-        subTitle={`${session.data.seatCode} · ${vnd(session.data.bill.total)} · đến ${time(session.data.endAt)}`}
-        extra={
-          <Space direction="vertical" align="center">
-            <Typography.Text>Mã bill</Typography.Text>
-            <Typography.Title copyable style={{ letterSpacing: 6, margin: 0 }}>{session.data.bill.code}</Typography.Title>
-            {session.data.pointsAwarded > 0 && <Tag color="green">Đã cộng {session.data.pointsAwarded} điểm</Tag>}
-          </Space>
-        }
-      />
+      <PaymentDoneResult done={{
+        what,
+        seatCode: session.data.seatCode,
+        amount: request.amount,
+        method: "VietQr",
+        billCode: session.data.bill.code,
+        billTotal: session.data.bill.total,
+        endAt: what === "Đồ thêm" ? undefined : session.data.endAt,
+        customerName: status.data?.customerName ?? session.data.customer?.fullName,
+        pointsAwarded: status.data?.pointsAwarded ?? 0,
+      }} />
     ) : session.isError || !billCode ? (
       <Alert
         type="warning"

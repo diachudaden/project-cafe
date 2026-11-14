@@ -40,7 +40,12 @@ export function BillPage() {
             ]} />
             {b.extensions.length > 0 && (
               <List size="small" dataSource={b.extensions} renderItem={(e) => (
-                <List.Item extra={vnd(e.price)}>+{Math.round(e.addedMinutes / 60 * 10) / 10} giờ · {dateTime(e.createdAt)}</List.Item>
+                <List.Item>
+                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%", gap: 12 }}>
+                    <span>+{Math.round((e.addedMinutes / 60) * 10) / 10} giờ · {dateTime(e.createdAt)}</span>
+                    <span>{vnd(e.price)}</span>
+                  </div>
+                </List.Item>
               )} />
             )}
           </Card>
@@ -48,7 +53,12 @@ export function BillPage() {
           {b.items.length > 0 && (
             <Card title="Đồ thêm" style={{ marginTop: 16 }}>
               <List size="small" dataSource={b.items} renderItem={(i) => (
-                <List.Item extra={vnd(i.amount)}>{i.quantity} × {displayName(i.name)} <Typography.Text type="secondary">({paymentLabels[i.paymentMethod]})</Typography.Text></List.Item>
+                <List.Item>
+                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%", gap: 12 }}>
+                    <span>{i.quantity} × {displayName(i.name)} <Typography.Text type="secondary">({paymentLabels[i.paymentMethod]})</Typography.Text></span>
+                    <span>{vnd(i.amount)}</span>
+                  </div>
+                </List.Item>
               )} />
             </Card>
           )}

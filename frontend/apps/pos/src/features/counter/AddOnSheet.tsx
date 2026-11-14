@@ -8,6 +8,7 @@ import { api, useAuth } from "../../api";
 import { useNotify } from "../useNotify";
 import { ALL_CATEGORIES, menuState } from "./addOnMenu";
 import { PaymentRequestModal } from "./PaymentRequestModal";
+import { PaymentDoneModal, type PaymentDone } from "./PaymentDoneModal";
 
 /** Sell add-on items (mì, trứng, bánh...) onto the seat's current bill; separate from extending the session. */
 export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchId: string; sessionId: string; seatCode: string; onClose: () => void }) {
@@ -22,6 +23,7 @@ export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchI
   const [search, setSearch] = useState("");
   const [payment, setPayment] = useState<PaymentMethod>("Cash");
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequestView | null>(null);
+  const [paid, setPaid] = useState<PaymentDone | null>(null);
 
   const byId = useMemo(() => new Map((products.data ?? []).map((p) => [p.id, p])), [products.data]);
   const categories = useMemo(() => [...new Set((products.data ?? []).map((p) => p.category))], [products.data]);
@@ -41,7 +43,13 @@ export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchI
   };
   const sell = useMutation({
     mutationFn: () => api.sessions.sellItems(sessionId, lines),
-    onSuccess: () => { notify.ok(`Đã thêm ${summary} vào bill ${seatCode} (+${vnd(total)}).`); refresh(); onClose(); },
+    onSuccess: (sale) => {
+      refresh();
+      setPaid({
+        what: "Đồ thêm", seatCode, amount: total, method: "Cash", billCode: sale.billCode, billTotal: sale.billTotal,
+        customerName: sale.customerName, pointsAwarded: sale.pointsAwarded, detail: summary,
+      });
+    },
     onError: notify.fail,
   });
   const createQr = useMutation({
@@ -52,9 +60,14 @@ export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchI
   const change = (id: string, delta: number) =>
     setCart((c) => ({ ...c, [id]: Math.min(99, Math.max(0, (c[id] ?? 0) + delta)) }));
 
+  if (paid) {
+    return <PaymentDoneModal done={paid} onClose={onClose} />;
+  }
+
   if (paymentRequest) {
     return (
       <PaymentRequestModal
+        what="Đồ thêm"
         branchId={branchId}
         request={paymentRequest}
         title={`Thanh toán đồ thêm ${seatCode}`}

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Drawer, Input, List, Modal, Radio, Result, Select, Space, Tag, Typography } from "antd";
+import { Button, Drawer, Input, List, Modal, Radio, Select, Space, Tag, Typography } from "antd";
 import type { CustomerLookup, FloorSeat, PaymentMethod, PricePlanView, SessionView } from "@cafecr/api-client";
-import { displayName, paymentLabels, seatTypeLabels, tierLabels, time, vnd } from "@cafecr/ui";
+import { displayName, paymentLabels, seatTypeLabels, tierLabels, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
 import { AddOnSheet } from "./AddOnSheet";
+import { PaymentDoneModal } from "./PaymentDoneModal";
 import { PaymentRequestModal } from "./PaymentRequestModal";
 
 const hours = (minutes: number) => `${Number((minutes / 60).toFixed(2))} tiếng`;
@@ -32,6 +33,7 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
       setDone(s);
       void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
       void queryClient.invalidateQueries({ queryKey: ["current-shift"] });
+      void queryClient.invalidateQueries({ queryKey: ["recent-closed", branchId] });
     },
     onError: notify.fail,
   });
@@ -56,6 +58,7 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
   if (paymentRequest) {
     return (
       <PaymentRequestModal
+        what="Check-in"
         branchId={branchId}
         request={paymentRequest}
         title={`Thanh toán check-in ${seat.code}`}
@@ -74,23 +77,14 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
 
   if (done) {
     return (
-      <Modal open onCancel={onClose}
-        footer={
-          <Space>
-            <Button size="large" onClick={() => setAddingItems(true)}>Thêm đồ ăn / uống</Button>
-            <Button type="primary" size="large" onClick={onClose}>Xong</Button>
-          </Space>
-        }>
-        <Result status="success" title={`Đã check-in ${done.seatCode}`}
-          subTitle={`${vnd(done.bill.total)} · ${paymentLabels[done.bill.paymentMethod]} · đến ${time(done.endAt)}`}
-          extra={
-            <Space direction="vertical" align="center">
-              <Typography.Text type="secondary">Mã bill để khách tích điểm</Typography.Text>
-              <Typography.Title copyable style={{ letterSpacing: 6, margin: 0 }}>{done.bill.code}</Typography.Title>
-              {done.pointsAwarded > 0 && <Tag color="green">Đã cộng {done.pointsAwarded} điểm cho {done.customer?.fullName}</Tag>}
-            </Space>
-          } />
-      </Modal>
+      <PaymentDoneModal
+        done={{
+          what: "Check-in", seatCode: done.seatCode, amount: done.bill.total, method: done.bill.paymentMethod,
+          billCode: done.bill.code, endAt: done.endAt, customerName: done.customer?.fullName, pointsAwarded: done.pointsAwarded,
+        }}
+        onClose={onClose}
+        actions={<Button size="large" onClick={() => setAddingItems(true)}>Thêm đồ ăn / uống</Button>}
+      />
     );
   }
 
