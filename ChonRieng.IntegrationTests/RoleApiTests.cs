@@ -332,6 +332,44 @@ public sealed class RoleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.NotFound, (await admin.GetAsync("/api/payment-logs/TTZZZZZZZZ")).StatusCode);
     }
 
+    [Fact]
+    public async Task Receipt_pdf_is_a_branch_scoped_attachment_with_the_bill_code()
+    {
+        var (branchA, branchC) = (await BranchIdAsync("Chi nhánh A"), await BranchIdAsync("Chi nhánh C"));
+        string codeA, codeC;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            codeA = await db.Bills.Where(b => b.BranchId == branchA && b.ClaimedByCustomerId == null).Select(b => b.Code).FirstAsync();
+            codeC = await db.Bills.Where(b => b.BranchId == branchC).Select(b => b.Code).FirstAsync();
+        }
+
+        var staff = await ClientAsync("staff01.demo@cafecr.invalid");
+        var response = await staff.GetAsync($"/api/bills/{codeA}/receipt.pdf");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("attachment", response.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.Equal($"bill-{codeA}.pdf", response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        var pdf = await response.Content.ReadAsByteArrayAsync();
+        using (var document = UglyToad.PdfPig.PdfDocument.Open(pdf))
+        {
+            var words = string.Join(" ", document.GetPages().SelectMany(p => p.GetWords()).Select(w => w.Text)).Normalize(NormalizationForm.FormC);
+            Assert.Contains(codeA, words);
+            Assert.Contains("Quét để tích điểm".Normalize(NormalizationForm.FormC), words);
+        }
+
+        // Another branch's bill is invisible to this staff member; Admin sees every branch; customers are not workforce.
+        Assert.Equal(HttpStatusCode.NotFound, (await staff.GetAsync($"/api/bills/{codeC}/receipt.pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await (await ClientAsync("admin01.demo@cafecr.invalid")).GetAsync($"/api/bills/{codeC}/receipt.pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await (await ClientAsync("customer05.demo@cafecr.invalid")).GetAsync($"/api/bills/{codeA}/receipt.pdf")).StatusCode);
+
+        var swagger = await factory.CreateClient().GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json", Json);
+        var operation = swagger.GetProperty("paths").GetProperty("/api/bills/{code}/receipt.pdf").GetProperty("get");
+        Assert.True(operation.GetProperty("responses").GetProperty("200").GetProperty("content").TryGetProperty("application/pdf", out _));
+        Assert.Equal("In hóa đơn (PDF khổ 80 mm)", operation.GetProperty("summary").GetString());
+    }
+
     private static DateOnly Today => DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(7)).DateTime);
 
     private async Task<JsonElement> LoginAsync(string email)

@@ -267,6 +267,8 @@ export function createFeatureApi(http: Http) {
       active: (branchId: string) => get<SessionView[]>(`/api/branches/${branchId}/sessions/active`),
       recentClosed: (branchId: string, hours = 2) => get<RecentClosedSession[]>(`/api/branches/${branchId}/sessions/recent-closed${query({ hours })}`),
       bill: (code: string) => get<SessionView>(`/api/bills/${encodeURIComponent(code)}`),
+      /** 80 mm receipt PDF (TASK-026), fetched with the auth header. */
+      receiptPdf: (code: string) => http.download(`/api/bills/${encodeURIComponent(code)}/receipt.pdf`),
       lookupCustomer: (q: string) => get<CustomerLookup[]>(`/api/customers/lookup${query({ q })}`),
     },
     payments: {

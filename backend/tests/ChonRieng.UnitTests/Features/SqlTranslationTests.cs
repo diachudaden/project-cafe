@@ -31,7 +31,7 @@ public sealed class SqlTranslationTests
         "branches", "availability", "plans", "managed-plans", "shifts", "my-shifts", "open-shifts", "attendance", "current-shift",
         "active-sessions", "customer-lookup", "my-bills", "my-session", "closings", "expenses", "payroll", "requests", "my-requests",
         "employees", "assistant", "revenue", "profit-loss", "occupancy", "compare", "dashboard",
-        "auto-release", "recent-closed", "my-bill-detail", "menu", "managed-products",
+        "auto-release", "recent-closed", "my-bill-detail", "menu", "managed-products", "receipt",
     ];
 
     [Theory]
@@ -90,6 +90,7 @@ public sealed class SqlTranslationTests
             // TASK-026: POS menu (500 on production) and the admin list that worked.
             "menu" => () => new AddOnService(db, clock).MenuAsync(Admin, BranchId, default),
             "managed-products" => () => new AddOnService(db, clock).ManagedAsync(Admin, BranchId, default),
+            "receipt" => () => new ReceiptService(db, clock).LoadAsync(Admin, "ABCD1234", default),
             "recent-closed" => () => new SessionService(db, clock).RecentClosedAsync(Admin, BranchId, 2, default),
             _ => throw new ArgumentOutOfRangeException(nameof(name)),
         };

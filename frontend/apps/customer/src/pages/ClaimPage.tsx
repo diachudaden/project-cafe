@@ -1,13 +1,16 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Card, Input, Result, Typography } from "antd";
 import type { ClaimResult } from "@cafecr/api-client";
-import { errorText, tierLabels, vnd } from "@cafecr/ui";
+import { errorText, normalizeBillCode, tierLabels, vnd } from "@cafecr/ui";
 import { api } from "../api";
 
 export function ClaimPage() {
   const queryClient = useQueryClient();
-  const [code, setCode] = useState("");
+  // The QR on a printed receipt opens /claim?code=XXXXXXXX (TASK-026): prefill, the customer still confirms.
+  const [searchParams] = useSearchParams();
+  const [code, setCode] = useState(() => normalizeBillCode(searchParams.get("code")));
   const [result, setResult] = useState<ClaimResult | null>(null);
   const claim = useMutation({
     mutationFn: () => api.loyalty.claim(code),
@@ -27,7 +30,7 @@ export function ClaimPage() {
           <Input
             size="large" maxLength={8} value={code} placeholder="VD: K7M2Q9XA" autoCapitalize="characters"
             style={{ letterSpacing: 6, fontSize: 24, textAlign: "center", textTransform: "uppercase" }}
-            onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+            onChange={(e) => setCode(normalizeBillCode(e.target.value))}
             onPressEnter={() => code.length === 8 && claim.mutate()}
           />
           {claim.isError && <Alert style={{ marginTop: 12 }} type="error" showIcon message={errorText(claim.error)} />}

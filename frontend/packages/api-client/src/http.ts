@@ -80,14 +80,16 @@ export function query(params: Record<string, string | number | boolean | null | 
 
 export interface Http {
   request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T>;
+  /** GET a binary file (e.g. a PDF) with the same auth header and refresh as `request`; no token ever goes in the URL. */
+  download(path: string, accept?: string): Promise<Blob>;
 }
 
 export function createHttp(options: HttpOptions = {}): Http {
   const baseUrl = options.baseUrl ?? "";
   const doFetch = options.fetch ?? ((input, init) => fetch(input, init));
 
-  async function request<T>(method: HttpMethod, path: string, body?: unknown, canRetry = true): Promise<T> {
-    const headers: Record<string, string> = { Accept: "application/json" };
+  async function send(method: HttpMethod, path: string, body: unknown, accept: string, canRetry = true): Promise<Response> {
+    const headers: Record<string, string> = { Accept: accept };
     if (body !== undefined) {
       headers["Content-Type"] = "application/json";
     }
@@ -110,7 +112,7 @@ export function createHttp(options: HttpOptions = {}): Http {
 
     if (response.status === 401 && token && canRetry && options.refreshAccessToken) {
       if (await options.refreshAccessToken()) {
-        return request<T>(method, path, body, false);
+        return send(method, path, body, accept, false);
       }
     }
 
@@ -118,6 +120,11 @@ export function createHttp(options: HttpOptions = {}): Http {
       throw await toApiError(response);
     }
 
+    return response;
+  }
+
+  async function request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
+    const response = await send(method, path, body, "application/json");
     if (response.status === 204) {
       return undefined as T;
     }
@@ -125,5 +132,8 @@ export function createHttp(options: HttpOptions = {}): Http {
     return (await response.json()) as T;
   }
 
-  return { request: (method, path, body) => request(method, path, body) };
+  return {
+    request: (method, path, body) => request(method, path, body),
+    download: async (path, accept = "application/pdf") => (await send("GET", path, undefined, `${accept}, application/problem+json`)).blob(),
+  };
 }

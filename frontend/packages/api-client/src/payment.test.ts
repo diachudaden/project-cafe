@@ -8,7 +8,7 @@ describe("payment API client", () => {
       .mockResolvedValueOnce({ code: "TTABCDEFGH", amount: 45000, qrUrl: "https://qr.example/tt", expiresAt: "2026-11-10T10:10:00Z" })
       .mockResolvedValueOnce({ code: "TTABCDEFGJ", amount: 40000, qrUrl: "https://qr.example/tt2", expiresAt: "2026-11-10T10:10:00Z" })
       .mockResolvedValueOnce({ id: "session-1" });
-    const api = createFeatureApi({ request } as Http);
+    const api = createFeatureApi({ request, download: vi.fn() } as Http);
     const checkIn = { seatId: "seat-1", pricePlanId: "plan-1", customerId: "customer-1" };
     const cashCheckIn = { seatId: "seat-1", pricePlanId: "plan-1", paymentMethod: "Cash" as const };
 
@@ -27,7 +27,7 @@ describe("payment API client", () => {
     const request = vi.fn<Http["request"]>()
       .mockResolvedValueOnce({ code: "TT/A", amount: 45000, status: "Paid", expiresAt: "2026-11-10T10:10:00Z", paidAt: null, billCode: "ABCDEFGH" })
       .mockResolvedValueOnce(undefined);
-    const api = createFeatureApi({ request } as Http);
+    const api = createFeatureApi({ request, download: vi.fn() } as Http);
 
     await expect(api.payments.status("TT/A")).resolves.toMatchObject({ status: "Paid", billCode: "ABCDEFGH" });
     await api.payments.cancel("TT/A");

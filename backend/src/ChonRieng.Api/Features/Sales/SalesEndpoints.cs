@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ChonRieng.Api.Features.Common;
+using Microsoft.Extensions.Options;
 
 namespace ChonRieng.Api.Features.Sales;
 
@@ -61,6 +62,16 @@ public static class SalesEndpoints
                 (await service.GetByBillCodeAsync(CurrentUser.From(user), code, ct)).ToHttp())
             .WithName("GetBillByCode").WithSummary("Tra cứu hóa đơn theo mã");
 
+        pos.MapGet("/bills/{code}/receipt.pdf", async (string code, HttpContext http, IOptions<ReceiptOptions> options, ClaimsPrincipal user,
+                    ReceiptService service, CancellationToken ct) =>
+                (await service.RenderAsync(CurrentUser.From(user), code, CustomerAppUrl(http, options.Value), ct))
+                .ToHttp(file => TypedResults.File(file.Content, "application/pdf", file.FileName)))
+            .WithName("GetBillReceiptPdf")
+            .WithSummary("In hóa đơn (PDF khổ 80 mm)")
+            .WithDescription("Tạo file PDF khổ giấy in nhiệt 80 mm (Content-Disposition: attachment, tên file bill-{code}.pdf): chi nhánh, mã bill, chỗ, gói, giờ bắt đầu/kết thúc, các lần gia hạn, đồ thêm, tiền mặt/VietQR, tổng tiền, nhân viên in và giờ in (giờ Việt Nam). Bill chưa tích điểm có mã QR \"Quét để tích điểm\" mở trang /claim?code=…; bill đã tích điểm in tên thành viên và số điểm được cộng. Admin xem mọi chi nhánh; Quản lý/Nhân viên chỉ chi nhánh được phân công (404 nếu không thuộc phạm vi).")
+            .Produces(StatusCodes.Status200OK, typeof(Stream), "application/pdf")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         pos.MapGet("/customers/lookup", (string q, SessionService service, CancellationToken ct) =>
                 service.LookupCustomersAsync(q, ct))
             .WithName("LookupCustomer")
@@ -94,4 +105,8 @@ public static class SalesEndpoints
                 await service.CurrentSessionAsync(CurrentUser.From(user), ct) is { } s ? Results.Ok(s) : Results.NoContent())
             .WithName("MyActiveSession").WithSummary("Lượt ngồi hiện tại (204 nếu không có)");
     }
+
+    /// <summary>Customer app origin for the claim QR: configured value, else the origin the POS called (same host behind nginx).</summary>
+    private static string CustomerAppUrl(HttpContext http, ReceiptOptions options) =>
+        string.IsNullOrWhiteSpace(options.CustomerAppUrl) ? $"{http.Request.Scheme}://{http.Request.Host}" : options.CustomerAppUrl;
 }

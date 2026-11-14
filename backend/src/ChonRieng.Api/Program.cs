@@ -148,6 +148,9 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+// Receipt PDF: QuestPDF Community licence + bundled Vietnamese font (fails fast if the font is not embedded).
+ChonRieng.Api.Features.Sales.ReceiptPdf.Initialize();
+
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
