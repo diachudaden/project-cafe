@@ -351,6 +351,54 @@ public sealed class SePayWebhookTests : IDisposable
         Assert.Equal(PaymentLogLevel.Info, (await _db.PaymentLogs.SingleAsync(l => l.Stage == PaymentLogStage.Settled)).Level);
     }
 
+    [Fact]
+    public async Task Menu_lists_active_branch_and_chain_products_only()
+    {
+        var (manager, branch, _, _, _) = await SeedCheckInAsync();
+        var (noodle, egg, _, foreign) = await SeedMenuAsync(branch);
+        var addOns = new AddOnService(_db, _clock);
+
+        var menu = await addOns.MenuAsync(manager, branch.Id, default);
+
+        Assert.True(menu.IsSuccess);
+        Assert.Equal(new[] { egg.Id, noodle.Id }.Order(), menu.Value!.Select(p => p.Id).Order());
+
+        // Staff of another branch must not read this branch's menu.
+        var otherStaff = new CurrentUser(
+            Guid.CreateVersion7(),
+            new HashSet<string> { BusinessRoles.Staff },
+            BranchAccessScope.ForBranches(new HashSet<Guid> { foreign.BranchId!.Value }));
+        var denied = await addOns.MenuAsync(otherStaff, branch.Id, default);
+        Assert.False(denied.IsSuccess);
+        Assert.Equal(StatusCodes.Status404NotFound, denied.Error!.Status);
+    }
+
+    [Fact]
+    public async Task Add_on_sales_never_change_the_session_end()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var sessions = new SessionService(_db, _clock);
+        var checkedIn = (await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null), default)).Value!;
+        var endAt = (await _db.Sessions.SingleAsync()).EndAt;
+        var (noodle, egg, _, _) = await SeedMenuAsync(branch);
+
+        Assert.True((await new AddOnService(_db, _clock)
+            .SellCashAsync(manager, checkedIn.Id, new AddOnSaleRequest([new(noodle.Id, 2)]), default)).IsSuccess);
+        Assert.Equal(endAt, (await _db.Sessions.SingleAsync()).EndAt);
+
+        Assert.True((await new PaymentRequestService(_db, Options.Create(_options), _clock, sessions, TestPaymentLog.For(_db, _clock))
+            .CreateAddOnAsync(manager, checkedIn.Id, new AddOnSaleRequest([new(egg.Id, 1)]), default)).IsSuccess);
+        var paymentRequest = await _db.PaymentRequests.SingleAsync();
+        var body = Payload("tx-add-on-end", AccountNumber, paymentRequest.Code, 8_000);
+        var timestamp = Timestamp();
+        await SendAsync(body, timestamp, Sign(timestamp, body));
+
+        Assert.Equal(PaymentRequestStatus.Paid, paymentRequest.Status);
+        var session = await _db.Sessions.SingleAsync();
+        Assert.Equal(endAt, session.EndAt);
+        Assert.Empty(await _db.SessionExtensions.ToListAsync());
+    }
+
     private async Task<(Product Noodle, Product Egg, Product Inactive, Product Foreign)> SeedMenuAsync(Branch branch)
     {
         var otherBranch = new Branch { Name = "Other", Address = "y", Is24h = true, OpenTime = new TimeOnly(0, 0), CloseTime = new TimeOnly(0, 0) };

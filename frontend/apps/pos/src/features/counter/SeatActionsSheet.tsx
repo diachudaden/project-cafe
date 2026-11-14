@@ -3,7 +3,7 @@ import { Button, Descriptions, Divider, Drawer, List, Modal, Radio, Space, Tag, 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { FloorSeat, PaymentMethod } from "@cafecr/api-client";
-import { minutesLeftText, paymentLabels, seatStateStyles, time, vnd } from "@cafecr/ui";
+import { displayName, minutesLeftText, paymentLabels, seatStateStyles, time, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
 import { AddOnSheet } from "./AddOnSheet";
@@ -67,7 +67,7 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
       <Descriptions column={1} size="small" items={[
         { label: "Thời gian", children: `${time(session.startAt)} → ${time(session.endAt)} (${minutesLeftText(session.minutesLeft)})` },
         { label: "Khách", children: session.customerName ?? "Khách lẻ" },
-        { label: "Gói", children: bill.data?.planName.replace(/^\[DEMO( ONLY)?\]\s*/, "") ?? "…" },
+        { label: "Gói", children: (bill.data ? displayName(bill.data.planName) : "…") },
         { label: "Bill", children: `${session.billCode} · ${vnd(bill.data?.bill.total ?? session.billTotal)}` },
       ]} />
       {(bill.data?.items.length ?? 0) > 0 && (
@@ -76,7 +76,7 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
           <List size="small" dataSource={bill.data!.items}
             renderItem={(i) => (
               <List.Item extra={<Tag>{paymentLabels[i.paymentMethod]}</Tag>}>
-                {i.quantity} × {i.name.replace(/^\[DEMO\]\s*/, "")} · {vnd(i.amount)} <Typography.Text type="secondary">({time(i.createdAt)})</Typography.Text>
+                {i.quantity} × {displayName(i.name)} · {vnd(i.amount)} <Typography.Text type="secondary">({time(i.createdAt)})</Typography.Text>
               </List.Item>
             )} />
         </>

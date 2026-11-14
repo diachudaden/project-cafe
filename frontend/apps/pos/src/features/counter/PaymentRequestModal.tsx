@@ -70,6 +70,8 @@ export function PaymentRequestModal({
     if (paymentStatus === "Paid") {
       void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
       void queryClient.invalidateQueries({ queryKey: ["current-shift"] });
+      // Add-on and extension lines are on the seat's bill (SeatActionsSheet: ["seat-bill", billCode]).
+      void queryClient.invalidateQueries({ queryKey: ["seat-bill"] });
     }
   }, [branchId, paymentStatus, queryClient]);
 
