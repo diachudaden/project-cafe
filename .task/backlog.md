@@ -27,6 +27,7 @@ This backlog tracks requirement-driven implementation tasks. Feature tasks inclu
 | TASK-019 | Implemented | Admin menu icons, employee/account filters, cross-branch open shifts | Icons in the admin menu; filters and show-all on Nhân viên; search and Staff/Manager/Customer tabs on Tài khoản; open shifts visible and claimable across branches. See [TASK-019](./TASK-019-admin-filters-open-shifts.md).
 | TASK-020 | Implemented | Payment trace log (create bill → done) | `PaymentLogs` table written by `PaymentLogService` at every payment step (incl. rejected SePay callbacks) and an admin "Nhật ký thanh toán" page with per-code timeline. See [TASK-020](./TASK-020-payment-trace-log.md).
 | TASK-021 | Implemented | All price plans in POS + add-on items | Every valid plan in a POS dropdown (D4 relaxed); sell mì/trứng/bánh... on the active bill by cash or VietQR, managed in Bảng giá. See [TASK-021](./TASK-021-plans-dropdown-and-add-on-items.md).
+| TASK-022 | Implemented | Modern Lịch ca grid with pre-defined shift slots | Shift-type × day grid, coloured day columns, click a Sáng/Chiều/Tối/Đêm slot and switch "Kích hoạt" to create it (24/7: Sáng/Chiều/Đêm, others: Sáng/Tối); phone day view. Bulk row/day activation deferred. See [TASK-022](./TASK-022-schedule-grid-redesign.md).
 
 ## Working rules
 
