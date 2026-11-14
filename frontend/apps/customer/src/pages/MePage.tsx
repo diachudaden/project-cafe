@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { Button, Card, Descriptions, List, Typography, theme } from "antd";
 import { dateTime, minutesLeftText, time, vnd } from "@cafecr/ui";
 import { api, useAuth } from "../api";
 import { EnableNotifications } from "../components/EnableNotifications";
+import { BillRow } from "../components/BillRow";
 import { PointsDeltaBadge, useAnimatedPoints } from "../components/PointsDelta";
 
 export function MePage() {
@@ -12,7 +12,6 @@ export function MePage() {
   const session = useQuery({ queryKey: ["my-session"], queryFn: api.loyalty.session, refetchInterval: 30_000 });
   const bills = useQuery({ queryKey: ["my-bills"], queryFn: api.loyalty.bills });
   const user = state.user!;
-  const navigate = useNavigate();
   const { shown, delta } = useAnimatedPoints(points.data?.points);
   const { token } = theme.useToken();
 
@@ -44,9 +43,9 @@ export function MePage() {
       <Card title="Hóa đơn đã tích điểm" style={{ marginTop: 16 }}>
         <List dataSource={bills.data} locale={{ emptyText: "Chưa có hóa đơn." }}
           renderItem={(b) => (
-            <List.Item extra={`+${b.points}`} onClick={() => navigate(`/bills/${b.code}`)} style={{ cursor: "pointer" }}>
+            <BillRow billCode={b.code} extra={`+${b.points}`}>
               <List.Item.Meta title={`${b.code} · ${vnd(b.total)}`} description={`${b.branchName} · ${dateTime(b.createdAt)}`} />
-            </List.Item>
+            </BillRow>
           )} />
       </Card>
     </div>
