@@ -1,5 +1,6 @@
 import type { SeatStatus, SeatType } from "./admin";
 import { query, type Http, type RuleViolation } from "./http";
+import { createInventoryApi } from "./inventory";
 
 // Types mirror backend/src/ChonRieng.Api/Features/**/…Contracts.cs. Dates: DateOnly = "YYYY-MM-DD",
 // TimeOnly = "HH:mm:ss", DateTimeOffset = ISO 8601. Enums are strings.
@@ -318,6 +319,7 @@ export function createFeatureApi(http: Http) {
       occupancy: (period: ReportPeriod, date: string, branchId?: string) => get<OccupancyRow[]>(`/api/reports/occupancy${query({ period, date, branchId })}`),
       branches: (period: ReportPeriod, date: string) => get<BranchComparisonRow[]>(`/api/reports/branches${query({ period, date })}`),
     },
+    inventory: createInventoryApi(http),
     notifications: {
       feed: () => get<NotificationFeed>("/api/me/notifications"),
       markRead: (ids?: string[]) => post<void>("/api/me/notifications/read", { ids }),

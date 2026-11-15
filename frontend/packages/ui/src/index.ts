@@ -6,3 +6,5 @@ export * from "./theme";
 export * from "./search";
 export * from "./notifications";
 export * from "./bills";
+export * from "./inventory";
+export * from "./InventoryControls";
