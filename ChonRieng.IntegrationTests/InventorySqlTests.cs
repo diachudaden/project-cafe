@@ -54,6 +54,52 @@ public sealed class InventorySqlTests(SqlServerFixture sql)
         Assert.Equal(60, suggestion.Value!.Single().Suggested);
         Assert.True(balances.IsSuccess);
     }
+
+    private static ShiftCountService Counts(AppDbContext db) => new(db, new OuterStockCalculator(db),
+        new InventoryEvents(db, new ChonRieng.Api.Features.Scheduling.ShiftService(db, Clock)),
+        Microsoft.Extensions.Options.Options.Create(new InventoryOptions()), Clock);
+
+    [Fact]
+    public async Task Parallel_opens_share_one_count_and_parallel_confirms_write_once()
+    {
+        var bed = await SqlBed.CreateAsync(sql, innerCoffee: 100, outerCoffee: 40);
+
+        async Task<Guid> Open()
+        {
+            await using var db = sql.NewContext();
+            return (await Counts(db).OpenShiftCountAsync(bed.Staff, bed.ShiftId, default)).Value!.CountId;
+        }
+
+        var ids = await Task.WhenAll(Open(), Open());
+        Assert.Equal(ids[0], ids[1]);
+        var countId = ids[0];
+
+        await using (var db = sql.NewContext())
+        {
+            var saved = await Counts(db).SaveLinesAsync(bed.Staff, countId, new SaveCountLinesRequest([new CountLineInput(bed.CoffeeId, 39)]), default);
+            Assert.True(saved.IsSuccess);
+            var summary = await Counts(db).SummaryAsync(bed.Staff, countId, default);
+            Assert.Equal(40, summary.Value!.Rows.Single().Expected);
+        }
+
+        async Task<ConfirmCountResult> Confirm()
+        {
+            await using var db = sql.NewContext();
+            return (await Counts(db).ConfirmAsync(bed.Staff, countId, new ConfirmCountRequest(null), default)).Value!;
+        }
+
+        var results = await Task.WhenAll(Confirm(), Confirm());
+
+        Assert.All(results, r => Assert.Equal(StockDocumentStatus.Confirmed, r.Status));
+        Assert.Single(results, r => !r.AlreadyConfirmed);
+        await using var check = sql.NewContext();
+        Assert.Equal(1, await check.StockMovements.CountAsync(m => m.DocumentId == countId));
+        Assert.Equal(1, await check.ShiftCountHandovers.CountAsync(h => h.CountDocumentId == countId));
+        Assert.Equal(39, (await check.StockBalances.SingleAsync(b => b.WarehouseId == bed.OuterId && b.ItemId == bed.CoffeeId)).Qty);
+
+        var edit = await Counts(check).SaveLinesAsync(bed.Staff, countId, new SaveCountLinesRequest([new CountLineInput(bed.CoffeeId, 1)]), default);
+        Assert.Equal(InventoryErrors.CountAlreadyConfirmed, edit.Error!.Violations![0].Rule);
+    }
 }
 
 /// <summary>A fresh branch (own shift, staff checked in, one item) inside the shared SQL Server database.</summary>

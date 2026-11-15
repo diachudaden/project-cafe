@@ -1,4 +1,4 @@
-import type { PaymentMethod } from "./features";
+import type { PaymentMethod, ShiftType } from "./features";
 import { query, type Http } from "./http";
 
 // Types mirror backend/src/ChonRieng.Api/Features/Inventory/*Contracts.cs (TASK-027). Quantities are base units.
@@ -56,6 +56,35 @@ export interface TransferSuggestion {
   expectedNow: number; par: number; min: number; suggested: number; innerQty: number;
 }
 
+export type HandoverStatus = "Waiting" | "Accepted" | "Disputed" | "Resolved";
+
+/** Blind count sheet: never carries an expected quantity. */
+export interface CountItem { itemId: string; name: string; baseUnit: string; units: ItemUnit[]; sortOrder: number; countedQty: number | null }
+export interface CountSheet { countId: string; code: string; warehouse: WarehouseType; shiftId: string | null; status: StockDocumentStatus; items: CountItem[] }
+export interface CountLine { itemId: string; countedQty: number }
+export interface CountSummaryRow {
+  itemId: string; name: string; baseUnit: string; units: ItemUnit[];
+  opening: number; transfersIn: number; waste: number; sessions: number; norm: number; usage: number;
+  expected: number; firstCounted: number | null; counted: number | null; variance: number | null; tolerance: number; withinTolerance: boolean | null;
+}
+export interface HandoverInfo {
+  id: string; status: HandoverStatus; receivedByName: string | null; receivedAt: string | null; disputeNote: string | null;
+  disputeLines: CountLine[]; resolvedByName: string | null; resolvedAt: string | null; resolveNote: string | null;
+}
+export interface CountSummary {
+  countId: string; code: string; warehouse: WarehouseType; status: StockDocumentStatus;
+  branchId: string; branchName: string; shiftId: string | null; shiftType: ShiftType | null; shiftStart: string | null; shiftEnd: string | null;
+  countedByName: string; confirmedByName: string | null; confirmedAt: string | null; sessions: number;
+  reason: string | null; approvalNote: string | null; withinCount: number; itemCount: number;
+  rows: CountSummaryRow[]; handover: HandoverInfo | null; payloadHash: string | null;
+}
+export interface OutOfTolerance { itemId: string; name: string; baseUnit: string; expected: number; counted: number; variance: number; tolerance: number }
+export interface ConfirmCountResult { countId: string; status: StockDocumentStatus; alreadyConfirmed: boolean; outOfTolerance: OutOfTolerance[] }
+export interface PendingHandover {
+  countId: string; code: string; fromShiftId: string; shiftType: ShiftType; shiftStart: string; shiftEnd: string;
+  status: HandoverStatus; countStatus: StockDocumentStatus; countedByName: string; confirmedAt: string;
+}
+
 export function createInventoryApi(http: Http) {
   const get = <T>(path: string) => http.request<T>("GET", path);
   const post = <T>(path: string, body?: unknown) => http.request<T>("POST", path, body ?? {});
@@ -78,7 +107,23 @@ export function createInventoryApi(http: Http) {
     createTransfer: (branchId: string, lines: QtyLine[], reason: string | null) => post<StockDocument>(`${base}/transfers`, { branchId, lines, reason }),
     createWaste: (branchId: string, warehouse: WarehouseType, lines: QtyLine[], reason: string, photoUrl?: string | null) =>
       post<StockDocument>(`${base}/waste`, { branchId, warehouse, lines, reason, photoUrl }),
+
+    // Counts: shift close (outer) and weekly inner share lines → summary → confirm.
+    openShiftCount: (shiftId: string) => post<CountSheet>(`${base}/shift-counts/open`, { shiftId }),
+    openInnerCount: (branchId: string) => post<CountSheet>(`${base}/inner-counts/open`, { branchId }),
+    saveCountLines: (warehouse: WarehouseType, countId: string, lines: CountLine[]) =>
+      put<CountSheet>(`${base}/${countPath(warehouse)}/${countId}/lines`, { lines }),
+    countSummary: (warehouse: WarehouseType, countId: string) => get<CountSummary>(`${base}/${countPath(warehouse)}/${countId}/summary`),
+    confirmCount: (warehouse: WarehouseType, countId: string, reason: string | null) =>
+      post<ConfirmCountResult>(`${base}/${countPath(warehouse)}/${countId}/confirm`, { reason }),
+    pendingHandovers: (branchId: string) => get<PendingHandover[]>(`${base}/handovers/pending${query({ branchId })}`),
+    acceptHandover: (countId: string) => post<CountSummary>(`${base}/shift-counts/${countId}/accept`),
+    disputeHandover: (countId: string, lines: CountLine[], note: string) => post<CountSummary>(`${base}/shift-counts/${countId}/dispute`, { lines, note }),
+    resolveHandover: (countId: string, lines: { itemId: string; finalQty: number }[], note: string) =>
+      post<CountSummary>(`${base}/shift-counts/${countId}/resolve`, { lines, note }),
   };
 }
+
+const countPath = (warehouse: WarehouseType) => (warehouse === "Outer" ? "shift-counts" : "inner-counts");
 
 export type InventoryApi = ReturnType<typeof createInventoryApi>;

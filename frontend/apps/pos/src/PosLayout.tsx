@@ -5,6 +5,7 @@ import { Badge, Button, Layout, Segmented, Space, Typography } from "antd";
 import { ThemeToggle, shiftTypeLabels, time, vnd } from "@cafecr/ui";
 import { api, useAuth } from "./api";
 import { ClosingWizard } from "./features/counter/ClosingWizard";
+import { HandoverBanner } from "./features/inventory/HandoverBanner";
 
 export function useCurrentShift() {
   return useQuery({ queryKey: ["current-shift"], queryFn: api.attendance.current, refetchInterval: 30_000 });
@@ -37,6 +38,7 @@ export function PosLayout() {
         <ThemeToggle ghost />
         <Button ghost onClick={() => void logout()}>Đăng xuất</Button>
       </Layout.Header>
+      {shift && <HandoverBanner branchId={shift.branchId} />}
       <div style={{ padding: "12px 16px 0" }}>
         <Segmented
           block

@@ -78,6 +78,13 @@ public static class InventoryMath
         return new ReconcileResult(kind, innerVar, outerVar, total, tolerance);
     }
 
+    /// <summary>
+    /// Items not counted every shift (<c>CountDaily = false</c>) are counted on a rotation: on business days where
+    /// (day number + shelf order) is a multiple of <paramref name="rotationDays"/>.
+    /// </summary>
+    public static bool IsRotationDay(DateOnly date, int sortOrder, int rotationDays) =>
+        rotationDays <= 1 || ((date.DayNumber + sortOrder) % rotationDays + rotationDays) % rotationDays == 0;
+
     /// <summary>Actual usage of a confirmed shift count: Opening + In − Waste − Counted.</summary>
     public static int ActualUsage(int opening, int transfersIn, int waste, int counted) => opening + transfersIn - waste - counted;
 

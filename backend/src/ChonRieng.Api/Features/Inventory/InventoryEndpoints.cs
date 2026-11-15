@@ -77,5 +77,65 @@ public static class InventoryEndpoints
             .WithName("CreateStockWaste")
             .WithSummary("Phiếu huỷ (PH) hàng hỏng / đổ vỡ")
             .WithDescription("Bắt buộc lý do. Kho trong không được âm (409 INSUFFICIENT_STOCK).");
+
+        MapCountEndpoints(inventory.MapGroup("/shift-counts"), "Đếm kho ngoài kết ca");
+        MapCountEndpoints(inventory.MapGroup("/inner-counts"), "Kiểm kê kho trong");
+
+        inventory.MapPost("/shift-counts/open", async (OpenShiftCountRequest request, ClaimsPrincipal user, ShiftCountService service, CancellationToken ct) =>
+                (await service.OpenShiftCountAsync(CurrentUser.From(user), request.ShiftId, ct)).ToHttp())
+            .WithName("OpenShiftCount")
+            .WithSummary("Mở (hoặc tiếp tục) phiếu đếm kho ngoài của ca")
+            .WithDescription("Đếm mù: chỉ trả danh sách món (đếm mỗi ca + món xoay vòng hôm nay), KHÔNG có số dự kiến. Chỉ nhân viên đang trong ca hoặc quản lý.");
+
+        inventory.MapPost("/inner-counts/open", async (OpenInnerCountRequest request, ClaimsPrincipal user, ShiftCountService service, CancellationToken ct) =>
+                (await service.OpenInnerCountAsync(CurrentUser.From(user), request.BranchId, ct)).ToHttp())
+            .RequireManagement()
+            .WithName("OpenInnerCount")
+            .WithSummary("Mở phiếu kiểm kê kho trong (quản lý)")
+            .WithDescription("Đếm mù toàn bộ mặt hàng; xác nhận đưa tồn sổ kho trong về đúng số đếm.");
+
+        inventory.MapGet("/handovers/pending", async (Guid branchId, ClaimsPrincipal user, ShiftCountService service, CancellationToken ct) =>
+                (await service.PendingHandoversAsync(CurrentUser.From(user), branchId, ct)).ToHttp())
+            .WithName("PendingHandovers")
+            .WithSummary("Bàn giao kho ngoài đang chờ ca sau nhận (banner POS)");
+
+        inventory.MapPost("/shift-counts/{id:guid}/accept", async (Guid id, ClaimsPrincipal user, ShiftCountService service, CancellationToken ct) =>
+                (await service.AcceptAsync(CurrentUser.From(user), id, ct)).ToHttp())
+            .WithName("AcceptHandover")
+            .WithSummary("Ca sau xác nhận nhận bàn giao kho ngoài");
+
+        inventory.MapPost("/shift-counts/{id:guid}/dispute", async (Guid id, DisputeHandoverRequest request, ClaimsPrincipal user, ShiftCountService service, CancellationToken ct) =>
+                (await service.DisputeAsync(CurrentUser.From(user), id, request, ct)).ToHttp())
+            .WithName("DisputeHandover")
+            .WithSummary("Ca sau báo không khớp (số tự đếm + ghi chú) → báo quản lý");
+
+        inventory.MapPost("/shift-counts/{id:guid}/resolve", async (Guid id, ResolveHandoverRequest request, ClaimsPrincipal user, ShiftCountService service, CancellationToken ct) =>
+                (await service.ResolveAsync(CurrentUser.From(user), id, request, ct)).ToHttp())
+            .RequireManagement()
+            .WithName("ResolveHandover")
+            .WithSummary("Quản lý chốt số bàn giao")
+            .WithDescription("Chênh lệch với số đếm được ghi bằng phiếu điều chỉnh (DC) gắn với phiếu đếm; phiếu đếm giữ nguyên. Đầu ca sau = số chốt.");
+    }
+
+    private static void MapCountEndpoints(RouteGroupBuilder group, string area)
+    {
+        var tag = area.Replace(' ', '-');
+        group.MapPut("/{id:guid}/lines", async (Guid id, SaveCountLinesRequest request, ClaimsPrincipal user, ShiftCountService service, CancellationToken ct) =>
+                (await service.SaveLinesAsync(CurrentUser.From(user), id, request, ct)).ToHttp())
+            .WithName($"SaveCountLines-{tag}")
+            .WithSummary($"{area}: lưu số đếm")
+            .WithDescription("Lần nhập đầu tiên của mỗi món được giữ làm FirstCountedQty (không đổi). Không trả số dự kiến. Phiếu đã khoá: 409 COUNT_ALREADY_CONFIRMED.");
+
+        group.MapGet("/{id:guid}/summary", async (Guid id, ClaimsPrincipal user, ShiftCountService service, CancellationToken ct) =>
+                (await service.SummaryAsync(CurrentUser.From(user), id, ct)).ToHttp())
+            .WithName($"CountSummary-{tag}")
+            .WithSummary($"{area}: bảng tổng hợp")
+            .WithDescription("Đầu ca · chuyển vào · huỷ · lượt × định mức · dự kiến · đếm · lệch · ngưỡng. 409 COUNT_INCOMPLETE khi còn món chưa đếm.");
+
+        group.MapPost("/{id:guid}/confirm", async (Guid id, ConfirmCountRequest request, ClaimsPrincipal user, ShiftCountService service, CancellationToken ct) =>
+                (await service.ConfirmAsync(CurrentUser.From(user), id, request, ct)).ToHttp())
+            .WithName($"ConfirmCount-{tag}")
+            .WithSummary($"{area}: xác nhận và khoá")
+            .WithDescription("Mọi món trong ngưỡng → Confirmed; có món vượt → PendingApproval (bắt buộc lý do ≥ 10 ký tự, báo quản lý). Gọi lại trên phiếu đã khoá trả kết quả cũ (idempotent).");
     }
 }

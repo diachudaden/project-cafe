@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ChonRieng.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261115084332_InventoryModule")]
+    [Migration("20261115091139_InventoryModule")]
     partial class InventoryModule
     {
         /// <inheritdoc />
@@ -1250,6 +1250,9 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("DisputeLines")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("DisputeNote")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -1268,6 +1271,9 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("RemindedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ResolveAdjustmentId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("ResolveNote")
                         .HasMaxLength(1000)
@@ -1493,9 +1499,6 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Property<int?>("CountedQty")
                         .HasColumnType("int");
 
-                    b.Property<int?>("DisputedQty")
-                        .HasColumnType("int");
-
                     b.Property<Guid>("DocumentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1518,9 +1521,6 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("Qty")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ResolvedQty")
                         .HasColumnType("int");
 
                     b.Property<int?>("SuggestedQty")

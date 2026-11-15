@@ -12,9 +12,13 @@ public sealed class ShiftCountHandover : Entity
     public DateTimeOffset? ReceivedAt { get; set; }
     public Guid? ReceivedShiftId { get; set; }
     public string? DisputeNote { get; set; }
+    /// <summary>JSON [{itemId, countedQty}]: the next shift's own count (the locked count document is never edited).</summary>
+    public string? DisputeLines { get; set; }
     public Guid? ResolvedBy { get; set; }
     public DateTimeOffset? ResolvedAt { get; set; }
     public string? ResolveNote { get; set; }
+    /// <summary>The adjustment (DC) that moved the count to the manager's final quantities.</summary>
+    public Guid? ResolveAdjustmentId { get; set; }
     /// <summary>Reminder sent to the POS (30 min) / manager (60 min).</summary>
     public DateTimeOffset? RemindedAt { get; set; }
     public DateTimeOffset? EscalatedAt { get; set; }

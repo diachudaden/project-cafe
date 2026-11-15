@@ -247,9 +247,11 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     ReceivedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     ReceivedShiftId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     DisputeNote = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    DisputeLines = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ResolvedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     ResolvedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     ResolveNote = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    ResolveAdjustmentId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     RemindedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     EscalatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
@@ -287,8 +289,6 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     ExpectedQty = table.Column<int>(type: "int", nullable: true),
                     Variance = table.Column<int>(type: "int", nullable: true),
                     Tolerance = table.Column<int>(type: "int", nullable: true),
-                    DisputedQty = table.Column<int>(type: "int", nullable: true),
-                    ResolvedQty = table.Column<int>(type: "int", nullable: true),
                     SuggestedQty = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>

@@ -91,3 +91,65 @@ public sealed record CreateWasteRequest(
 public sealed record TransferSuggestion(
     Guid ItemId, string ItemName, string BaseUnit, IReadOnlyList<ItemUnitView> Units,
     int ExpectedNow, int Par, int Min, int Suggested, int InnerQty);
+
+// ---- Counts (shift close: outer; weekly: inner) ----
+/// <summary>Blind count sheet: deliberately has no expected quantity.</summary>
+public sealed record CountItemView(
+    Guid ItemId, string Name, string BaseUnit, IReadOnlyList<ItemUnitView> Units, int SortOrder,
+    [property: Description("Số đã nhập (nháp) của chính người đếm.")] int? CountedQty);
+
+public sealed record CountSheetView(
+    Guid CountId, string Code, WarehouseType Warehouse, Guid? ShiftId, StockDocumentStatus Status, IReadOnlyList<CountItemView> Items);
+
+public sealed record OpenShiftCountRequest(Guid ShiftId);
+
+public sealed record OpenInnerCountRequest(Guid BranchId);
+
+public sealed record CountLineInput(Guid ItemId, [property: Range(0, 1_000_000)] int CountedQty);
+
+public sealed record SaveCountLinesRequest([property: Required] IReadOnlyList<CountLineInput> Lines);
+
+public sealed record CountSummaryRow(
+    Guid ItemId, string Name, string BaseUnit, IReadOnlyList<ItemUnitView> Units,
+    [property: Description("Đầu ca: số đếm ca trước (kho ngoài) / tồn sổ (kho trong).")] int Opening,
+    int TransfersIn, int Waste, int Sessions, decimal Norm, decimal Usage,
+    int Expected, int? FirstCounted, int? Counted, int? Variance, int Tolerance, bool? WithinTolerance);
+
+public sealed record CountedOutOfTolerance(Guid ItemId, string Name, string BaseUnit, int Expected, int Counted, int Variance, int Tolerance);
+
+public sealed record HandoverLine(Guid ItemId, int CountedQty);
+
+public sealed record HandoverInfo(
+    Guid Id, HandoverStatus Status, string? ReceivedByName, DateTimeOffset? ReceivedAt, string? DisputeNote,
+    IReadOnlyList<HandoverLine> DisputeLines, string? ResolvedByName, DateTimeOffset? ResolvedAt, string? ResolveNote);
+
+public sealed record CountSummaryView(
+    Guid CountId, string Code, WarehouseType Warehouse, StockDocumentStatus Status,
+    Guid BranchId, string BranchName, Guid? ShiftId, ShiftType? ShiftType, DateTimeOffset? ShiftStart, DateTimeOffset? ShiftEnd,
+    string CountedByName, string? ConfirmedByName, DateTimeOffset? ConfirmedAt,
+    [property: Description("Số lượt bán + gia hạn trong ca.")] int Sessions,
+    string? Reason, string? ApprovalNote,
+    [property: Description("Số món trong ngưỡng / tổng số món.")] int WithinCount, int ItemCount,
+    IReadOnlyList<CountSummaryRow> Rows, HandoverInfo? Handover, string? PayloadHash);
+
+public sealed record ConfirmCountRequest(
+    [property: MaxLength(1000), Description("Bắt buộc (≥ 10 ký tự) khi có món vượt ngưỡng.")] string? Reason);
+
+public sealed record ConfirmCountResult(
+    Guid CountId, StockDocumentStatus Status,
+    [property: Description("true khi phiếu đã được xác nhận trước đó (gọi lại không ghi thêm).")] bool AlreadyConfirmed,
+    IReadOnlyList<CountedOutOfTolerance> OutOfTolerance);
+
+public sealed record DisputeHandoverRequest(
+    [property: Required] IReadOnlyList<CountLineInput> Lines,
+    [property: Required, MaxLength(1000)] string Note);
+
+public sealed record ResolveLineInput(Guid ItemId, [property: Range(0, 1_000_000)] int FinalQty);
+
+public sealed record ResolveHandoverRequest(
+    [property: Required] IReadOnlyList<ResolveLineInput> Lines,
+    [property: Required, MaxLength(1000)] string Note);
+
+public sealed record PendingHandoverView(
+    Guid CountId, string Code, Guid FromShiftId, ShiftType ShiftType, DateTimeOffset ShiftStart, DateTimeOffset ShiftEnd,
+    HandoverStatus Status, StockDocumentStatus CountStatus, string CountedByName, DateTimeOffset ConfirmedAt);

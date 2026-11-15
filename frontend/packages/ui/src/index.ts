@@ -8,3 +8,4 @@ export * from "./notifications";
 export * from "./bills";
 export * from "./inventory";
 export * from "./InventoryControls";
+export * from "./CountSummaryTable";

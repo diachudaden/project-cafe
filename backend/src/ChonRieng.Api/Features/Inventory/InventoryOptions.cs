@@ -17,4 +17,8 @@ public sealed class InventoryOptions
     /// <summary>Minimum length of the reason for an out-of-tolerance count.</summary>
     [Range(1, 200)]
     public int CountReasonMinLength { get; set; } = 10;
+
+    /// <summary>Items with CountDaily = false are counted at shift close once every this many days.</summary>
+    [Range(1, 31)]
+    public int RotationDays { get; set; } = 3;
 }

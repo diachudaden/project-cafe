@@ -26,10 +26,6 @@ public sealed class StockDocumentLine : Entity
     public int? ExpectedQty { get; set; }
     public int? Variance { get; set; }
     public int? Tolerance { get; set; }
-    /// <summary>Next shift's own count when it disputes the handover.</summary>
-    public int? DisputedQty { get; set; }
-    /// <summary>Quantity a manager settled on when resolving a dispute.</summary>
-    public int? ResolvedQty { get; set; }
 
     // Transfer documents only.
     public int? SuggestedQty { get; set; }

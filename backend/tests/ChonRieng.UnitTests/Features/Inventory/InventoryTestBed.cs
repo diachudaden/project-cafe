@@ -46,6 +46,9 @@ public sealed class InventoryTestBed : IDisposable
             new ItemBranchSetting { ItemId = Coffee.Id, BranchId = Branch.Id, NormPerSession = 1.2m, OuterMin = 20, OuterPar = 60, InnerMin = 100 },
             new ItemBranchSetting { ItemId = Cups.Id, BranchId = Branch.Id, NormPerSession = 1m, OuterMin = 30, OuterPar = 100, InnerMin = 300 });
         Db.ShiftAssignments.Add(new ShiftAssignment { ShiftId = Shift.Id, EmployeeId = Staff.Employee.Id, Status = ShiftAssignmentStatus.Accepted });
+        var managerRole = new Microsoft.AspNetCore.Identity.IdentityRole<Guid>(BusinessRoles.BranchManager) { Id = Guid.NewGuid(), NormalizedName = "BRANCHMANAGER" };
+        Db.Roles.Add(managerRole);
+        Db.UserRoles.Add(new Microsoft.AspNetCore.Identity.IdentityUserRole<Guid> { UserId = Manager.User.Id, RoleId = managerRole.Id });
         Db.SaveChanges();
         (Inner, Outer) = Warehouses.EnsureAsync(Db, Branch.Id, default).GetAwaiter().GetResult();
     }
@@ -58,6 +61,8 @@ public sealed class InventoryTestBed : IDisposable
     public OuterStockCalculator Calculator => new(Db);
     public StockDocumentService Documents => new(Db, Calculator, Clock);
     public InventoryCatalogService Catalog => new(Db, Calculator, Clock);
+    public InventoryEvents Events => new(Db, new ChonRieng.Api.Features.Scheduling.ShiftService(Db, Clock));
+    public ShiftCountService Counts => new(Db, Calculator, Events, Options, Clock);
     public static IOptions<InventoryOptions> Options => Microsoft.Extensions.Options.Options.Create(new InventoryOptions());
 
     public Shift NewShift(ShiftType type, DateTimeOffset start, DateTimeOffset end)
