@@ -50,6 +50,7 @@ public static class FeatureRegistration
         services.AddScoped<StockDocumentService>();
         services.AddScoped<InventoryEvents>();
         services.AddScoped<ShiftCountService>();
+        services.AddScoped<InventoryReviewService>();
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;

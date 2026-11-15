@@ -63,6 +63,7 @@ public sealed class InventoryTestBed : IDisposable
     public InventoryCatalogService Catalog => new(Db, Calculator, Clock);
     public InventoryEvents Events => new(Db, new ChonRieng.Api.Features.Scheduling.ShiftService(Db, Clock));
     public ShiftCountService Counts => new(Db, Calculator, Events, Options, Clock);
+    public InventoryReviewService Review => new(Db, Documents, Clock);
     public static IOptions<InventoryOptions> Options => Microsoft.Extensions.Options.Options.Create(new InventoryOptions());
 
     public Shift NewShift(ShiftType type, DateTimeOffset start, DateTimeOffset end)

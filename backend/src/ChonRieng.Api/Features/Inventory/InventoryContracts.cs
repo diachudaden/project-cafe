@@ -153,3 +153,36 @@ public sealed record ResolveHandoverRequest(
 public sealed record PendingHandoverView(
     Guid CountId, string Code, Guid FromShiftId, ShiftType ShiftType, DateTimeOffset ShiftStart, DateTimeOffset ShiftEnd,
     HandoverStatus Status, StockDocumentStatus CountStatus, string CountedByName, DateTimeOffset ConfirmedAt);
+
+// ---- Review, adjustments, attention ----
+public sealed record ReviewDocumentRequest([property: MaxLength(1000), Description("Bắt buộc khi từ chối.")] string? Note);
+
+public sealed record AdjustmentLineInput(Guid ItemId, [property: Description("Số cần sửa (±) so với phiếu gốc, đơn vị gốc.")] int QtyDelta);
+
+public sealed record CreateAdjustmentRequest(
+    Guid AdjustsDocumentId,
+    [property: Required] IReadOnlyList<AdjustmentLineInput> Lines,
+    [property: Required, MaxLength(1000)] string Reason);
+
+public sealed record ResolveIssueRequest([property: Required, MaxLength(1000)] string Note);
+
+public sealed record AttentionCount(
+    Guid CountId, string Code, ShiftType? ShiftType, DateTimeOffset? ShiftStart, DateTimeOffset? ShiftEnd,
+    string ConfirmedByName, DateTimeOffset ConfirmedAt, string? Reason, int OutOfTolerance);
+
+public sealed record AttentionHandover(
+    Guid CountId, string Code, HandoverStatus Status, ShiftType? ShiftType, DateTimeOffset? ShiftStart, DateTimeOffset? ShiftEnd,
+    DateTimeOffset CreatedAt, int MinutesWaiting, string? ReceivedByName, string? DisputeNote);
+
+public sealed record InventoryIssueView(
+    Guid Id, Guid ItemId, string ItemName, string BaseUnit, InventoryIssueKind Kind, DateTimeOffset PeriodFrom, DateTimeOffset PeriodTo,
+    int InnerVar, int OuterVar, int Total, int Tolerance, InventoryIssueStatus Status, Guid? AdjustmentDocumentId,
+    DateTimeOffset CreatedAt, string? Note);
+
+public sealed record AttentionView(
+    IReadOnlyList<AttentionCount> PendingCounts,
+    [property: Description("Bàn giao tranh chấp hoặc chờ quá 60 phút.")] IReadOnlyList<AttentionHandover> Handovers,
+    [property: Description("Phiếu điều chỉnh nháp do job đối soát đề xuất.")] IReadOnlyList<StockDocumentView> DraftAdjustments,
+    [property: Description("Ghi phiếu sai (TransferMisrecorded).")] IReadOnlyList<InventoryIssueView> MisrecordedIssues,
+    [property: Description("Hao hụt thật / dư không rõ (RealLoss, UnexplainedSurplus).")] IReadOnlyList<InventoryIssueView> LossIssues,
+    int Total);

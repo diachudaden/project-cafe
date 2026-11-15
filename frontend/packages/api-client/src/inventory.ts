@@ -85,6 +85,26 @@ export interface PendingHandover {
   status: HandoverStatus; countStatus: StockDocumentStatus; countedByName: string; confirmedAt: string;
 }
 
+export type InventoryIssueKind = "Normal" | "WithinTolerance" | "TransferMisrecorded" | "RealLoss" | "UnexplainedSurplus";
+export type InventoryIssueStatus = "Open" | "Resolved";
+export interface InventoryIssue {
+  id: string; itemId: string; itemName: string; baseUnit: string; kind: InventoryIssueKind; periodFrom: string; periodTo: string;
+  innerVar: number; outerVar: number; total: number; tolerance: number; status: InventoryIssueStatus;
+  adjustmentDocumentId: string | null; createdAt: string; note: string | null;
+}
+export interface AttentionCount {
+  countId: string; code: string; shiftType: ShiftType | null; shiftStart: string | null; shiftEnd: string | null;
+  confirmedByName: string; confirmedAt: string; reason: string | null; outOfTolerance: number;
+}
+export interface AttentionHandover {
+  countId: string; code: string; status: HandoverStatus; shiftType: ShiftType | null; shiftStart: string | null; shiftEnd: string | null;
+  createdAt: string; minutesWaiting: number; receivedByName: string | null; disputeNote: string | null;
+}
+export interface Attention {
+  pendingCounts: AttentionCount[]; handovers: AttentionHandover[]; draftAdjustments: StockDocument[];
+  misrecordedIssues: InventoryIssue[]; lossIssues: InventoryIssue[]; total: number;
+}
+
 export function createInventoryApi(http: Http) {
   const get = <T>(path: string) => http.request<T>("GET", path);
   const post = <T>(path: string, body?: unknown) => http.request<T>("POST", path, body ?? {});
@@ -121,6 +141,15 @@ export function createInventoryApi(http: Http) {
     disputeHandover: (countId: string, lines: CountLine[], note: string) => post<CountSummary>(`${base}/shift-counts/${countId}/dispute`, { lines, note }),
     resolveHandover: (countId: string, lines: { itemId: string; finalQty: number }[], note: string) =>
       post<CountSummary>(`${base}/shift-counts/${countId}/resolve`, { lines, note }),
+
+    // Manager review (TASK-027 slice 5).
+    attention: (branchId: string) => get<Attention>(`${base}/attention${query({ branchId })}`),
+    approve: (documentId: string, note: string | null) => post<StockDocument>(`${base}/documents/${documentId}/approve`, { note }),
+    reject: (documentId: string, note: string) => post<StockDocument>(`${base}/documents/${documentId}/reject`, { note }),
+    createAdjustment: (adjustsDocumentId: string, lines: { itemId: string; qtyDelta: number }[], reason: string) =>
+      post<StockDocument>(`${base}/adjustments`, { adjustsDocumentId, lines, reason }),
+    issues: (branchId: string, from: string, to: string) => get<InventoryIssue[]>(`${base}/issues${query({ branchId, from, to })}`),
+    resolveIssue: (id: string, note: string) => post<InventoryIssue>(`${base}/issues/${id}/resolve`, { note }),
   };
 }
 

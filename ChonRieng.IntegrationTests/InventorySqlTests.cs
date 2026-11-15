@@ -100,6 +100,26 @@ public sealed class InventorySqlTests(SqlServerFixture sql)
         var edit = await Counts(check).SaveLinesAsync(bed.Staff, countId, new SaveCountLinesRequest([new CountLineInput(bed.CoffeeId, 1)]), default);
         Assert.Equal(InventoryErrors.CountAlreadyConfirmed, edit.Error!.Violations![0].Rule);
     }
+
+    [Fact]
+    public async Task Attention_box_translates_to_sql()
+    {
+        var bed = await SqlBed.CreateAsync(sql, innerCoffee: 100, outerCoffee: 40);
+        await using var db = sql.NewContext();
+        var counts = Counts(db);
+        var sheet = (await counts.OpenShiftCountAsync(bed.Staff, bed.ShiftId, default)).Value!;
+        await counts.SaveLinesAsync(bed.Staff, sheet.CountId, new SaveCountLinesRequest([new CountLineInput(bed.CoffeeId, 20)]), default);
+        Assert.Equal(StockDocumentStatus.PendingApproval,
+            (await counts.ConfirmAsync(bed.Staff, sheet.CountId, new ConfirmCountRequest("Thiếu 20 gói cà phê"), default)).Value!.Status);
+
+        var calculator = new OuterStockCalculator(db);
+        var review = new InventoryReviewService(db, new StockDocumentService(db, calculator, Clock), Clock);
+        var attention = (await review.AttentionAsync(bed.Manager, bed.BranchId, default)).Value!;
+        var issues = await review.ListIssuesAsync(bed.Manager, bed.BranchId, DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1)), default);
+
+        Assert.Equal(1, Assert.Single(attention.PendingCounts).OutOfTolerance);
+        Assert.True(issues.IsSuccess);
+    }
 }
 
 /// <summary>A fresh branch (own shift, staff checked in, one item) inside the shared SQL Server database.</summary>

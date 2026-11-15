@@ -39,4 +39,33 @@ public static class StockLedger
         });
         return balance;
     }
+
+    /// <summary>
+    /// Posts an adjustment (DC): each signed line moves <c>+Qty</c> into ToWarehouse and <c>−Qty</c> out of FromWarehouse.
+    /// Returns the item that would drive the inner (exact) warehouse negative, or null when posted.
+    /// </summary>
+    public static async Task<(Guid ItemId, int Available, int Needed)?> PostAdjustmentAsync(
+        AppDbContext db, StockDocument doc, IReadOnlyDictionary<Guid, WarehouseType> warehouseTypes, DateTimeOffset at, CancellationToken ct)
+    {
+        foreach (var line in doc.Lines)
+        {
+            foreach (var (warehouseId, qty) in new[] { (doc.ToWarehouseId, line.Qty), (doc.FromWarehouseId, -line.Qty) })
+            {
+                if (warehouseId is not { } id || qty == 0)
+                {
+                    continue;
+                }
+
+                var balance = await BalanceAsync(db, id, line.ItemId, ct);
+                if (qty < 0 && warehouseTypes.GetValueOrDefault(id) == WarehouseType.Inner && balance.Qty + qty < 0)
+                {
+                    return (line.ItemId, balance.Qty, -qty);
+                }
+
+                await PostAsync(db, id, line.ItemId, qty, doc.Id, at, ct);
+            }
+        }
+
+        return null;
+    }
 }

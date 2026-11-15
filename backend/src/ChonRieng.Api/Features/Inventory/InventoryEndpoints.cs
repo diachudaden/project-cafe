@@ -78,6 +78,43 @@ public static class InventoryEndpoints
             .WithSummary("Phiếu huỷ (PH) hàng hỏng / đổ vỡ")
             .WithDescription("Bắt buộc lý do. Kho trong không được âm (409 INSUFFICIENT_STOCK).");
 
+        inventory.MapGet("/attention", async (Guid branchId, ClaimsPrincipal user, InventoryReviewService service, CancellationToken ct) =>
+                (await service.AttentionAsync(CurrentUser.From(user), branchId, ct)).ToHttp())
+            .RequireManagement()
+            .WithName("InventoryAttention")
+            .WithSummary("Hộp Cần xử lý")
+            .WithDescription("Phiếu đếm chờ duyệt, bàn giao tranh chấp / chờ quá 60 phút, phiếu điều chỉnh nháp và issues mở (tách Ghi phiếu sai và Hao hụt thật).");
+
+        inventory.MapPost("/documents/{id:guid}/approve", async (Guid id, ReviewDocumentRequest request, ClaimsPrincipal user, InventoryReviewService service, CancellationToken ct) =>
+                (await service.ApproveAsync(CurrentUser.From(user), id, request, ct)).ToHttp())
+            .RequireManagement()
+            .WithName("ApproveStockDocument")
+            .WithSummary("Duyệt phiếu đếm chờ duyệt / phiếu điều chỉnh nháp (ghi sổ khi duyệt DC)");
+
+        inventory.MapPost("/documents/{id:guid}/reject", async (Guid id, ReviewDocumentRequest request, ClaimsPrincipal user, InventoryReviewService service, CancellationToken ct) =>
+                (await service.RejectAsync(CurrentUser.From(user), id, request, ct)).ToHttp())
+            .RequireManagement()
+            .WithName("RejectStockDocument")
+            .WithSummary("Từ chối (cần lý do)")
+            .WithDescription("Phiếu đếm chờ duyệt bị từ chối: đảo các bút toán tồn của phiếu và cho phép đếm lại ca đó.");
+
+        inventory.MapPost("/adjustments", async (CreateAdjustmentRequest request, ClaimsPrincipal user, InventoryReviewService service, CancellationToken ct) =>
+                (await service.CreateAdjustmentAsync(CurrentUser.From(user), request, ct)).ToHttp(d => TypedResults.Created($"/api/inventory/documents/{d.Id}", d)))
+            .RequireManagement()
+            .WithName("CreateStockAdjustment")
+            .WithSummary("Phiếu điều chỉnh (DC) cho phiếu đã khoá")
+            .WithDescription("Cách duy nhất để sửa phiếu đã khoá. qtyDelta (±) so với phiếu gốc; phiếu gốc giữ nguyên.");
+
+        inventory.MapGet("/issues", async (Guid branchId, DateOnly from, DateOnly to, ClaimsPrincipal user, InventoryReviewService service, CancellationToken ct) =>
+                (await service.ListIssuesAsync(CurrentUser.From(user), branchId, from, to, ct)).ToHttp())
+            .RequireManagement()
+            .WithName("ListInventoryIssues").WithSummary("Kết quả đối soát 2 kho theo kỳ");
+
+        inventory.MapPost("/issues/{id:guid}/resolve", async (Guid id, ResolveIssueRequest request, ClaimsPrincipal user, InventoryReviewService service, CancellationToken ct) =>
+                (await service.ResolveIssueAsync(CurrentUser.From(user), id, request, ct)).ToHttp())
+            .RequireManagement()
+            .WithName("ResolveInventoryIssue").WithSummary("Đóng issue đối soát kèm ghi chú");
+
         MapCountEndpoints(inventory.MapGroup("/shift-counts"), "Đếm kho ngoài kết ca");
         MapCountEndpoints(inventory.MapGroup("/inner-counts"), "Kiểm kê kho trong");
 
