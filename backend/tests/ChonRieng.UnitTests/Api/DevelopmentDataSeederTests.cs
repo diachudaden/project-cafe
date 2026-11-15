@@ -105,6 +105,7 @@ public sealed class DevelopmentDataSeederTests
         Assert.Equal(45_000m, (await dbContext.PricePlans.SingleAsync(item => item.BranchId == null)).Price);
 
         await AssertHistoryIsConsistentAsync(dbContext);
+        await AssertInventoryIsConsistentAsync(dbContext);
 
         var managerEmployeeId = await dbContext.Employees
             .Where(item => item.UserId == manager.Id)
@@ -262,5 +263,23 @@ public sealed class DevelopmentDataSeederTests
         public string ApplicationName { get; set; } = "ChonRieng.UnitTests";
         public string ContentRootPath { get; set; } = Directory.GetCurrentDirectory();
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static async Task AssertInventoryIsConsistentAsync(AppDbContext db)
+    {
+        // Five demo branches (A–E) × inner + outer; the unrelated branch gets its warehouses on first use.
+        Assert.Equal(10, await db.Warehouses.CountAsync());
+        Assert.Equal(5, await db.InventoryItems.CountAsync());
+        Assert.Equal(25, await db.ItemBranchSettings.CountAsync());
+        Assert.Equal(50, await db.StockBalances.CountAsync());
+        var cafe = await db.InventoryItems.Include(i => i.Units).SingleAsync(i => i.Name == "[DEMO] Cà phê 3in1");
+        Assert.Contains(cafe.Units, u => u.UnitName == "Thùng" && u.Factor == 480);
+
+        // Every cached balance equals the sum of its movements.
+        var sums = await db.StockMovements.GroupBy(m => new { m.WarehouseId, m.ItemId })
+            .Select(g => new { g.Key.WarehouseId, g.Key.ItemId, Qty = g.Sum(m => m.Qty) }).ToListAsync();
+        var balances = await db.StockBalances.ToListAsync();
+        Assert.All(balances, b => Assert.Equal(sums.Single(x => x.WarehouseId == b.WarehouseId && x.ItemId == b.ItemId).Qty, b.Qty));
+        Assert.All(await db.StockDocuments.Select(d => d.Code).ToListAsync(), code => Assert.Matches(@"^P[NC]-[0-9A-F]{4}-\d{6}-\d{3}$", code));
     }
 }

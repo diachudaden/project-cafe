@@ -34,6 +34,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ShiftRequest> ShiftRequests => Set<ShiftRequest>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+    public DbSet<ItemUnit> ItemUnits => Set<ItemUnit>();
+    public DbSet<ItemBranchSetting> ItemBranchSettings => Set<ItemBranchSetting>();
+    public DbSet<StockDocument> StockDocuments => Set<StockDocument>();
+    public DbSet<StockDocumentLine> StockDocumentLines => Set<StockDocumentLine>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+    public DbSet<ShiftCountHandover> ShiftCountHandovers => Set<ShiftCountHandover>();
+    public DbSet<InventoryIssue> InventoryIssues => Set<InventoryIssue>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

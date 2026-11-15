@@ -123,6 +123,7 @@ public static class DevelopmentDataSeeder
         await EnsureFloorAsync(dbContext, branches, cancellationToken);
         await EnsurePricePlansAsync(dbContext, branches, now, cancellationToken);
         await EnsureProductsAsync(dbContext, now, cancellationToken);
+        await DevelopmentInventorySeeder.SeedAsync(dbContext, branches, admin.Id, now, cancellationToken);
 
         // Original TASK-005 accounts, unchanged.
         var manager = await EnsureSeedUserAsync(userManager, ManagerEmail, "[DEMO DATA] Branch Manager", BusinessRoles.BranchManager, password);

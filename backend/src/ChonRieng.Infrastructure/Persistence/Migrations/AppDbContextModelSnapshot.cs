@@ -379,6 +379,9 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("ReversesExpenseId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("StockDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedByEmployeeId");
@@ -387,9 +390,182 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[ReversesExpenseId] IS NOT NULL");
 
+                    b.HasIndex("StockDocumentId")
+                        .IsUnique()
+                        .HasFilter("[StockDocumentId] IS NOT NULL");
+
                     b.HasIndex("BranchId", "Date");
 
                     b.ToTable("Expenses", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.InventoryIssue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AdjustmentDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("InnerCountDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("InnerVar")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte>("Kind")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("OuterVar")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("PeriodFrom")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("PeriodTo")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ResolvedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<int>("Tolerance")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Total")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId");
+
+                    b.HasIndex("BranchId", "Status");
+
+                    b.HasIndex("InnerCountDocumentId", "ItemId")
+                        .IsUnique();
+
+                    b.ToTable("InventoryIssues", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.InventoryItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BaseUnit")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("CountDaily")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("InventoryItems", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.ItemBranchSetting", b =>
+                {
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("InnerMin")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("NormLearnedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal?>("NormOverride")
+                        .HasColumnType("decimal(8,3)");
+
+                    b.Property<decimal>("NormPerSession")
+                        .HasColumnType("decimal(8,3)");
+
+                    b.Property<int>("OuterMin")
+                        .HasColumnType("int");
+
+                    b.Property<int>("OuterPar")
+                        .HasColumnType("int");
+
+                    b.HasKey("ItemId", "BranchId");
+
+                    b.HasIndex("BranchId");
+
+                    b.ToTable("ItemBranchSettings", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.ItemUnit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Factor")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UnitName")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId", "UnitName")
+                        .IsUnique();
+
+                    b.ToTable("ItemUnits", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ItemUnits_Factor", "[Factor] > 1");
+                        });
                 });
 
             modelBuilder.Entity("ChonRieng.Domain.Entities.Notification", b =>
@@ -1059,6 +1235,66 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.ToTable("ShiftClosings", (string)null);
                 });
 
+            modelBuilder.Entity("ChonRieng.Domain.Entities.ShiftCountHandover", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CountDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("DisputeNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("EscalatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ReceivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReceivedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReceivedShiftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("RemindedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ResolveNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ResolvedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CountDocumentId")
+                        .IsUnique();
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("ShiftCountHandovers", (string)null);
+                });
+
             modelBuilder.Entity("ChonRieng.Domain.Entities.ShiftRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1109,6 +1345,254 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.HasIndex("Status", "ShiftId");
 
                     b.ToTable("ShiftRequests", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.StockBalance", b =>
+                {
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Qty")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("WarehouseId", "ItemId");
+
+                    b.HasIndex("ItemId");
+
+                    b.ToTable("StockBalances", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.StockDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AdjustsDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ApprovalNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ConfirmedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("FromWarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("InvoiceNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("PayloadHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("PhotoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int?>("SessionCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("ShiftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("Supplier")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ToWarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte>("Type")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdjustsDocumentId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("FromWarehouseId");
+
+                    b.HasIndex("ToWarehouseId");
+
+                    b.HasIndex("BranchId", "Status");
+
+                    b.HasIndex("ShiftId", "ToWarehouseId")
+                        .IsUnique()
+                        .HasFilter("[Type] = 4 AND [ShiftId] IS NOT NULL AND [Status] <> 5");
+
+                    b.HasIndex("BranchId", "Type", "CreatedAt");
+
+                    b.ToTable("StockDocuments", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.StockDocumentLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("CountedQty")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DisputedQty")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("ExpectedQty")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("FirstCountedQty")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Norm")
+                        .HasColumnType("decimal(8,3)");
+
+                    b.Property<int?>("OpeningQty")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Qty")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ResolvedQty")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SuggestedQty")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Tolerance")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TransferInQty")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasColumnType("decimal(12,0)");
+
+                    b.Property<string>("UnitName")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int?>("UnitQty")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Usage")
+                        .HasColumnType("decimal(12,3)");
+
+                    b.Property<int?>("Variance")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("WasteQty")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId");
+
+                    b.HasIndex("DocumentId", "ItemId")
+                        .IsUnique();
+
+                    b.ToTable("StockDocumentLines", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.StockMovement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Qty")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentId");
+
+                    b.HasIndex("ItemId");
+
+                    b.HasIndex("WarehouseId", "ItemId", "OccurredAt");
+
+                    b.ToTable("StockMovements", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StockMovements_Qty", "[Qty] <> 0");
+                        });
                 });
 
             modelBuilder.Entity("ChonRieng.Domain.Entities.User", b =>
@@ -1235,6 +1719,31 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasFilter("[RevokedAt] IS NULL AND [IsPos] = 1");
 
                     b.ToTable("UserSessions", (string)null);
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.Warehouse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte>("Type")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId", "Type")
+                        .IsUnique();
+
+                    b.ToTable("Warehouses", (string)null);
                 });
 
             modelBuilder.Entity("ChonRieng.Domain.Entities.Zone", b =>
@@ -1531,6 +2040,55 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Navigation("CreatedByEmployee");
                 });
 
+            modelBuilder.Entity("ChonRieng.Domain.Entities.InventoryIssue", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChonRieng.Domain.Entities.InventoryItem", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.ItemBranchSetting", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChonRieng.Domain.Entities.InventoryItem", "Item")
+                        .WithMany("BranchSettings")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.ItemUnit", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.InventoryItem", "Item")
+                        .WithMany("Units")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
             modelBuilder.Entity("ChonRieng.Domain.Entities.Notification", b =>
                 {
                     b.HasOne("ChonRieng.Domain.Entities.User", "User")
@@ -1754,6 +2312,17 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Navigation("Shift");
                 });
 
+            modelBuilder.Entity("ChonRieng.Domain.Entities.ShiftCountHandover", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.StockDocument", "CountDocument")
+                        .WithMany()
+                        .HasForeignKey("CountDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CountDocument");
+                });
+
             modelBuilder.Entity("ChonRieng.Domain.Entities.ShiftRequest", b =>
                 {
                     b.HasOne("ChonRieng.Domain.Entities.Employee", "RequesterEmployee")
@@ -1787,6 +2356,110 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Navigation("TargetEmployee");
                 });
 
+            modelBuilder.Entity("ChonRieng.Domain.Entities.StockBalance", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.InventoryItem", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChonRieng.Domain.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.StockDocument", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.StockDocument", "AdjustsDocument")
+                        .WithMany()
+                        .HasForeignKey("AdjustsDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ChonRieng.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChonRieng.Domain.Entities.Warehouse", "FromWarehouse")
+                        .WithMany()
+                        .HasForeignKey("FromWarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ChonRieng.Domain.Entities.Shift", "Shift")
+                        .WithMany()
+                        .HasForeignKey("ShiftId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ChonRieng.Domain.Entities.Warehouse", "ToWarehouse")
+                        .WithMany()
+                        .HasForeignKey("ToWarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AdjustsDocument");
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("FromWarehouse");
+
+                    b.Navigation("Shift");
+
+                    b.Navigation("ToWarehouse");
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.StockDocumentLine", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.StockDocument", "Document")
+                        .WithMany("Lines")
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChonRieng.Domain.Entities.InventoryItem", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.StockMovement", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.StockDocument", "Document")
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChonRieng.Domain.Entities.InventoryItem", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChonRieng.Domain.Entities.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+
+                    b.Navigation("Item");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("ChonRieng.Domain.Entities.UserSession", b =>
                 {
                     b.HasOne("ChonRieng.Domain.Entities.Branch", "Branch")
@@ -1803,6 +2476,17 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Navigation("Branch");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.Warehouse", b =>
+                {
+                    b.HasOne("ChonRieng.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
                 });
 
             modelBuilder.Entity("ChonRieng.Domain.Entities.Zone", b =>
@@ -1905,6 +2589,13 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Navigation("ShiftAssignments");
                 });
 
+            modelBuilder.Entity("ChonRieng.Domain.Entities.InventoryItem", b =>
+                {
+                    b.Navigation("BranchSettings");
+
+                    b.Navigation("Units");
+                });
+
             modelBuilder.Entity("ChonRieng.Domain.Entities.PaymentRequest", b =>
                 {
                     b.Navigation("Transactions");
@@ -1936,6 +2627,11 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Navigation("Bills");
 
                     b.Navigation("Closing");
+                });
+
+            modelBuilder.Entity("ChonRieng.Domain.Entities.StockDocument", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("ChonRieng.Domain.Entities.User", b =>

@@ -38,7 +38,17 @@ public sealed class DomainSchemaModelTests
         "Notifications",
         "UserSessions",
         "Users",
+        "Warehouses",
+        "InventoryItems",
+        "ItemUnits",
+        "StockDocuments",
+        "StockDocumentLines",
+        "ShiftCountHandovers",
+        "InventoryIssues",
     ];
+
+    // Composite or bigint keys by design: settings/balances are keyed by their pair, the movement ledger is append-only identity.
+    private static readonly string[] NonGuidKeyTables = ["ItemBranchSettings", "StockBalances", "StockMovements"];
 
     private static AppDbContext CreateContext()
     {
@@ -59,7 +69,8 @@ public sealed class DomainSchemaModelTests
             .ToHashSet(StringComparer.Ordinal);
 
         Assert.All(BusinessTables, table => Assert.Contains(table, tables));
-        Assert.Equal(33, tables.Count);
+        Assert.Equal(43, tables.Count);
+        Assert.All(NonGuidKeyTables, table => Assert.Contains(table, tables));
         Assert.Contains("AspNetRoles", tables);
         Assert.Contains("AspNetUserRoles", tables);
         Assert.Contains("AspNetUserClaims", tables);
@@ -77,7 +88,7 @@ public sealed class DomainSchemaModelTests
             .Where(entity => BusinessTables.Contains(entity.GetTableName(), StringComparer.Ordinal))
             .ToArray();
 
-        Assert.Equal(27, businessEntities.Length);
+        Assert.Equal(34, businessEntities.Length);
         Assert.All(businessEntities, entity =>
         {
             var primaryKey = Assert.Single(entity.FindPrimaryKey()!.Properties);
@@ -172,7 +183,7 @@ public sealed class DomainSchemaModelTests
 
         var migrations = db.Database.GetMigrations().ToArray();
 
-        Assert.Equal(9, migrations.Length);
+        Assert.Equal(10, migrations.Length);
         Assert.EndsWith("_InitialCafeCrSchema", migrations[0], StringComparison.Ordinal);
         Assert.EndsWith("_AddRefreshTokenExpiry", migrations[1], StringComparison.Ordinal);
         Assert.EndsWith("_RoleWorkflows", migrations[2], StringComparison.Ordinal);
@@ -182,5 +193,38 @@ public sealed class DomainSchemaModelTests
         Assert.EndsWith("_AddOnItems", migrations[6], StringComparison.Ordinal);
         Assert.EndsWith("_SessionCloseReason", migrations[7], StringComparison.Ordinal);
         Assert.EndsWith("_NotificationPaymentLinks", migrations[8], StringComparison.Ordinal);
+        Assert.EndsWith("_InventoryModule", migrations[9], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Inventory_tables_map_the_ledger_and_lock_constraints()
+    {
+        using var db = CreateContext();
+
+        var movement = db.Model.FindEntityType(typeof(StockMovement))!;
+        var movementKey = Assert.Single(movement.FindPrimaryKey()!.Properties);
+        Assert.Equal(typeof(long), movementKey.ClrType);
+        Assert.Equal(ValueGenerated.OnAdd, movementKey.ValueGenerated);
+
+        var balance = db.Model.FindEntityType(typeof(StockBalance))!;
+        Assert.Equal([nameof(StockBalance.WarehouseId), nameof(StockBalance.ItemId)],
+            balance.FindPrimaryKey()!.Properties.Select(p => p.Name));
+        Assert.True(balance.FindProperty(nameof(StockBalance.RowVersion))!.IsConcurrencyToken);
+
+        var document = db.Model.FindEntityType(typeof(StockDocument))!;
+        Assert.True(document.FindProperty(nameof(StockDocument.RowVersion))!.IsConcurrencyToken);
+        Assert.Contains(document.GetIndexes(), index =>
+            index.IsUnique
+            && index.GetFilter() == "[Type] = 4 AND [ShiftId] IS NOT NULL AND [Status] <> 5"
+            && index.Properties.Select(p => p.Name).SequenceEqual([nameof(StockDocument.ShiftId), nameof(StockDocument.ToWarehouseId)]));
+
+        var warehouse = db.Model.FindEntityType(typeof(Warehouse))!;
+        Assert.Contains(warehouse.GetIndexes(), index =>
+            index.IsUnique && index.Properties.Select(p => p.Name).SequenceEqual([nameof(Warehouse.BranchId), nameof(Warehouse.Type)]));
+
+        Assert.Equal("decimal(8,3)", db.Model.FindEntityType(typeof(ItemBranchSetting))!
+            .FindProperty(nameof(ItemBranchSetting.NormPerSession))!.GetColumnType());
+        Assert.Contains(db.Model.FindEntityType(typeof(Expense))!.GetIndexes(), index =>
+            index.IsUnique && index.Properties.Select(p => p.Name).SequenceEqual([nameof(Expense.StockDocumentId)]));
     }
 }
