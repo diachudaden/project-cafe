@@ -186,3 +186,30 @@ public sealed record AttentionView(
     [property: Description("Ghi phiếu sai (TransferMisrecorded).")] IReadOnlyList<InventoryIssueView> MisrecordedIssues,
     [property: Description("Hao hụt thật / dư không rõ (RealLoss, UnexplainedSurplus).")] IReadOnlyList<InventoryIssueView> LossIssues,
     int Total);
+
+// ---- Reports ----
+public enum UsageGroupBy
+{
+    Day = 1,
+    Shift = 2,
+}
+
+public sealed record UsageReportRow(
+    [property: Description("Ngày (yyyy-MM-dd) hoặc mã phiếu đếm khi groupBy = Shift.")] string Period,
+    DateOnly Date, ShiftType? ShiftType, Guid ItemId, string ItemName, string BaseUnit,
+    int Sessions,
+    [property: Description("Tiêu hao thực tế = đầu ca + chuyển vào − huỷ − đếm.")] int ActualUsage,
+    [property: Description("Tiêu hao theo định mức = lượt × định mức.")] decimal NormUsage,
+    [property: Description("Định mức thực tế / lượt.")] decimal? ActualPerSession,
+    decimal Norm, int Variance, int Counts);
+
+public sealed record UsageReport(Guid BranchId, DateOnly From, DateOnly To, UsageGroupBy GroupBy, IReadOnlyList<UsageReportRow> Rows);
+
+public sealed record IssueKindTotal(InventoryIssueKind Kind, int Issues, int Units);
+
+public sealed record IssueItemTotal(Guid ItemId, string ItemName, string BaseUnit, int Misrecorded, int RealLoss, int Surplus, decimal? LossValue);
+
+public sealed record IssuesReport(
+    Guid BranchId, DateOnly From, DateOnly To, IReadOnlyList<IssueKindTotal> Kinds, IReadOnlyList<IssueItemTotal> Items, IReadOnlyList<InventoryIssueView> Issues);
+
+public sealed record BranchUsageRow(Guid BranchId, string BranchName, Guid ItemId, string ItemName, string BaseUnit, int Sessions, int ActualUsage, decimal? ActualPerSession, decimal Norm);

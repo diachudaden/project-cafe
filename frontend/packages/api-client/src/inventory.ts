@@ -105,6 +105,23 @@ export interface Attention {
   misrecordedIssues: InventoryIssue[]; lossIssues: InventoryIssue[]; total: number;
 }
 
+export type UsageGroupBy = "Day" | "Shift";
+export interface UsageReportRow {
+  period: string; date: string; shiftType: ShiftType | null; itemId: string; itemName: string; baseUnit: string;
+  sessions: number; actualUsage: number; normUsage: number; actualPerSession: number | null; norm: number; variance: number; counts: number;
+}
+export interface UsageReport { branchId: string; from: string; to: string; groupBy: UsageGroupBy; rows: UsageReportRow[] }
+export interface IssuesReport {
+  branchId: string; from: string; to: string;
+  kinds: { kind: InventoryIssueKind; issues: number; units: number }[];
+  items: { itemId: string; itemName: string; baseUnit: string; misrecorded: number; realLoss: number; surplus: number; lossValue: number | null }[];
+  issues: InventoryIssue[];
+}
+export interface BranchUsageRow {
+  branchId: string; branchName: string; itemId: string; itemName: string; baseUnit: string; sessions: number; actualUsage: number;
+  actualPerSession: number | null; norm: number;
+}
+
 export function createInventoryApi(http: Http) {
   const get = <T>(path: string) => http.request<T>("GET", path);
   const post = <T>(path: string, body?: unknown) => http.request<T>("POST", path, body ?? {});
@@ -150,6 +167,11 @@ export function createInventoryApi(http: Http) {
       post<StockDocument>(`${base}/adjustments`, { adjustsDocumentId, lines, reason }),
     issues: (branchId: string, from: string, to: string) => get<InventoryIssue[]>(`${base}/issues${query({ branchId, from, to })}`),
     resolveIssue: (id: string, note: string) => post<InventoryIssue>(`${base}/issues/${id}/resolve`, { note }),
+
+    usageReport: (branchId: string, from: string, to: string, groupBy: UsageGroupBy) =>
+      get<UsageReport>(`${base}/reports/usage${query({ branchId, from, to, groupBy })}`),
+    issuesReport: (branchId: string, from: string, to: string) => get<IssuesReport>(`${base}/reports/issues${query({ branchId, from, to })}`),
+    branchUsage: (from: string, to: string) => get<BranchUsageRow[]>(`${base}/reports/branches${query({ from, to })}`),
   };
 }
 

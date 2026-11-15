@@ -115,6 +115,23 @@ public static class InventoryEndpoints
             .RequireManagement()
             .WithName("ResolveInventoryIssue").WithSummary("Đóng issue đối soát kèm ghi chú");
 
+        var reports = inventory.MapGroup("/reports").RequireManagement();
+        reports.MapGet("/usage", async (Guid branchId, DateOnly from, DateOnly to, UsageGroupBy? groupBy, ClaimsPrincipal user, InventoryReportService service, CancellationToken ct) =>
+                (await service.UsageAsync(CurrentUser.From(user), branchId, from, to, groupBy ?? UsageGroupBy.Day, ct)).ToHttp())
+            .WithName("InventoryUsageReport")
+            .WithSummary("Tiêu hao và định mức thực tế / lượt theo ngày hoặc ca")
+            .WithDescription("Từ các phiếu đếm kho ngoài đã khoá. Tiêu hao thực tế = đầu ca + chuyển vào − huỷ − đếm; so với lượt × định mức.");
+
+        reports.MapGet("/issues", async (Guid branchId, DateOnly from, DateOnly to, ClaimsPrincipal user, InventoryReportService service, CancellationToken ct) =>
+                (await service.IssuesAsync(CurrentUser.From(user), branchId, from, to, ct)).ToHttp())
+            .WithName("InventoryIssuesReport")
+            .WithSummary("Đối soát: Ghi phiếu sai vs Hao hụt thật vs Dư không rõ (kèm giá trị hao hụt ước tính)");
+
+        reports.MapGet("/branches", async (DateOnly from, DateOnly to, ClaimsPrincipal user, InventoryReportService service, CancellationToken ct) =>
+                (await service.BranchesAsync(CurrentUser.From(user), from, to, ct)).ToHttp())
+            .WithName("InventoryBranchComparison")
+            .WithSummary("So sánh định mức thực tế / lượt giữa các chi nhánh");
+
         MapCountEndpoints(inventory.MapGroup("/shift-counts"), "Đếm kho ngoài kết ca");
         MapCountEndpoints(inventory.MapGroup("/inner-counts"), "Kiểm kê kho trong");
 

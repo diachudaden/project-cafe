@@ -136,6 +136,12 @@ public sealed class InventorySqlTests(SqlServerFixture sql)
         await jobs.RemindUnconfirmedCountsAsync(now.AddHours(8), default);
         await jobs.ReconcileAsync(now, default);
         await jobs.RecalcNormsAsync(now, default);
+
+        var reports = new InventoryReportService(db);
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        Assert.True((await reports.UsageAsync(bed.Manager, bed.BranchId, today.AddDays(-1), today, UsageGroupBy.Shift, default)).IsSuccess);
+        Assert.True((await reports.IssuesAsync(bed.Manager, bed.BranchId, today.AddDays(-1), today, default)).IsSuccess);
+        Assert.True((await reports.BranchesAsync(bed.Manager, today.AddDays(-1), today, default)).IsSuccess);
     }
 }
 

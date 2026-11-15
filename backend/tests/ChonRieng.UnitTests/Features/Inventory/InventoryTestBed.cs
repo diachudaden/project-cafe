@@ -65,6 +65,7 @@ public sealed class InventoryTestBed : IDisposable
     public ShiftCountService Counts => new(Db, Calculator, Events, Options, Clock);
     public InventoryReviewService Review => new(Db, Documents, Clock);
     public InventoryJobs Jobs => new(Db, Calculator, Events, Options, Microsoft.Extensions.Logging.Abstractions.NullLogger<InventoryJobs>.Instance);
+    public InventoryReportService Reports => new(Db);
     public static IOptions<InventoryOptions> Options => Microsoft.Extensions.Options.Options.Create(new InventoryOptions());
 
     public Shift NewShift(ShiftType type, DateTimeOffset start, DateTimeOffset end)

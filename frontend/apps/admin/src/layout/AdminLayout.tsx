@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Layout, List, Menu, Popover, Select, Space, Typography, theme } from "antd";
 import {
   ApartmentOutlined, AppstoreOutlined, AuditOutlined, BarChartOutlined, CalendarOutlined, ClockCircleOutlined, DashboardOutlined, DollarOutlined,
-  AlertOutlined, DatabaseOutlined, FileDoneOutlined, FormOutlined, InboxOutlined, SafetyCertificateOutlined, TagsOutlined, TeamOutlined, WalletOutlined,
+  AlertOutlined, DatabaseOutlined, LineChartOutlined, FileDoneOutlined, FormOutlined, InboxOutlined, SafetyCertificateOutlined, TagsOutlined, TeamOutlined, WalletOutlined,
 } from "@ant-design/icons";
 import { ThemeToggle, dateTime, hasRole, roleLabels } from "@cafecr/ui";
 import { api, useAuth } from "../api";
@@ -19,6 +19,7 @@ const managementMenu = [
   { key: "/inventory/attention", icon: <AlertOutlined />, label: "Kho · Cần xử lý" },
   { key: "/inventory/stock", icon: <InboxOutlined />, label: "Kho · Tồn & phiếu" },
   { key: "/inventory/items", icon: <DatabaseOutlined />, label: "Kho · Mặt hàng" },
+  { key: "/inventory/reports", icon: <LineChartOutlined />, label: "Kho · Báo cáo" },
   { key: "/payment-logs", icon: <AuditOutlined />, label: "Nhật ký thanh toán" },
   { key: "/payroll", icon: <DollarOutlined />, label: "Lương" },
   { key: "/reports", icon: <BarChartOutlined />, label: "Báo cáo" },

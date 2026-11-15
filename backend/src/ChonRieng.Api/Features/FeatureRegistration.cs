@@ -52,6 +52,7 @@ public static class FeatureRegistration
         services.AddScoped<ShiftCountService>();
         services.AddScoped<InventoryReviewService>();
         services.AddScoped<InventoryJobs>();
+        services.AddScoped<InventoryReportService>();
         services.AddHostedService<InventoryJobsWorker>();
         services.AddRateLimiter(options =>
         {
