@@ -12,6 +12,8 @@ public sealed class Expense : Entity
     public Guid? CreatedByEmployeeId { get; set; }
     public Guid? CreatedByUserId { get; set; }
     public Guid? ReversesExpenseId { get; set; }
+    /// <summary>Paid goods receipt (PN) this expense records.</summary>
+    public Guid? StockDocumentId { get; set; }
 
     public Branch Branch { get; set; } = null!;
     public Employee? CreatedByEmployee { get; set; }

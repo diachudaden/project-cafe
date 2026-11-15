@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using ChonRieng.Api.Features.Catalog;
 using ChonRieng.Api.Features.Engagement;
 using ChonRieng.Api.Features.Finance;
+using ChonRieng.Api.Features.Inventory;
 using ChonRieng.Api.Features.Reports;
 using ChonRieng.Api.Features.Sales;
 using ChonRieng.Api.Features.Scheduling;
@@ -40,6 +41,19 @@ public static class FeatureRegistration
         services.AddScoped<LoyaltyService>();
         services.AddScoped<FinanceService>();
         services.AddScoped<ReportService>();
+        services.AddOptions<InventoryOptions>()
+            .BindConfiguration(InventoryOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddScoped<OuterStockCalculator>();
+        services.AddScoped<InventoryCatalogService>();
+        services.AddScoped<StockDocumentService>();
+        services.AddScoped<InventoryEvents>();
+        services.AddScoped<ShiftCountService>();
+        services.AddScoped<InventoryReviewService>();
+        services.AddScoped<InventoryJobs>();
+        services.AddScoped<InventoryReportService>();
+        services.AddHostedService<InventoryJobsWorker>();
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -61,5 +75,6 @@ public static class FeatureRegistration
         app.MapFinanceEndpoints();
         app.MapReportEndpoints();
         app.MapNotificationEndpoints();
+        app.MapInventoryEndpoints();
     }
 }

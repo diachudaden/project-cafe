@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Alert, Button, Descriptions, Input, InputNumber, Modal, Space, Statistic, Steps, Table, Typography } from "antd";
-import { closingLabels, vnd } from "@cafecr/ui";
+import { closingLabels, shiftTypeLabels, vn, vnd } from "@cafecr/ui";
+import { OuterCountStep } from "../inventory/OuterCountStep";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
 
 const NOTES = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000];
 
-/** "Rời ca": count cash by denomination → compare with expected → hand over (submit + auto logout). */
+/** "Rời ca": count cash → compare → count the outer warehouse (TASK-027) → hand over (submit + auto logout). */
 export function ClosingWizard({ shiftId, onClose, onDone }: { shiftId: string; onClose: () => void; onDone: () => void }) {
   const notify = useNotify();
   const preview = useQuery({ queryKey: ["closing-preview", shiftId], queryFn: () => api.finance.closingPreview(shiftId) });
@@ -39,8 +40,8 @@ export function ClosingWizard({ shiftId, onClose, onDone }: { shiftId: string; o
   const locked = preview.data?.closing && ["Submitted", "Approved"].includes(preview.data.closing.status);
 
   return (
-    <Modal open width={640} title="Kết ca" onCancel={onClose} footer={null}>
-      <Steps current={step} size="small" style={{ marginBottom: 16 }} items={[{ title: "Đếm tiền" }, { title: "Đối chiếu" }, { title: "Bàn giao" }]} />
+    <Modal open width={900} title="Kết ca" onCancel={onClose} footer={null}>
+      <Steps current={step} size="small" style={{ marginBottom: 16 }} items={[{ title: "Đếm tiền" }, { title: "Đối chiếu" }, { title: "Kho ngoài" }, { title: "Bàn giao" }]} />
       {locked && <Alert type="info" message={`Biên bản ${closingLabels[preview.data!.closing!.status].label.toLowerCase()}.`} />}
       {!locked && step === 0 && (
         <>
@@ -74,15 +75,20 @@ export function ClosingWizard({ shiftId, onClose, onDone }: { shiftId: string; o
           {difference !== 0 && <Input.TextArea style={{ marginTop: 12 }} placeholder="Lý do chênh lệch (bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />}
           <Space style={{ marginTop: 12 }}>
             <Button onClick={() => setStep(0)}>Quay lại</Button>
-            <Button type="primary" disabled={difference !== 0 && !note.trim()} onClick={() => setStep(2)}>Tiếp: bàn giao</Button>
+            <Button type="primary" disabled={difference !== 0 && !note.trim()} onClick={() => setStep(2)}>Tiếp: đếm kho ngoài</Button>
           </Space>
         </>
       )}
-      {!locked && step === 2 && (
+      {!locked && step === 2 && preview.data && (
+        <OuterCountStep shiftId={shiftId}
+          shiftLabel={`${shiftTypeLabels[preview.data.shiftType]} ${vn(preview.data.startAt).format("DD/MM")}`}
+          onBack={() => setStep(1)} onDone={() => setStep(3)} />
+      )}
+      {!locked && step === 3 && (
         <>
           <Typography.Paragraph>Xác nhận bàn giao {vnd(counted)} tiền mặt cho ca sau. Sau khi nộp, bạn sẽ rời ca và được đăng xuất.</Typography.Paragraph>
           <Space>
-            <Button onClick={() => setStep(1)}>Quay lại</Button>
+            <Button onClick={() => setStep(2)}>Quay lại</Button>
             <Button type="primary" danger loading={save.isPending} onClick={() => save.mutate(true)}>Nộp biên bản & rời ca</Button>
           </Space>
         </>

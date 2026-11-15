@@ -95,3 +95,50 @@ public enum ClosingStatus : byte
     Approved = 3,
     Rejected = 4,
 }
+
+public enum WarehouseType : byte
+{
+    Inner = 1,
+    Outer = 2,
+}
+
+public enum StockDocumentType : byte
+{
+    Receipt = 1,
+    Transfer = 2,
+    Waste = 3,
+    Count = 4,
+    Adjustment = 5,
+}
+
+public enum StockDocumentStatus : byte
+{
+    Draft = 1,
+    Confirmed = 2,
+    PendingApproval = 3,
+    Approved = 4,
+    Rejected = 5,
+}
+
+public enum HandoverStatus : byte
+{
+    Waiting = 1,
+    Accepted = 2,
+    Disputed = 3,
+    Resolved = 4,
+}
+
+public enum InventoryIssueKind : byte
+{
+    Normal = 1,
+    WithinTolerance = 2,
+    TransferMisrecorded = 3,
+    RealLoss = 4,
+    UnexplainedSurplus = 5,
+}
+
+public enum InventoryIssueStatus : byte
+{
+    Open = 1,
+    Resolved = 2,
+}

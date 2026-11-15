@@ -1,4 +1,5 @@
 import type {
+  HandoverStatus, InventoryIssueKind, StockDocumentStatus, StockDocumentType,
   AssignmentStatus, ClosingStatus, PaymentMethod, Role, SeatLiveState, SeatType, SessionCloseReason, ShiftPhase, ShiftRequestType, ShiftType,
 } from "@cafecr/api-client";
 
@@ -77,4 +78,30 @@ export const dayOfWeekLabels: Record<string, string> = {
 export const closeReasonLabels: Record<SessionCloseReason, { label: string; color: string }> = {
   Manual: { label: "Nhân viên trả chỗ", color: "default" },
   AutoReleased: { label: "Hệ thống tự trả chỗ", color: "orange" },
+};
+
+// ---- Inventory (TASK-027) ----
+
+export const stockDocumentTypeLabels: Record<StockDocumentType, string> = {
+  Receipt: "Phiếu nhập", Transfer: "Phiếu chuyển", Waste: "Phiếu huỷ", Count: "Phiếu đếm", Adjustment: "Phiếu điều chỉnh",
+};
+export const stockDocumentStatusLabels: Record<StockDocumentStatus, { label: string; color: string }> = {
+  Draft: { label: "Nháp", color: "default" },
+  Confirmed: { label: "Đã khoá", color: "green" },
+  PendingApproval: { label: "Chờ duyệt", color: "gold" },
+  Approved: { label: "Đã duyệt", color: "blue" },
+  Rejected: { label: "Từ chối", color: "red" },
+};
+export const handoverStatusLabels: Record<HandoverStatus, { label: string; color: string }> = {
+  Waiting: { label: "Chờ ca sau nhận", color: "gold" },
+  Accepted: { label: "Đã nhận", color: "green" },
+  Disputed: { label: "Báo không khớp", color: "red" },
+  Resolved: { label: "Quản lý đã chốt", color: "blue" },
+};
+export const issueKindLabels: Record<InventoryIssueKind, { label: string; color: string }> = {
+  Normal: { label: "Bình thường", color: "green" },
+  WithinTolerance: { label: "Trong ngưỡng", color: "default" },
+  TransferMisrecorded: { label: "Ghi phiếu sai", color: "orange" },
+  RealLoss: { label: "Hao hụt thật", color: "red" },
+  UnexplainedSurplus: { label: "Dư không rõ", color: "purple" },
 };

@@ -19,6 +19,10 @@ import { PaymentLogsPage } from "./features/payment-logs/PaymentLogsPage";
 import { EmployeesPage } from "./features/employees/EmployeesPage";
 import { BranchesPage } from "./features/branches/BranchesPage";
 import { UsersPage } from "./features/users/UsersPage";
+import { InventoryItemsPage } from "./features/inventory/InventoryItemsPage";
+import { StockPage } from "./features/inventory/StockPage";
+import { AttentionPage } from "./features/inventory/AttentionPage";
+import { InventoryReportsPage } from "./features/inventory/InventoryReportsPage";
 
 function AdminOnly({ children }: { children: ReactNode }) {
   const { state } = useAuth();
@@ -47,6 +51,10 @@ export function App() {
         <Route path="/floor" element={<FloorPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/employees" element={<EmployeesPage />} />
+        <Route path="/inventory/stock" element={<StockPage />} />
+        <Route path="/inventory/items" element={<InventoryItemsPage />} />
+        <Route path="/inventory/attention" element={<AttentionPage />} />
+        <Route path="/inventory/reports" element={<InventoryReportsPage />} />
         <Route path="/payment-logs" element={<PaymentLogsPage />} />
         <Route path="/branches" element={<AdminOnly><BranchesPage /></AdminOnly>} />
         <Route path="/users" element={<AdminOnly><UsersPage /></AdminOnly>} />

@@ -26,6 +26,10 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         builder.HasIndex(x => x.ReversesExpenseId)
             .IsUnique()
             .HasFilter("[ReversesExpenseId] IS NOT NULL");
+        // A paid receipt (PN) records exactly one expense.
+        builder.HasIndex(x => x.StockDocumentId)
+            .IsUnique()
+            .HasFilter("[StockDocumentId] IS NOT NULL");
     }
 }
 

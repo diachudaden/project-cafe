@@ -19,3 +19,4 @@ Approved defaults from [docs/proposals/roles/05-decisions.md](../docs/proposals/
 - Closing: expected cash = Cash bill totals of the shift; a difference requires a note; approved closings are immutable.
 - Finance: the expense ledger is append-only (corrections are reversal entries). Payroll = approved hours × rate + night hours (22:00–06:00) × allowance + bonus − deduction; Managers draft and adjust, only Admin finalizes; finalized payroll is immutable.
 - Managers manage Staff of their branches only (rates, branch assignment); role changes remain Admin-only.
+- Inventory (TASK-027, D32): inner warehouse = exact book, outer = expected and counted blind at every shift close; locked stock documents are immutable (corrections are adjustments); a paid receipt records one "Nguyên liệu" expense; transfers above the suggestion or par need a reason but are never blocked; inner stock cannot go negative.

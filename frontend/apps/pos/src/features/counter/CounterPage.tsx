@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Card, Empty, List, Space, Spin, Tag, Typography } from "antd";
+import { Alert, Button, Card, Empty, FloatButton, List, Space, Spin, Tag, Typography } from "antd";
+import { InboxOutlined } from "@ant-design/icons";
 import type { FloorSeat } from "@cafecr/api-client";
 import { addDays, autoReleaseText, closeReasonLabels, displayName, minutesLeftText, seatStateStyles, seatTypeLabels, shiftTypeLabels, time, todayVn, vnd } from "@cafecr/ui";
 import { api } from "../../api";
@@ -8,6 +9,7 @@ import { useCurrentShift } from "../../PosLayout";
 import { useNotify } from "../useNotify";
 import { CheckInSheet } from "./CheckInSheet";
 import { SeatActionsSheet } from "./SeatActionsSheet";
+import { RestockSheet } from "../inventory/RestockSheet";
 
 export function CounterPage() {
   const current = useCurrentShift();
@@ -56,6 +58,7 @@ function Floor({ branchId }: { branchId: string }) {
   const floor = useQuery({ queryKey: ["floor", branchId], queryFn: () => api.catalog.floor(branchId), refetchInterval: 10_000 });
   const [checkIn, setCheckIn] = useState<FloorSeat | null>(null);
   const [actions, setActions] = useState<FloorSeat | null>(null);
+  const [restock, setRestock] = useState(false);
   const seats = floor.data?.zones.flatMap((z) => z.seats) ?? [];
   const ending = seats.filter((s) => s.state === "EndingSoon" || s.state === "Overdue");
 
@@ -103,6 +106,9 @@ function Floor({ branchId }: { branchId: string }) {
       <RecentlyClosed branchId={branchId} />
       {checkIn && <CheckInSheet branchId={branchId} seat={checkIn} onClose={() => setCheckIn(null)} />}
       {actions && <SeatActionsSheet branchId={branchId} seat={actions} onClose={() => setActions(null)} />}
+      <FloatButton type="primary" icon={<InboxOutlined />} description="Lôi hàng" shape="square" style={{ width: 72, height: 72 }}
+        tooltip="Lôi hàng ra kho ngoài" onClick={() => setRestock(true)} />
+      <RestockSheet branchId={branchId} open={restock} onClose={() => setRestock(false)} />
     </Space>
   );
 }
