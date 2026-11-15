@@ -35,9 +35,12 @@ public sealed class InventoryEvents(AppDbContext db, ShiftService shifts)
         await ManagersAsync(count.BranchId, HandoverOverdue, "Bàn giao kho ngoài chưa được nhận",
             $"{count.Code}: ca sau chưa xác nhận sau {minutes} phút.", now, ct);
 
+    /// <summary>The link carries the shift id so the reminder job can tell it was already sent.</summary>
+    public static string CountMissingLink(Guid shiftId) => $"{ManagerLink}?shift={shiftId}";
+
     public async Task CountMissingAsync(Shift shift, int minutes, DateTimeOffset now, CancellationToken ct) =>
         await ManagersAsync(shift.BranchId, CountReminder, "Ca chưa đếm kho ngoài",
-            $"{ShiftService.Describe(shift)} đã kết thúc {minutes} phút nhưng chưa xác nhận số đếm kho ngoài.", now, ct);
+            $"{ShiftService.Describe(shift)} đã kết thúc {minutes} phút nhưng chưa xác nhận số đếm kho ngoài.", now, ct, CountMissingLink(shift.Id));
 
     public async Task IssueAsync(Guid branchId, string title, string body, DateTimeOffset now, CancellationToken ct) =>
         await ManagersAsync(branchId, IssueFound, title, body, now, ct);
@@ -54,11 +57,11 @@ public sealed class InventoryEvents(AppDbContext db, ShiftService shifts)
         }
     }
 
-    private async Task ManagersAsync(Guid branchId, string type, string title, string body, DateTimeOffset now, CancellationToken ct)
+    private async Task ManagersAsync(Guid branchId, string type, string title, string body, DateTimeOffset now, CancellationToken ct, string link = ManagerLink)
     {
         foreach (var userId in await shifts.ManagerUserIdsAsync(branchId, ct))
         {
-            db.Notify(userId, type, title, body, ManagerLink, now);
+            db.Notify(userId, type, title, body, link, now);
         }
     }
 }

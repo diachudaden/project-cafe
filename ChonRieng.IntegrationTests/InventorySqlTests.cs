@@ -120,6 +120,23 @@ public sealed class InventorySqlTests(SqlServerFixture sql)
         Assert.Equal(1, Assert.Single(attention.PendingCounts).OutOfTolerance);
         Assert.True(issues.IsSuccess);
     }
+
+    [Fact]
+    public async Task Inventory_jobs_translate_to_sql()
+    {
+        var bed = await SqlBed.CreateAsync(sql, innerCoffee: 100, outerCoffee: 5);
+        await using var db = sql.NewContext();
+        var jobs = new InventoryJobs(db, new OuterStockCalculator(db),
+            new InventoryEvents(db, new ChonRieng.Api.Features.Scheduling.ShiftService(db, Clock)),
+            Microsoft.Extensions.Options.Options.Create(new InventoryOptions()),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<InventoryJobs>.Instance);
+        var now = DateTimeOffset.UtcNow;
+
+        Assert.True(await jobs.SuggestRestockAsync(now, default) >= 1); // 5 < min 20 in a running shift
+        await jobs.RemindUnconfirmedCountsAsync(now.AddHours(8), default);
+        await jobs.ReconcileAsync(now, default);
+        await jobs.RecalcNormsAsync(now, default);
+    }
 }
 
 /// <summary>A fresh branch (own shift, staff checked in, one item) inside the shared SQL Server database.</summary>

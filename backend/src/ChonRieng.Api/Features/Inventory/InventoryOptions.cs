@@ -21,4 +21,7 @@ public sealed class InventoryOptions
     /// <summary>Items with CountDaily = false are counted at shift close once every this many days.</summary>
     [Range(1, 31)]
     public int RotationDays { get; set; } = 3;
+
+    /// <summary>Background jobs (reminders, restock, nightly reconciliation and norm learning). false = off.</summary>
+    public bool JobsEnabled { get; set; } = true;
 }

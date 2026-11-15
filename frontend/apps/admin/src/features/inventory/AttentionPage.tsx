@@ -139,12 +139,14 @@ function DraftAdjustments({ branchId, docs }: { branchId: string; docs: StockDoc
         columns={[
           { title: "Mã", dataIndex: "code" },
           { title: "Loại", dataIndex: "type", render: (t: StockDocument["type"]) => stockDocumentTypeLabels[t] },
-          { title: "Nội dung", render: (_, d) => d.lines.map((l) => `${l.itemName} ${l.qty > 0 ? "+" : ""}${l.qty} (kho trong → kho ngoài)`).join(", ") },
-          { title: "Lý do", dataIndex: "reason" },
+          { title: "Nội dung", render: (_, d) => d.lines.map((l) => `${l.itemName} ${l.qty > 0 ? "+" : ""}${l.qty} ${l.baseUnit}`).join(", ") },
+          { title: "Lý do", render: (_, d) => <>{d.reason}{d.note && <><br /><Typography.Text type="secondary">{d.note}</Typography.Text></>}</> },
           { title: "", render: (_, d) => (
             <Space>
               <Button size="small" onClick={() => setRejecting(d.id)}>Bỏ qua</Button>
-              <Button size="small" type="primary" loading={approve.isPending && approve.variables === d.id} onClick={() => approve.mutate(d.id)}>Duyệt & ghi sổ</Button>
+              <Button size="small" type="primary" loading={approve.isPending && approve.variables === d.id} onClick={() => approve.mutate(d.id)}>
+                {d.fromWarehouse || d.toWarehouse ? "Duyệt & ghi sổ" : "Xác nhận ghi nhận"}
+              </Button>
             </Space>
           ) },
         ]} />
