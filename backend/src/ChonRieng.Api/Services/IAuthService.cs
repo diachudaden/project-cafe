@@ -18,5 +18,8 @@ public interface IAuthService
 
     Task<PasswordUpdateResult> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Null when the signed-in account no longer exists.</summary>
+    Task<PasswordUpdateResult?> ChangePasswordAsync(ClaimsPrincipal principal, ChangePasswordRequest request, CancellationToken cancellationToken);
+
     Task<AuthUserResponse?> GetCurrentUserAsync(ClaimsPrincipal principal, CancellationToken cancellationToken);
 }

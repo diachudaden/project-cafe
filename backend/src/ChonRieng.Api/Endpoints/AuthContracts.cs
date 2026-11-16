@@ -102,6 +102,19 @@ public sealed record ResetPasswordRequest
     public required string NewPassword { get; init; }
 }
 
+/// <summary>Dữ liệu đổi mật khẩu khi đang đăng nhập.</summary>
+public sealed record ChangePasswordRequest
+{
+    [Required, MaxLength(128), Description("Mật khẩu hiện tại.")]
+    public required string CurrentPassword { get; init; }
+
+    [Required, MaxLength(128), Description("Mật khẩu mới: tối thiểu 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt; phải khác mật khẩu hiện tại.")]
+    public required string NewPassword { get; init; }
+
+    [MaxLength(512), Description("Refresh token của phiên đang dùng. Nếu gửi, phiên này được giữ lại; mọi phiên khác bị đăng xuất. Không gửi thì đăng xuất mọi phiên.")]
+    public string? RefreshToken { get; init; }
+}
+
 /// <summary>Kết quả đặt lại hoặc đổi mật khẩu.</summary>
 public enum PasswordUpdateStatus
 {

@@ -210,6 +210,55 @@ public sealed class AuthService(
         return PasswordUpdateResult.Success;
     }
 
+    public async Task<PasswordUpdateResult?> ChangePasswordAsync(
+        ClaimsPrincipal principal,
+        ChangePasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = TryGetUserId(principal, out var userId)
+            ? await userManager.FindByIdAsync(userId.ToString())
+            : null;
+        if (user is null)
+        {
+            return null;
+        }
+
+        // CheckPasswordAsync does not touch AccessFailedCount: a wrong current password here is throttled by the
+        // per-user rate limit instead of counting towards the sign-in lockout.
+        if (!await userManager.CheckPasswordAsync(user, request.CurrentPassword))
+        {
+            return PasswordUpdateResult.Invalid(new Dictionary<string, string[]>
+            {
+                ["currentPassword"] = ["Mật khẩu hiện tại không đúng."],
+            });
+        }
+
+        if (request.NewPassword == request.CurrentPassword)
+        {
+            return PasswordUpdateResult.Invalid(new Dictionary<string, string[]>
+            {
+                ["newPassword"] = ["Mật khẩu mới phải khác mật khẩu hiện tại."],
+            });
+        }
+
+        // ChangePasswordAsync validates the new password and rotates the security stamp.
+        var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            return PasswordUpdateResult.Invalid(IdentityErrorFormatter.ToValidationErrors(result));
+        }
+
+        var revoked = await RevokeSessionsAsync(user.Id, request.RefreshToken, cancellationToken);
+        QueuePasswordChangedEmail(user);
+        logger.LogInformation("Password changed for user {UserId}; revoked {Sessions} other sessions.", user.Id, revoked);
+        return PasswordUpdateResult.Success;
+    }
+
+    private static bool TryGetUserId(ClaimsPrincipal principal, out Guid userId) =>
+        Guid.TryParse(
+            principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue(JwtRegisteredClaimNames.Sub),
+            out userId);
+
     private async Task<int> RevokeSessionsAsync(Guid userId, string? keepRefreshToken, CancellationToken cancellationToken)
     {
         var keepHash = string.IsNullOrEmpty(keepRefreshToken) ? null : tokenService.HashRefreshToken(keepRefreshToken);
