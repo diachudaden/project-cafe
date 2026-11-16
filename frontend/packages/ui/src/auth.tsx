@@ -1,5 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import type { AuthSession, AuthUser, LoginInput, RegisterInput, Role } from "@cafecr/api-client";
+import type {
+  AuthSession,
+  AuthUser,
+  ChangePasswordInput,
+  ForgotPasswordInput,
+  ForgotPasswordResult,
+  LoginInput,
+  RegisterInput,
+  ResetPasswordInput,
+  Role,
+} from "@cafecr/api-client";
 
 export type AuthState =
   | { status: "loading"; user: null }
@@ -11,6 +21,10 @@ export interface AuthContextValue {
   login(input: LoginInput): Promise<AuthUser>;
   register(input: RegisterInput): Promise<AuthUser>;
   logout(): Promise<void>;
+  forgotPassword(input: ForgotPasswordInput): Promise<ForgotPasswordResult>;
+  resetPassword(input: ResetPasswordInput): Promise<void>;
+  /** Keeps the current session; other sessions of the account are signed out. */
+  changePassword(input: Omit<ChangePasswordInput, "refreshToken">): Promise<void>;
 }
 
 export const hasRole = (user: AuthUser | null, ...roles: Role[]) => !!user && roles.some((r) => user.roles.includes(r));
@@ -44,7 +58,15 @@ export function createAuth(session: AuthSession, onSignedOut?: () => void) {
       onSignedOut?.();
     }, []);
 
-    return <AuthContext.Provider value={{ state, login, register, logout }}>{children}</AuthContext.Provider>;
+    const forgotPassword = useCallback((input: ForgotPasswordInput) => session.forgotPassword(input), []);
+    const resetPassword = useCallback((input: ResetPasswordInput) => session.resetPassword(input), []);
+    const changePassword = useCallback((input: Omit<ChangePasswordInput, "refreshToken">) => session.changePassword(input), []);
+
+    return (
+      <AuthContext.Provider value={{ state, login, register, logout, forgotPassword, resetPassword, changePassword }}>
+        {children}
+      </AuthContext.Provider>
+    );
   }
 
   function useAuth(): AuthContextValue {

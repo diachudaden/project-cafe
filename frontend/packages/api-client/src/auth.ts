@@ -36,6 +36,35 @@ export interface LoginInput {
   deviceId?: string;
 }
 
+/** App whose reset page the emailed link opens; the server maps it to a fixed path (no client URLs). */
+export type PasswordResetApp = "customer" | "admin" | "pos";
+
+export interface ForgotPasswordInput {
+  email: string;
+  app: PasswordResetApp;
+}
+
+/** Mirrors ForgotPasswordResponse: the same message whether or not the email is registered. */
+export interface ForgotPasswordResult {
+  message: string;
+}
+
+export interface ResetPasswordInput {
+  email: string;
+  token: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+  /** Session to keep signed in; every other session is signed out. */
+  refreshToken?: string | null;
+}
+
+/** True for the single 400 the API returns for a wrong, used or expired reset link. */
+export const isInvalidResetLink = (error: unknown) => error instanceof ApiError && error.code === "INVALID_RESET_LINK";
+
 export function createAuthApi(http: Http) {
   return {
     login: (input: LoginInput) => http.request<AuthTokens>("POST", "/api/auth/login", input),
@@ -43,6 +72,10 @@ export function createAuthApi(http: Http) {
     refresh: (refreshToken: string) => http.request<AuthTokens>("POST", "/api/auth/refresh", { refreshToken }),
     logout: (refreshToken: string) => http.request<void>("POST", "/api/auth/logout", { refreshToken }),
     me: () => http.request<AuthUser>("GET", "/api/auth/me"),
+    forgotPassword: (input: ForgotPasswordInput) => http.request<ForgotPasswordResult>("POST", "/api/auth/forgot-password", input),
+    resetPassword: (input: ResetPasswordInput) => http.request<void>("POST", "/api/auth/reset-password", input),
+    /** Needs an authenticated Http. */
+    changePassword: (input: ChangePasswordInput) => http.request<void>("POST", "/api/auth/change-password", input),
   };
 }
 
@@ -102,6 +135,20 @@ export class AuthSession {
       this.refreshing = null;
     });
     return this.refreshing;
+  }
+
+  forgotPassword(input: ForgotPasswordInput): Promise<ForgotPasswordResult> {
+    return this.authApi.forgotPassword(input);
+  }
+
+  resetPassword(input: ResetPasswordInput): Promise<void> {
+    return this.authApi.resetPassword(input);
+  }
+
+  /** Changes the password and keeps this session: its refresh token is sent so the server spares it. */
+  changePassword(input: Omit<ChangePasswordInput, "refreshToken">): Promise<void> {
+    const refreshToken = this.options.storage.getItem(this.options.storageKey);
+    return createAuthApi(this.http).changePassword({ ...input, refreshToken });
   }
 
   async logout(): Promise<void> {

@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, Descriptions, List, Typography, theme } from "antd";
-import { dateTime, minutesLeftText, time, vnd } from "@cafecr/ui";
+import { useState } from "react";
+import { Button, Card, Descriptions, List, Modal, Typography, theme } from "antd";
+import { ChangePasswordForm, dateTime, minutesLeftText, time, vnd } from "@cafecr/ui";
 import { api, useAuth } from "../api";
 import { EnableNotifications } from "../components/EnableNotifications";
 import { BillRow } from "../components/BillRow";
 import { PointsDeltaBadge, useAnimatedPoints } from "../components/PointsDelta";
 
 export function MePage() {
-  const { state, logout } = useAuth();
+  const { state, logout, changePassword } = useAuth();
+  const [changingPassword, setChangingPassword] = useState(false);
   const points = useQuery({ queryKey: ["points"], queryFn: api.loyalty.points });
   const session = useQuery({ queryKey: ["my-session"], queryFn: api.loyalty.session, refetchInterval: 30_000 });
   const bills = useQuery({ queryKey: ["my-bills"], queryFn: api.loyalty.bills });
@@ -38,7 +40,11 @@ export function MePage() {
           { label: "Email", children: user.email },
           { label: "Điện thoại", children: user.phoneNumber ?? "—" },
         ]} />
-        <Button block style={{ marginTop: 12 }} onClick={() => void logout()}>Đăng xuất</Button>
+        <Button block style={{ marginTop: 12 }} onClick={() => setChangingPassword(true)}>Đổi mật khẩu</Button>
+        <Button block style={{ marginTop: 8 }} onClick={() => void logout()}>Đăng xuất</Button>
+        <Modal title="Đổi mật khẩu" open={changingPassword} footer={null} destroyOnClose onCancel={() => setChangingPassword(false)}>
+          <ChangePasswordForm onSubmit={changePassword} onDone={() => setChangingPassword(false)} />
+        </Modal>
       </Card>
       <Card title="Hóa đơn đã tích điểm" style={{ marginTop: 16 }}>
         <List dataSource={bills.data} locale={{ emptyText: "Chưa có hóa đơn." }}

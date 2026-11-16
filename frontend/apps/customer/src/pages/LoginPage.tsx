@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Alert, Button, Card, Form, Input, Segmented, Typography } from "antd";
 import { ApiError, type RegisterInput } from "@cafecr/api-client";
 import { errorText, hasRole } from "@cafecr/ui";
@@ -59,6 +59,9 @@ export function LoginPage() {
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={submitting}>{mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}</Button>
         </Form>
+        {mode === "login" && (
+          <div style={{ textAlign: "center", marginTop: 12 }}><Link to="/forgot-password">Quên mật khẩu?</Link></div>
+        )}
       </Card>
     </div>
   );
