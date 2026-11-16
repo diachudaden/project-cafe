@@ -7,10 +7,13 @@ using ChonRieng.Api.Features.Health;
 using ChonRieng.Api.Authorization;
 using ChonRieng.Api.Middleware;
 using ChonRieng.Api.Services;
+using ChonRieng.Api.Services.Email;
 using ChonRieng.Application.Persistence;
 using ChonRieng.Domain.Entities;
 using ChonRieng.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -71,7 +74,36 @@ builder.Services
     })
     .AddRoles<IdentityRole<Guid>>()
     .AddEntityFrameworkStores<AppDbContext>()
-    .AddSignInManager();
+    .AddSignInManager()
+    .AddDefaultTokenProviders();
+
+// Password-reset tokens are Data Protection payloads: keys must survive a container restart or every link already
+// emailed stops working. Compose mounts a volume at DataProtection__KeysPath; unset = the framework's default folder.
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("ChonRieng.Api");
+var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+{
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+}
+
+builder.Services.AddEmailDelivery();
+builder.Services.AddOptions<DataProtectionTokenProviderOptions>()
+    .Configure<Microsoft.Extensions.Options.IOptions<PasswordResetOptions>>((options, reset) =>
+        options.TokenLifespan = TimeSpan.FromMinutes(reset.Value.TokenMinutes));
+
+// Caddy -> nginx -> API: take the client address from X-Forwarded-For, trusting only loopback/private hops,
+// so per-IP rate limits see the real client instead of the nginx container.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.ForwardLimit = null;
+    options.KnownProxies.Clear();
+    options.KnownIPNetworks.Clear();
+    foreach (var network in new[] { "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "::1/128", "fc00::/7" })
+    {
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+    }
+});
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddSingleton<ITokenService, TokenService>();
@@ -178,6 +210,7 @@ if (seedDevelopmentData)
     return;
 }
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseSwagger();
