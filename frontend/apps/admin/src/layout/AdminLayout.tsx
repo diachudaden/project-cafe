@@ -1,11 +1,12 @@
+import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Badge, Button, Layout, List, Menu, Popover, Select, Space, Typography, theme } from "antd";
+import { Badge, Button, Dropdown, Layout, List, Menu, Popover, Select, Space, Typography, theme } from "antd";
 import {
   ApartmentOutlined, AppstoreOutlined, AuditOutlined, BarChartOutlined, CalendarOutlined, ClockCircleOutlined, DashboardOutlined, DollarOutlined,
   AlertOutlined, DatabaseOutlined, LineChartOutlined, FileDoneOutlined, FormOutlined, InboxOutlined, SafetyCertificateOutlined, TagsOutlined, TeamOutlined, WalletOutlined,
 } from "@ant-design/icons";
-import { ThemeToggle, dateTime, hasRole, roleLabels } from "@cafecr/ui";
+import { ChangePasswordModal, ThemeToggle, dateTime, hasRole, roleLabels } from "@cafecr/ui";
 import { api, useAuth } from "../api";
 import { useBranch } from "../branch/BranchContext";
 
@@ -72,7 +73,8 @@ function Notifications() {
 }
 
 export function AdminLayout() {
-  const { state, logout } = useAuth();
+  const { state, logout, changePassword } = useAuth();
+  const [changingPassword, setChangingPassword] = useState(false);
   const { token } = theme.useToken();
   const { branchId, setBranchId, branches, canSeeAll } = useBranch();
   const navigate = useNavigate();
@@ -109,9 +111,15 @@ export function AdminLayout() {
           />
           <div style={{ flex: 1 }} />
           <Notifications />
-          <Typography.Text>
-            {user.fullName || user.email} · {user.roles.map((r) => roleLabels[r]).join(", ")}
-          </Typography.Text>
+          <Dropdown trigger={["click"]} menu={{
+            items: [{ key: "change-password", label: "Đổi mật khẩu" }],
+            onClick: ({ key }) => key === "change-password" && setChangingPassword(true),
+          }}>
+            <Button type="text">
+              {user.fullName || user.email} · {user.roles.map((r) => roleLabels[r]).join(", ")} ▾
+            </Button>
+          </Dropdown>
+          <ChangePasswordModal open={changingPassword} onClose={() => setChangingPassword(false)} onSubmit={changePassword} />
           <ThemeToggle />
           <Button onClick={() => void logout()}>Đăng xuất</Button>
         </Layout.Header>

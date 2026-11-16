@@ -8,6 +8,8 @@ import { ClaimPage } from "./pages/ClaimPage";
 import { PointsPage } from "./pages/PointsPage";
 import { MePage } from "./pages/MePage";
 import { LoginPage } from "./pages/LoginPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { BillPage } from "./pages/BillPage";
 import { NotificationBell } from "./components/NotificationBell";
 
@@ -41,6 +43,8 @@ export function App() {
       <Routes>
         <Route path="/" element={<FindPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/claim" element={<RequireCustomer><ClaimPage /></RequireCustomer>} />
         <Route path="/points" element={<RequireCustomer><PointsPage /></RequireCustomer>} />
         <Route path="/me" element={<RequireCustomer><MePage /></RequireCustomer>} />

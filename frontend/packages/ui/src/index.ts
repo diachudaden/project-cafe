@@ -9,3 +9,5 @@ export * from "./bills";
 export * from "./inventory";
 export * from "./InventoryControls";
 export * from "./CountSummaryTable";
+export * from "./password";
+export * from "./PasswordForms";

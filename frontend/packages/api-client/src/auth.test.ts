@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AuthSession, type AuthTokens } from "./auth";
+import { AuthSession, isInvalidResetLink, type AuthTokens } from "./auth";
 import { ApiError } from "./http";
 
 const user = { id: "u1", email: "admin@cafecr.invalid", fullName: "Admin", phoneNumber: null, roles: ["Admin" as const], branchIds: [] };
@@ -94,5 +94,72 @@ describe("AuthSession", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).message).toBe("Tên là bắt buộc.");
     expect((error as ApiError).fieldErrors).toEqual({ Name: ["Tên là bắt buộc."] });
+  });
+});
+
+describe("password endpoints", () => {
+  function body(call: Parameters<typeof globalThis.fetch>) {
+    return JSON.parse(String(call[1]?.body));
+  }
+
+  it("sends forgot-password with the app and no token, and returns the generic message", async () => {
+    const message = "Nếu email đã đăng ký, bạn sẽ nhận được liên kết đặt lại mật khẩu trong vài phút.";
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(json(202, { message }));
+    const session = new AuthSession({ storage: memoryStorage(), storageKey: "rt", fetch });
+
+    await expect(session.forgotPassword({ email: "a@x.vn", app: "pos" })).resolves.toEqual({ message });
+
+    expect(fetch.mock.calls[0][0]).toBe("/api/auth/forgot-password");
+    expect(body(fetch.mock.calls[0])).toEqual({ email: "a@x.vn", app: "pos" });
+    expect((fetch.mock.calls[0][1]?.headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+
+  it("resets the password and recognises the invalid-link error", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(json(400, { title: "Liên kết không hợp lệ hoặc đã hết hạn", detail: "Hãy yêu cầu gửi lại liên kết đặt lại mật khẩu.", code: "INVALID_RESET_LINK" }))
+      .mockResolvedValueOnce(json(400, { errors: { Identity: ["Mật khẩu phải có ít nhất một chữ số."] } }));
+    const session = new AuthSession({ storage: memoryStorage(), storageKey: "rt", fetch });
+    const input = { email: "a@x.vn", token: "tok", newPassword: "New-Password-456!" };
+
+    await expect(session.resetPassword(input)).resolves.toBeUndefined();
+    expect(fetch.mock.calls[0][0]).toBe("/api/auth/reset-password");
+    expect(body(fetch.mock.calls[0])).toEqual(input);
+
+    const invalid = await session.resetPassword(input).catch((e: unknown) => e);
+    expect(isInvalidResetLink(invalid)).toBe(true);
+    expect((invalid as ApiError).title).toBe("Liên kết không hợp lệ hoặc đã hết hạn");
+
+    const weak = await session.resetPassword(input).catch((e: unknown) => e);
+    expect(isInvalidResetLink(weak)).toBe(false);
+    expect((weak as ApiError).message).toBe("Mật khẩu phải có ít nhất một chữ số.");
+  });
+
+  it("changes the password with the bearer token and keeps the current refresh token", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(json(200, tokens(1)))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const storage = memoryStorage();
+    const session = new AuthSession({ storage, storageKey: "rt", fetch });
+    await session.login({ email: user.email, password: "x" });
+
+    await session.changePassword({ currentPassword: "Old-Password-123!", newPassword: "New-Password-456!" });
+
+    expect(fetch.mock.calls[1][0]).toBe("/api/auth/change-password");
+    expect((fetch.mock.calls[1][1]?.headers as Record<string, string>).Authorization).toBe("Bearer access-1");
+    expect(body(fetch.mock.calls[1])).toEqual({ currentPassword: "Old-Password-123!", newPassword: "New-Password-456!", refreshToken: "refresh-1" });
+    expect(storage.getItem("rt")).toBe("refresh-1");
+  });
+
+  it("surfaces a 429 with a retry-later message", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(json(429, { title: "Quá nhiều yêu cầu", detail: "Bạn đã thử quá nhiều lần. Vui lòng thử lại sau ít phút." }));
+    const session = new AuthSession({ storage: memoryStorage(), storageKey: "rt", fetch });
+
+    const error = (await session.forgotPassword({ email: "a@x.vn", app: "customer" }).catch((e: unknown) => e)) as ApiError;
+
+    expect(error.status).toBe(429);
+    expect(error.message).toContain("thử lại sau");
   });
 });

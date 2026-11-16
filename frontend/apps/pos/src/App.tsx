@@ -3,6 +3,8 @@ import { Button, Result, Spin } from "antd";
 import { hasRole } from "@cafecr/ui";
 import { useAuth } from "./api";
 import { LoginPage } from "./LoginPage";
+import { ForgotPasswordPage } from "./ForgotPasswordPage";
+import { ResetPasswordPage } from "./ResetPasswordPage";
 import { PosLayout } from "./PosLayout";
 import { CounterPage } from "./features/counter/CounterPage";
 import { SchedulePage } from "./features/schedule/SchedulePage";
@@ -25,6 +27,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route element={<RequireEmployee><PosLayout /></RequireEmployee>}>
         <Route index element={<CounterPage />} />
         <Route path="/schedule" element={<SchedulePage />} />

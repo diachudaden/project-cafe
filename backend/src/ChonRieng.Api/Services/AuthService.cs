@@ -1,11 +1,14 @@
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 using ChonRieng.Api.Endpoints;
 using ChonRieng.Api.Features.Sales;
+using ChonRieng.Api.Services.Email;
 using ChonRieng.Application.Persistence;
 using ChonRieng.Domain.Entities;
 using ChonRieng.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -17,7 +20,12 @@ public sealed class AuthService(
     AppDbContext dbContext,
     IBranchAccessService branchAccessService,
     ITokenService tokenService,
-    IOptions<JwtOptions> jwtOptions) : IAuthService
+    IOptions<JwtOptions> jwtOptions,
+    IEmailQueue emailQueue,
+    IOptions<AppOptions> appOptions,
+    IOptions<PasswordResetOptions> passwordResetOptions,
+    TimeProvider clock,
+    ILogger<AuthService> logger) : IAuthService
 {
     private static readonly string[] CustomerRole = [BusinessRoles.Customer];
     private readonly JwtOptions _jwtOptions = jwtOptions.Value;
@@ -156,6 +164,143 @@ public sealed class AuthService(
         var roles = (await userManager.GetRolesAsync(user)).ToArray();
         var branchIds = await GetBranchIdsAsync(user.Id, roles, cancellationToken);
         return ToUserResponse(user, roles, branchIds);
+    }
+
+    public async Task RequestPasswordResetAsync(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        // The caller answers 202 with the same body whatever happens here (no user enumeration).
+        var user = await userManager.FindByEmailAsync(request.Email);
+        if (user is null || string.IsNullOrEmpty(user.Email) || IsPermanentlyLocked(user))
+        {
+            return;
+        }
+
+        var token = await userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+        var link = PasswordEmailTemplates.BuildResetLink(appOptions.Value.PublicBaseUrl, request.App, user.Email, encodedToken);
+        var queued = emailQueue.Enqueue(PasswordEmailTemplates.Reset(
+            user.Id, user.Email, user.FullName, link, passwordResetOptions.Value.TokenMinutes));
+        logger.LogInformation("Password reset requested for user {UserId} via {App}; queued={Queued}.", user.Id, request.App, queued);
+    }
+
+    public async Task<PasswordUpdateResult> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var user = await userManager.FindByEmailAsync(request.Email);
+        if (user is null || IsPermanentlyLocked(user) || !TryDecodeToken(request.Token, out var token))
+        {
+            return PasswordUpdateResult.InvalidLink;
+        }
+
+        // Identity checks the token (purpose, lifetime, security stamp) before the password rules, and on success
+        // rotates the security stamp, which invalidates this and every other outstanding reset token.
+        var result = await userManager.ResetPasswordAsync(user, token, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            return result.Errors.Any(error => error.Code == nameof(IdentityErrorDescriber.InvalidToken))
+                ? PasswordUpdateResult.InvalidLink
+                : PasswordUpdateResult.Invalid(IdentityErrorFormatter.ToValidationErrors(result));
+        }
+
+        // Proving control of the mailbox also clears a lockout caused by wrong passwords.
+        await userManager.ResetAccessFailedCountAsync(user);
+        await userManager.SetLockoutEndDateAsync(user, null);
+        var revoked = await RevokeSessionsAsync(user.Id, keepRefreshToken: null, cancellationToken);
+        QueuePasswordChangedEmail(user);
+        logger.LogInformation("Password reset completed for user {UserId}; revoked {Sessions} sessions.", user.Id, revoked);
+        return PasswordUpdateResult.Success;
+    }
+
+    public async Task<PasswordUpdateResult?> ChangePasswordAsync(
+        ClaimsPrincipal principal,
+        ChangePasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = TryGetUserId(principal, out var userId)
+            ? await userManager.FindByIdAsync(userId.ToString())
+            : null;
+        if (user is null)
+        {
+            return null;
+        }
+
+        // CheckPasswordAsync does not touch AccessFailedCount: a wrong current password here is throttled by the
+        // per-user rate limit instead of counting towards the sign-in lockout.
+        if (!await userManager.CheckPasswordAsync(user, request.CurrentPassword))
+        {
+            return PasswordUpdateResult.Invalid(new Dictionary<string, string[]>
+            {
+                ["currentPassword"] = ["Mật khẩu hiện tại không đúng."],
+            });
+        }
+
+        if (request.NewPassword == request.CurrentPassword)
+        {
+            return PasswordUpdateResult.Invalid(new Dictionary<string, string[]>
+            {
+                ["newPassword"] = ["Mật khẩu mới phải khác mật khẩu hiện tại."],
+            });
+        }
+
+        // ChangePasswordAsync validates the new password and rotates the security stamp.
+        var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            return PasswordUpdateResult.Invalid(IdentityErrorFormatter.ToValidationErrors(result));
+        }
+
+        var revoked = await RevokeSessionsAsync(user.Id, request.RefreshToken, cancellationToken);
+        QueuePasswordChangedEmail(user);
+        logger.LogInformation("Password changed for user {UserId}; revoked {Sessions} other sessions.", user.Id, revoked);
+        return PasswordUpdateResult.Success;
+    }
+
+    private static bool TryGetUserId(ClaimsPrincipal principal, out Guid userId) =>
+        Guid.TryParse(
+            principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue(JwtRegisteredClaimNames.Sub),
+            out userId);
+
+    private async Task<int> RevokeSessionsAsync(Guid userId, string? keepRefreshToken, CancellationToken cancellationToken)
+    {
+        var keepHash = string.IsNullOrEmpty(keepRefreshToken) ? null : tokenService.HashRefreshToken(keepRefreshToken);
+        var now = clock.GetUtcNow();
+        var sessions = await dbContext.UserSessions
+            .Where(item => item.UserId == userId && item.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+        var revoked = 0;
+        foreach (var session in sessions.Where(item => item.RefreshTokenHash != keepHash))
+        {
+            session.RevokedAt = now;
+            revoked++;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return revoked;
+    }
+
+    private void QueuePasswordChangedEmail(User user)
+    {
+        if (!string.IsNullOrEmpty(user.Email))
+        {
+            emailQueue.Enqueue(PasswordEmailTemplates.Changed(user.Id, user.Email, user.FullName, clock.GetUtcNow()));
+        }
+    }
+
+    /// <summary>A lockout set far in the future is an administrative block, not the 15-minute wrong-password lockout.</summary>
+    private bool IsPermanentlyLocked(User user) =>
+        user.LockoutEnd is { } end && end > clock.GetUtcNow().AddYears(100);
+
+    private static bool TryDecodeToken(string encoded, out string token)
+    {
+        try
+        {
+            token = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(encoded));
+            return token.Length > 0;
+        }
+        catch (FormatException)
+        {
+            token = "";
+            return false;
+        }
     }
 
     private async Task<AuthTokenResponse> CreateTokenResponseAsync(

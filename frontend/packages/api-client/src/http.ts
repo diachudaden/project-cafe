@@ -14,6 +14,8 @@ export interface ProblemDetails {
   detail?: string;
   errors?: Record<string, string[]>;
   violations?: RuleViolation[];
+  /** Machine-readable error code for a few non-validation 400s (e.g. INVALID_RESET_LINK). */
+  code?: string;
   /** Added by ASP.NET Core to every ProblemDetails; quote it when reporting a server error. */
   traceId?: string;
 }
@@ -26,6 +28,7 @@ export class ApiError extends Error {
     readonly violations: RuleViolation[] = [],
     readonly title?: string,
     readonly traceId?: string,
+    readonly code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -58,7 +61,7 @@ async function toApiError(response: Response): Promise<ApiError> {
     problem.title ??
     "Yêu cầu không thành công.";
 
-  return new ApiError(response.status, message, fieldErrors, problem.violations ?? [], problem.title, problem.traceId);
+  return new ApiError(response.status, message, fieldErrors, problem.violations ?? [], problem.title, problem.traceId, problem.code);
 }
 
 export interface HttpOptions {
