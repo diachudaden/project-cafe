@@ -14,7 +14,8 @@ The repository provides a .NET 10 API with Swagger/OpenAPI, an EF Core Code Firs
 ## API baseline decisions
 
 - Authentication uses JWT bearer access tokens and rotating refresh tokens.
-- Customer self-registration is allowed and creates a customer profile. Email verification is deferred until an email-delivery service exists; the baseline therefore permits immediate sign-in and is not sufficient by itself for a public production deployment.
+- Customer self-registration is allowed and creates a customer profile. An email-delivery service (SMTP via MailKit) exists since TASK-028 and is used for password reset and password-change notices; email verification at registration is still deferred to a later task, so the baseline permits immediate sign-in and is not sufficient by itself for a public production deployment.
+- Every account can reset a forgotten password through an emailed link and change its password while signed in (TASK-028, decision D33). A reset revokes every refresh-token session; a change keeps only the current one.
 - Supported roles are `Admin`, `BranchManager`, `Staff`, and `Customer`; a user may hold multiple roles. Existing generic CRUD remains Admin-only. BranchManager/Staff access is scoped to branch IDs in signed JWT `branch_id` claims populated from `EmployeeBranch`; Customer access to customer-owned resources is self-only. Feature-specific permissions remain to be defined in their tasks.
 - Role and branch claims are snapshots: existing access tokens remain effective until their 15-minute expiry; refresh uses current roles and branch assignments.
 - Business-resource management uses explicit request/response DTOs. Identity framework tables and refresh-token session records are never exposed as generic CRUD resources. Password hashes, employee PIN hashes, and refresh-token hashes are never returned by API responses.

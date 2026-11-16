@@ -2,7 +2,22 @@
 
 ## Status
 
-**In progress** on branch `feat/password-reset` (from `development`).
+**Implemented** on branch `feat/password-reset` (from `development`, 6 commits, one per slice). **No migration.**
+Decision D33 records the behaviour. New settings: `Email__*`, `App__PublicBaseUrl`, `PasswordReset__TokenMinutes`,
+`DataProtection__KeysPath` (Compose sets `/keys` on the `dataprotection_keys` volume) and optional `AuthRateLimits__*`.
+
+**Before deploying:** set `App__PublicBaseUrl` to the public origin (e.g. `https://15-134-162-105.sslip.io`) and the Gmail
+`Email__*` values in the server `.env`; otherwise mail goes to the server's Mailpit and links point at `http://localhost`.
+
+## Deviations from the prompt (approved before coding)
+
+| Prompt | Implemented | Why |
+| --- | --- | --- |
+| Hangfire for sending | `EmailQueue` (`Channel`) + `EmailDispatchWorker` (`BackgroundService`), 3 attempts (after 5 s, 30 s) | Hangfire is not in the repo (D32); no new framework. Not durable: a mail queued during a restart is lost |
+| Data Protection keys in volume or DB | File system at `DataProtection__KeysPath` on a named volume, fixed application name | No migration, no Infrastructure change |
+| — | `UseForwardedHeaders` (X-Forwarded-For, trusted from loopback/private networks, no hop limit) | Caddy → nginx → API: without it every request has the nginx IP and per-IP limits would be global |
+| Change password in an admin/POS page or menu | "Đổi mật khẩu" in a dropdown on the user name, opening a shared modal (also used by customer `MePage`) | One shared component, no extra route |
+| Rate limit numbers "e.g. 5 / 15 min" | Configurable `AuthRateLimits__*`; login 30/5′ and register 10/60′ per IP | A branch's staff share one public IP on the POS |
 
 ## Goal
 
@@ -111,6 +126,64 @@ change their password while signed in. The API gets its first email-delivery ser
 6. Exceeding a rate limit returns 429.
 7. No token, link or password appears in logs.
 8. Reset links stay valid across an API container restart (persisted Data Protection keys).
+
+## Implementation notes
+
+- Backend: `Services/Email/` (`EmailOptions`/`AppOptions`/`PasswordResetOptions`, `SmtpEmailSender`, `EmailQueue` +
+  `EmailDispatchWorker`, `PasswordEmailTemplates`, `EmailRegistration`), `Services/AuthRateLimits.cs`
+  (`AuthRateLimitOptions`, policies, per-email `ForgotPasswordEmailLimiter`), `AuthService` (request/reset/change,
+  `RevokeSessionsAsync`), `AuthEndpoints`/`AuthContracts`, `Program.cs` (token providers, Data Protection, forwarded headers).
+- The 400 for a bad link is a ProblemDetails with `title` "Liên kết không hợp lệ hoặc đã hết hạn" and `code`
+  `INVALID_RESET_LINK` (frontend: `isInvalidResetLink`).
+- Identity's `ResetPasswordAsync`/`ChangePasswordAsync` rotate the security stamp themselves; that is what makes a used
+  reset link invalid.
+- A wrong current password on change uses `CheckPasswordAsync`, which does not touch `AccessFailedCount`.
+- "Permanently locked" = `LockoutEnd` more than 100 years ahead (no such admin feature exists yet); such accounts get no mail.
+- Identity's password validator is ASCII-only (e.g. `ậ` counts as a special character, not a lowercase letter);
+  `passwordProblems` in `@cafecr/ui` uses the same classes.
+- Frontend: `@cafecr/api-client` (`forgotPassword`, `resetPassword`, `changePassword` sending the stored refresh token),
+  `@cafecr/ui` (`password.ts`, `PasswordForms.tsx`: `ForgotPasswordForm`, `ResetPasswordForm`, `ChangePasswordForm`,
+  `ChangePasswordModal`; auth context exposes the three calls); thin `ForgotPasswordPage`/`ResetPasswordPage` in each app.
+
+## Verification results (2026-11-16)
+
+| Command | Result |
+| --- | --- |
+| `dotnet build CafeCR.slnx` | Build succeeded, 0 errors, 1 warning (existing `MsSqlBuilder()` obsolete warning in `SqlServerFixture.cs`) |
+| `dotnet test CafeCR.slnx` | UnitTests 203/203 passed. IntegrationTests 41/41 passed on two consecutive runs; in one earlier full run the 5 `InventorySqlTests` failed in 1 ms (SQL Server container fixture start) and passed when rerun — not reproduced, see open issues |
+| `npm test` (frontend) | api-client 14/14, ui 33/33, admin 14/14 passed |
+| `npm run build` (frontend) | customer, admin, pos built |
+
+New tests: `ChonRieng.IntegrationTests/PasswordResetTests.cs`, `ChangePasswordTests.cs`, `MailpitSmtpTests.cs` (real
+SMTP to a Mailpit container), `PasswordApiFactory.cs` (`FakeEmailSender`, log capture, per-test client IP);
+`backend/tests/ChonRieng.UnitTests/Api/EmailOptionsTests.cs`, `PasswordEmailTemplatesTests.cs`;
+`frontend/packages/api-client/src/auth.test.ts`, `frontend/packages/ui/src/password.test.ts`.
+
+Not run: a full `docker compose up` with a browser. The local `.env` points at a real database and server Compose
+files, so the manual Mailpit walkthrough below is left to the developer. React components have no render tests (the
+frontend has no DOM test setup); the form rules are covered through `passwordProblems`.
+
+### Manual check with Mailpit
+
+1. `.env` without Gmail values (or `Email__Host=mailpit`, `Email__Port=1025`, `Email__UseStartTls=false`),
+   `App__PublicBaseUrl=http://localhost`; `docker compose up --build -d`.
+2. `http://localhost/login` → "Quên mật khẩu?" → registered email → notice shown, button locked 60 s.
+3. `http://localhost:8025` → open "Đặt lại mật khẩu Chọn Riêng Cafe" → button → `/reset-password?email=…&token=…`.
+4. Set a new password → redirected to login; old password fails; Mailpit shows "Mật khẩu của bạn vừa được thay đổi".
+5. Open the same link again → "Liên kết không hợp lệ hoặc đã hết hạn" + "Gửi lại liên kết".
+6. Repeat from `/admin/login` and `/pos/login` (links go to `/admin/reset-password` and `/pos/reset-password`).
+7. Signed in: customer "Tôi" → "Đổi mật khẩu"; admin/POS: click the user name → "Đổi mật khẩu". The current tab stays
+   signed in; another browser signed in to the same account is signed out at its next refresh.
+8. `docker compose restart api`, then use a link requested before the restart: it still works (persisted keys).
+
+## Open issues
+
+- One unreproduced failure of the SQL Server Testcontainers fixture during a full parallel test run (Mailpit and
+  SQL Server containers start concurrently); worth watching in CI.
+- Access tokens already issued stay valid up to 15 minutes after a reset/change (JWTs are not checked against the
+  security stamp); only refresh is blocked immediately.
+- The email queue is in memory; a durable outbox would be needed for guaranteed delivery.
+- `compose.yaml` also starts Mailpit on the server; harmless (UI bound to 127.0.0.1) but can be moved to a dev profile.
 
 ## Verification
 

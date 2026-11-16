@@ -18,6 +18,22 @@ Edit `.env` and set:
 - `Jwt__SigningKey` to a random secret of at least 32 UTF-8 bytes. Generate one with `openssl rand -base64 48`.
 - `BootstrapAdmin__Email` and `BootstrapAdmin__Password` for the first administrator. Use a strong password (at least 12 characters with uppercase, lowercase, a digit, and a symbol).
 - `DevelopmentSeed__Password` for the demo manager, staff, and customer accounts. This is used only by the explicit development seed command and should be a strong local-only password.
+- Email (TASK-028), used for password reset and password-change notices:
+
+  | Key | Production (Gmail) | Default (Mailpit, dev) |
+  | --- | --- | --- |
+  | `Email__Host` | `smtp.gmail.com` | `mailpit` in Compose, `localhost` otherwise |
+  | `Email__Port` | `587` | `1025` |
+  | `Email__Username` | the Gmail address | empty (no authentication) |
+  | `Email__Password` | a 16-character [App Password](https://myaccount.google.com/apppasswords) (needs 2-Step Verification) | empty |
+  | `Email__FromAddress` | the Gmail address | `no-reply@chonrieng.local` |
+  | `Email__FromName` | `Chọn Riêng Cafe` | `Chọn Riêng Cafe` |
+  | `Email__UseStartTls` | `true` | `false` |
+  | `App__PublicBaseUrl` | `https://<your domain>` (no trailing `/`) | `http://localhost` |
+  | `PasswordReset__TokenMinutes` | `15` | `15` |
+
+  `App__PublicBaseUrl` is the only source of the host in reset links; set it to the address users open. Keep `Email__Username`/`Email__Password` only in `.env`. The API validates these settings at startup.
+- Optional `AuthRateLimits__*` (per client IP unless noted, fixed windows): `LoginPerIp` 30 / `LoginWindowMinutes` 5, `RegisterPerIp` 10 / 60, `ForgotPasswordPerIp` 5 and `ForgotPasswordPerEmail` 5 / 15, `ResetPasswordPerIp` 10 / 15, `ChangePasswordPerUser` 5 / 15.
 
 The API does not read `.env` by itself when run on the host. Load it in Bash from the repository root before starting the API or running EF commands:
 
@@ -112,8 +128,12 @@ Open the Swagger UI at the URL printed by ASP.NET Core plus `/swagger` (the curr
 - `POST /api/auth/refresh` rotates a valid refresh token.
 - `POST /api/auth/logout` revokes the submitted refresh token.
 - `GET /api/auth/me` returns the authenticated account's safe profile.
+- `POST /api/auth/forgot-password` `{ email, app }` (`app` = `customer` | `admin` | `pos`) always answers 202 with the same message and, for an existing account, emails a link to `{App__PublicBaseUrl}/reset-password`, `/admin/reset-password` or `/pos/reset-password` valid for `PasswordReset__TokenMinutes`.
+- `POST /api/auth/reset-password` `{ email, token, newPassword }` sets the new password (204), clears a wrong-password lockout and signs out every session. A wrong, used or expired link returns 400 "Liên kết không hợp lệ hoặc đã hết hạn".
+- `POST /api/auth/change-password` `{ currentPassword, newPassword, refreshToken? }` (signed in) changes the password and signs out every other session; the session of `refreshToken` stays signed in.
+- Sign-in, registration and the password endpoints are rate limited per client IP (429 when exceeded); see `AuthRateLimits__*` above.
 - Access tokens last 15 minutes by default; refresh tokens last 7 days by default.
-- Email verification is not implemented because no email-delivery service exists. Immediate sign-in is allowed for this prototype; add verification before public production use.
+- Email verification at registration is not implemented yet (email delivery exists since TASK-028). Immediate sign-in is allowed for this prototype; add verification before public production use.
 - Supported roles are `Admin`, `BranchManager`, `Staff`, and `Customer`; an account may have multiple roles. Only `Admin` can access the current generic `/api/admin/*` CRUD.
 - Branch-scoped feature endpoints must use the `BranchScope` policy and filter queries with the branch IDs in the signed access token. Those IDs come from `EmployeeBranch`; `IsHome` does not change authorization. Customer-owned endpoints must use the `CustomerOwnResource` policy with route `userId` or `customerId`.
 - Role and branch scope claims are snapshots. A role/branch change does not update an already-issued access token; it remains effective until its 15-minute expiry. Refreshing re-reads current roles and branch assignments.
@@ -124,7 +144,7 @@ Open the Swagger UI at the URL printed by ASP.NET Core plus `/swagger` (the curr
 
 ## Docker Compose
 
-Compose runs two services (`api` and `web`); it does not provision a SQL Server container. Settings come from the root `.env`; the connection string must identify a SQL Server reachable from inside the API container. Configure and apply migrations before starting:
+Compose runs three services (`api`, `web` and `mailpit`); it does not provision a SQL Server container. Settings come from the root `.env`; the connection string must identify a SQL Server reachable from inside the API container. Configure and apply migrations before starting:
 
 ```bash
 docker compose up --build -d
@@ -137,6 +157,11 @@ docker compose up --build -d
 | | `http://localhost/pos/` | POS Nhân viên (Staff; tablet). |
 | | `http://localhost/api/*` | Proxied to the API container, so the browser needs no CORS. |
 | `api` | `http://127.0.0.1:8080` | Bound to localhost only; Swagger UI at `/swagger`. |
+| `mailpit` | `http://127.0.0.1:8025` | Dev mail catcher: every email the API sends with the default `Email__*` settings appears here. SMTP port 1025 is reachable only inside the Compose network. |
+
+Data Protection keys (they sign password-reset links) are kept in the `dataprotection_keys` volume, so links stay valid when the API container is recreated. Deleting the volume only invalidates reset links that were already sent.
+
+To test password reset locally: `docker compose up --build -d`, open `http://localhost/login` → "Quên mật khẩu?", enter a registered email, open the mail in Mailpit at `http://localhost:8025` and follow the link (the same works under `/admin/login` and `/pos/login`).
 
 Optional `.env` settings: `WEB_PORT` (default `80`), `API_PORT` (default `8080`), `ASPNETCORE_ENVIRONMENT` (default `Development`; use `Production` on a server to reduce logging).
 
