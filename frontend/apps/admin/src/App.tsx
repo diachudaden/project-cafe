@@ -4,6 +4,8 @@ import { hasRole } from "@cafecr/ui";
 import { useAuth } from "./api";
 import { RequireManagement } from "./auth/RequireManagement";
 import { LoginPage } from "./auth/LoginPage";
+import { ForgotPasswordPage } from "./auth/ForgotPasswordPage";
+import { ResetPasswordPage } from "./auth/ResetPasswordPage";
 import { AdminLayout } from "./layout/AdminLayout";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { SchedulePage } from "./features/schedule/SchedulePage";
@@ -33,6 +35,8 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         element={
           <RequireManagement>

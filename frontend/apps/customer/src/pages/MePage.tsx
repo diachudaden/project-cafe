@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card, Descriptions, List, Modal, Typography, theme } from "antd";
-import { ChangePasswordForm, dateTime, minutesLeftText, time, vnd } from "@cafecr/ui";
+import { Button, Card, Descriptions, List, Typography, theme } from "antd";
+import { ChangePasswordModal, dateTime, minutesLeftText, time, vnd } from "@cafecr/ui";
 import { api, useAuth } from "../api";
 import { EnableNotifications } from "../components/EnableNotifications";
 import { BillRow } from "../components/BillRow";
@@ -42,9 +42,7 @@ export function MePage() {
         ]} />
         <Button block style={{ marginTop: 12 }} onClick={() => setChangingPassword(true)}>Đổi mật khẩu</Button>
         <Button block style={{ marginTop: 8 }} onClick={() => void logout()}>Đăng xuất</Button>
-        <Modal title="Đổi mật khẩu" open={changingPassword} footer={null} destroyOnClose onCancel={() => setChangingPassword(false)}>
-          <ChangePasswordForm onSubmit={changePassword} onDone={() => setChangingPassword(false)} />
-        </Modal>
+        <ChangePasswordModal open={changingPassword} onClose={() => setChangingPassword(false)} onSubmit={changePassword} />
       </Card>
       <Card title="Hóa đơn đã tích điểm" style={{ marginTop: 16 }}>
         <List dataSource={bills.data} locale={{ emptyText: "Chưa có hóa đơn." }}

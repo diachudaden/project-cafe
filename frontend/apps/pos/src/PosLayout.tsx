@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Badge, Button, Layout, Segmented, Space, Typography } from "antd";
-import { ThemeToggle, shiftTypeLabels, time, vnd } from "@cafecr/ui";
+import { Badge, Button, Dropdown, Layout, Segmented, Space, Typography } from "antd";
+import { ChangePasswordModal, ThemeToggle, shiftTypeLabels, time, vnd } from "@cafecr/ui";
 import { api, useAuth } from "./api";
 import { ClosingWizard } from "./features/counter/ClosingWizard";
 import { HandoverBanner } from "./features/inventory/HandoverBanner";
@@ -13,7 +13,8 @@ export function useCurrentShift() {
 
 /** Top bar: current shift, cash held and the "Kết ca" button are always visible (reference UX). */
 export function PosLayout() {
-  const { state, logout } = useAuth();
+  const { state, logout, changePassword } = useAuth();
+  const [changingPassword, setChangingPassword] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const current = useCurrentShift();
@@ -34,7 +35,12 @@ export function PosLayout() {
         )}
         <div style={{ flex: 1 }} />
         {shift && <Button danger type="primary" onClick={() => setClosing(true)}>Kết ca</Button>}
-        <Typography.Text style={{ color: "#fff" }}>{state.user?.fullName.replace("[DEMO DATA] ", "")}</Typography.Text>
+        <Dropdown trigger={["click"]} menu={{
+          items: [{ key: "change-password", label: "Đổi mật khẩu" }],
+          onClick: ({ key }) => key === "change-password" && setChangingPassword(true),
+        }}>
+          <Button type="text" style={{ color: "#fff" }}>{state.user?.fullName.replace("[DEMO DATA] ", "")} ▾</Button>
+        </Dropdown>
         <ThemeToggle ghost />
         <Button ghost onClick={() => void logout()}>Đăng xuất</Button>
       </Layout.Header>
@@ -55,6 +61,7 @@ export function PosLayout() {
       <Layout.Content style={{ padding: 16 }}>
         <Outlet />
       </Layout.Content>
+      <ChangePasswordModal open={changingPassword} onClose={() => setChangingPassword(false)} onSubmit={changePassword} />
       {shift && closing && (
         <ClosingWizard shiftId={shift.shiftId} onClose={() => setClosing(false)} onDone={() => { setClosing(false); void logout(); }} />
       )}

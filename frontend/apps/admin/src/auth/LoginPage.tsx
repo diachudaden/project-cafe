@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Alert, Button, Card, Form, Input, Typography } from "antd";
 import { ApiError, type LoginInput } from "@cafecr/api-client";
 import { hasRole } from "@cafecr/ui";
@@ -67,6 +67,7 @@ export function LoginPage() {
             Đăng nhập
           </Button>
         </Form>
+        <div style={{ textAlign: "center", marginTop: 12 }}><Link to="/forgot-password">Quên mật khẩu?</Link></div>
       </Card>
     </div>
   );

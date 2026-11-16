@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, App, Button, Form, Input, Result, Typography } from "antd";
+import { Alert, App, Button, Form, Input, Modal, Result, Typography } from "antd";
 import type { Rule } from "antd/es/form";
 import {
   ApiError,
@@ -211,5 +211,19 @@ export function ChangePasswordForm({ onSubmit, onDone }: ChangePasswordFormProps
         <Button type="primary" htmlType="submit" block loading={submitting}>Đổi mật khẩu</Button>
       </Form>
     </>
+  );
+}
+
+export interface ChangePasswordModalProps extends Pick<ChangePasswordFormProps, "onSubmit"> {
+  open: boolean;
+  onClose(): void;
+}
+
+/** The change-password form in a modal, for the account menu of each app. */
+export function ChangePasswordModal({ open, onClose, onSubmit }: ChangePasswordModalProps) {
+  return (
+    <Modal title="Đổi mật khẩu" open={open} footer={null} destroyOnClose onCancel={onClose}>
+      <ChangePasswordForm onSubmit={onSubmit} onDone={onClose} />
+    </Modal>
   );
 }
