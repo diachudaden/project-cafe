@@ -87,6 +87,7 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 }
 
 builder.Services.AddEmailDelivery();
+builder.Services.AddAuthRateLimits();
 builder.Services.AddOptions<DataProtectionTokenProviderOptions>()
     .Configure<Microsoft.Extensions.Options.IOptions<PasswordResetOptions>>((options, reset) =>
         options.TokenLifespan = TimeSpan.FromMinutes(reset.Value.TokenMinutes));

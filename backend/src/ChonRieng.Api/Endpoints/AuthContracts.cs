@@ -70,3 +70,50 @@ public sealed record AuthTokenResponse(
 public sealed record RegistrationResult(
     AuthTokenResponse? Tokens,
     IReadOnlyDictionary<string, string[]> Errors);
+
+/// <summary>Yêu cầu gửi liên kết đặt lại mật khẩu qua email.</summary>
+public sealed record ForgotPasswordRequest
+{
+    [Required, EmailAddress, MaxLength(256), Description("Email của tài khoản cần đặt lại mật khẩu.")]
+    public required string Email { get; init; }
+
+    [Required, AllowedValues("customer", "admin", "pos"), Description("Ứng dụng gửi yêu cầu: `customer` (Web khách), `admin` (Web quản lý) hoặc `pos`. Quyết định trang mở từ liên kết trong email; máy chủ tự dựng liên kết, không nhận URL từ client.")]
+    public required string App { get; init; }
+}
+
+/// <summary>Phản hồi chung của yêu cầu quên mật khẩu (giống nhau dù email có tồn tại hay không).</summary>
+public sealed record ForgotPasswordResponse(
+    [property: Description("Thông báo hiển thị cho người dùng.")] string Message)
+{
+    public static readonly ForgotPasswordResponse Accepted =
+        new("Nếu email đã đăng ký, bạn sẽ nhận được liên kết đặt lại mật khẩu trong vài phút.");
+}
+
+/// <summary>Dữ liệu đặt lại mật khẩu từ liên kết trong email.</summary>
+public sealed record ResetPasswordRequest
+{
+    [Required, EmailAddress, MaxLength(256), Description("Email lấy từ tham số `email` của liên kết.")]
+    public required string Email { get; init; }
+
+    [Required, MaxLength(2048), Description("Mã lấy từ tham số `token` của liên kết (base64url).")]
+    public required string Token { get; init; }
+
+    [Required, MaxLength(128), Description("Mật khẩu mới: tối thiểu 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.")]
+    public required string NewPassword { get; init; }
+}
+
+/// <summary>Kết quả đặt lại hoặc đổi mật khẩu.</summary>
+public enum PasswordUpdateStatus
+{
+    Succeeded,
+    InvalidLink,
+    ValidationFailed,
+}
+
+public sealed record PasswordUpdateResult(PasswordUpdateStatus Status, IReadOnlyDictionary<string, string[]> Errors)
+{
+    public static readonly PasswordUpdateResult Success = new(PasswordUpdateStatus.Succeeded, new Dictionary<string, string[]>());
+    public static readonly PasswordUpdateResult InvalidLink = new(PasswordUpdateStatus.InvalidLink, new Dictionary<string, string[]>());
+
+    public static PasswordUpdateResult Invalid(IReadOnlyDictionary<string, string[]> errors) => new(PasswordUpdateStatus.ValidationFailed, errors);
+}
