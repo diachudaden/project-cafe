@@ -168,7 +168,7 @@ frontend has no DOM test setup); the form rules are covered through `passwordPro
 1. `.env` without Gmail values (or `Email__Host=mailpit`, `Email__Port=1025`, `Email__UseStartTls=false`),
    `App__PublicBaseUrl=http://localhost`; `docker compose up --build -d`.
 2. `http://localhost/login` → "Quên mật khẩu?" → registered email → notice shown, button locked 60 s.
-3. `http://localhost:8025` → open "Đặt lại mật khẩu Chọn Riêng Cafe" → button → `/reset-password?email=…&token=…`.
+3. `http://localhost:8025` → open "Đặt lại mật khẩu" → button → `/reset-password?email=…&token=…`.
 4. Set a new password → redirected to login; old password fails; Mailpit shows "Mật khẩu của bạn vừa được thay đổi".
 5. Open the same link again → "Liên kết không hợp lệ hoặc đã hết hạn" + "Gửi lại liên kết".
 6. Repeat from `/admin/login` and `/pos/login` (links go to `/admin/reset-password` and `/pos/reset-password`).

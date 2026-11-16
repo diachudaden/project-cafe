@@ -8,7 +8,7 @@ public static class PasswordEmailTemplates
 {
     public const string ResetPurpose = "password-reset";
     public const string ChangedPurpose = "password-changed";
-    public const string ResetSubject = "Đặt lại mật khẩu Chọn Riêng Cafe";
+    public const string ResetSubject = "Đặt lại mật khẩu:";
     public const string ChangedSubject = "Mật khẩu của bạn vừa được thay đổi";
 
     /// <summary>App wire values accepted by <c>POST /api/auth/forgot-password</c> and the path each one resets on.</summary>
