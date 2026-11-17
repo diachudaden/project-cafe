@@ -21,6 +21,13 @@ public sealed record SessionBill(
     bool Claimed,
     DateTimeOffset CreatedAt);
 
+/// <summary>Bill đồ thêm bán sau check-in (D34), gắn với bill chỗ ngồi.</summary>
+public sealed record AddOnBillSummary(
+    [property: Description("Mã 8 ký tự của bill đồ thêm.")] string Code,
+    decimal Total,
+    PaymentMethod PaymentMethod,
+    DateTimeOffset CreatedAt);
+
 /// <summary>Lượt ngồi.</summary>
 public sealed record SessionView(
     Guid Id,
@@ -37,8 +44,10 @@ public sealed record SessionView(
     SessionCustomer? Customer,
     SessionBill Bill,
     [property: Description("Điểm khách được cộng trong thao tác này (nếu có).")] int PointsAwarded,
-    [property: Description("Đồ thêm (mì, trứng, bánh...) đã bán trên hóa đơn này.")] IReadOnlyList<BillItemView> Items,
-    [property: Description("Lý do kết thúc: Manual (nhân viên trả chỗ) hoặc AutoReleased (hệ thống tự trả chỗ khi quá giờ). null khi đang diễn ra.")] SessionCloseReason? CloseReason = null);
+    [property: Description("Đồ thêm mua kèm lúc check-in, nằm trong bill chỗ ngồi. Đồ thêm bán sau nằm ở addOnBills.")] IReadOnlyList<BillItemView> Items,
+    [property: Description("Lý do kết thúc: Manual (nhân viên trả chỗ) hoặc AutoReleased (hệ thống tự trả chỗ khi quá giờ). null khi đang diễn ra.")] SessionCloseReason? CloseReason = null,
+    [property: Description("Các bill đồ thêm bán sau check-in của lượt ngồi này, cũ trước mới sau.")] IReadOnlyList<AddOnBillSummary>? AddOnBills = null,
+    [property: Description("Loại bill của mã đã tra (GET /api/bills/{code}): Session, hoặc AddOn khi tra bằng mã bill đồ thêm (trả về lượt ngồi của bill đó).")] BillKind Kind = BillKind.Session);
 
 public sealed record RecentClosedSession(
     Guid SessionId,
@@ -68,7 +77,8 @@ public sealed record MyPointsResponse(
     string MemberCode,
     IReadOnlyList<PointHistoryItem> History);
 
-public sealed record MyBill(string Code, string BranchName, decimal Total, DateTimeOffset CreatedAt, DateTimeOffset? ClaimedAt, int Points);
+public sealed record MyBill(string Code, string BranchName, decimal Total, DateTimeOffset CreatedAt, DateTimeOffset? ClaimedAt, int Points,
+    [property: Description("Session = bill chỗ ngồi, AddOn = bill đồ thêm.")] BillKind Kind = BillKind.Session);
 
 public sealed record MyBillExtension(DateTimeOffset CreatedAt, int AddedMinutes, decimal Price);
 
@@ -76,11 +86,12 @@ public sealed record MyBillPoints(int Points, string Reason, DateTimeOffset Crea
 
 public sealed record MyBillDetail(
     string Code,
+    [property: Description("Session = bill chỗ ngồi; AddOn = bill đồ thêm (không có gói, giờ vào/ra, gia hạn).")] BillKind Kind,
     string BranchName,
     string SeatCode,
-    string PlanName,
-    DateTimeOffset StartAt,
-    [property: Description("Giờ kết thúc (đã gồm các lần gia hạn).")] DateTimeOffset EndAt,
+    [property: Description("null với bill đồ thêm.")] string? PlanName,
+    [property: Description("null với bill đồ thêm.")] DateTimeOffset? StartAt,
+    [property: Description("Giờ kết thúc (đã gồm các lần gia hạn); null với bill đồ thêm.")] DateTimeOffset? EndAt,
     SessionStatus SessionStatus,
     [property: Description("Manual / AutoReleased khi lượt đã kết thúc.")] SessionCloseReason? CloseReason,
     IReadOnlyList<MyBillExtension> Extensions,

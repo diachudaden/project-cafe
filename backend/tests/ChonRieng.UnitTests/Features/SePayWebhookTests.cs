@@ -388,6 +388,12 @@ public sealed class SePayWebhookTests : IDisposable
         Assert.Equal(409, (await loyalty.ClaimAsync(AsCustomer(owner), sale.BillCode, default)).Error!.Status);
         Assert.Null((await _db.Bills.AsNoTracking().SingleAsync(b => b.Code == checkedIn.Bill.Code)).ClaimedByCustomerId);
         Assert.Equal(15, (await _db.Customers.AsNoTracking().SingleAsync(c => c.Id == member.Id)).Points);
+
+        var detail = (await loyalty.BillDetailAsync(AsCustomer(owner), sale.BillCode, default)).Value!;
+        Assert.Equal((BillKind.AddOn, seat.Code, (string?)null, (DateTimeOffset?)null), (detail.Kind, detail.SeatCode, detail.PlanName, detail.StartAt));
+        Assert.Empty(detail.Extensions);
+        Assert.Equal(15_000, Assert.Single(detail.Items).Amount);
+        Assert.Equal(BillKind.AddOn, Assert.Single(await loyalty.BillsAsync(AsCustomer(owner), default)).Kind);
     }
 
     [Fact]

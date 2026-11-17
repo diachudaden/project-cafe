@@ -496,8 +496,16 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
     public async Task<Result<SessionView>> GetByBillCodeAsync(CurrentUser user, string code, CancellationToken ct)
     {
         var normalized = Loyalty.NormalizeCode(code);
-        var view = (await Query(db.Sessions.Where(s => s.Bill != null && s.Bill.Code == normalized), 0, ct)).SingleOrDefault();
-        return view is null || !user.CanAccessBranch(view.BranchId) ? ServiceError.NotFound("Không tìm thấy hóa đơn.") : view;
+        // An add-on bill (D34) resolves to the session of its parent bill.
+        var found = await db.Bills.AsNoTracking().Where(b => b.Code == normalized)
+            .Select(b => new { b.Kind, SessionId = b.SessionId ?? b.ParentBill!.SessionId })
+            .SingleOrDefaultAsync(ct);
+        var view = found?.SessionId is { } sessionId
+            ? (await Query(db.Sessions.Where(s => s.Id == sessionId), 0, ct)).SingleOrDefault()
+            : null;
+        return view is null || !user.CanAccessBranch(view.BranchId)
+            ? ServiceError.NotFound("Không tìm thấy hóa đơn.")
+            : view with { Kind = found!.Kind };
     }
 
     public async Task<IReadOnlyList<CustomerLookupResult>> LookupCustomersAsync(string q, CancellationToken ct)
@@ -598,11 +606,15 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
                 Items = s.Bill.Items.OrderBy(i => i.CreatedAt)
                     .Select(i => new BillItemView(i.Id, i.Name, i.UnitPrice, i.Quantity, i.Amount, i.PaymentMethod, i.CreatedAt))
                     .ToList(),
+                AddOnBills = s.Bill.AddOnBills.OrderBy(b => b.CreatedAt)
+                    .Select(b => new AddOnBillSummary(b.Code, b.Total, b.PaymentMethod, b.CreatedAt))
+                    .ToList(),
             })
             .ToListAsync(ct);
 
         return rows.Select(r => new SessionView(r.Id, r.BranchId, r.SeatId, r.SeatCode, r.PricePlanId, r.PlanName, r.StartAt, r.EndAt,
-            r.Status, (int)Math.Floor((r.EndAt - now).TotalMinutes), r.Extensions, r.Customer, r.Bill, pointsAwarded, r.Items, r.CloseReason)).ToList();
+            r.Status, (int)Math.Floor((r.EndAt - now).TotalMinutes), r.Extensions, r.Customer, r.Bill, pointsAwarded, r.Items, r.CloseReason,
+            r.AddOnBills)).ToList();
     }
 
     /// <summary>NeedsAttention text for a payment that arrives after its session ended.</summary>

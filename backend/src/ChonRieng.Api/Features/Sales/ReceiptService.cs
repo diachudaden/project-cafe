@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using ChonRieng.Api.Features.Common;
+using ChonRieng.Domain.Entities;
 using ChonRieng.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,10 +32,14 @@ public sealed record ReceiptData(
     decimal Total,
     DateTimeOffset CreatedAt,
     string? MemberName,
-    int PointsEarned)
+    int PointsEarned,
+    BillKind Kind = BillKind.Session)
 {
-    /// <summary>The check-in (plan) amount: the bill total minus extensions and add-on lines.</summary>
-    public decimal PlanAmount => Total - Extensions.Sum(e => e.Price) - Items.Sum(i => i.Amount);
+    /// <summary>The check-in (plan) amount: the bill total minus extensions and add-on lines; 0 for an add-on bill.</summary>
+    public decimal PlanAmount => IsAddOn ? 0 : Total - Extensions.Sum(e => e.Price) - Items.Sum(i => i.Amount);
+
+    /// <summary>An add-on bill (D34) prints only its lines: no plan, times or extensions.</summary>
+    public bool IsAddOn => Kind == BillKind.AddOn;
 
     public bool Claimed => MemberName is not null;
 }
@@ -69,26 +74,34 @@ public sealed class ReceiptService(AppDbContext db, TimeProvider clock)
         var normalized = Loyalty.NormalizeCode(code);
         var global = user.IsAdmin;
         var branchIds = user.Scope.BranchIds.ToList();
-        return await db.Bills.AsNoTracking()
+        // Add-on bills (D34) have no session: the seat comes from the parent bill, and plan/times/extensions stay empty.
+        var row = await db.Bills.AsNoTracking()
             .Where(b => b.Code == normalized && (global || branchIds.Contains(b.BranchId)))
-            .Select(b => new ReceiptData(
+            .Select(b => new
+            {
+                b.Kind,
                 b.Code,
-                b.Branch.Name,
-                b.Branch.Address,
-                b.Session.Seat.Code,
-                b.Session.PricePlan.Name,
-                b.Session.StartAt,
-                b.Session.EndAt,
-                b.Session.Extensions.OrderBy(e => e.CreatedAt).Select(e => new MyBillExtension(e.CreatedAt, e.AddedMinutes, e.Price)).ToList(),
-                b.Items.OrderBy(i => i.CreatedAt)
+                BranchName = b.Branch.Name,
+                BranchAddress = b.Branch.Address,
+                SeatCode = b.Session != null ? b.Session.Seat.Code : b.ParentBill!.Session!.Seat.Code,
+                PlanName = b.Session != null ? b.Session.PricePlan.Name : "",
+                StartAt = b.Session != null ? b.Session.StartAt : b.CreatedAt,
+                EndAt = b.Session != null ? b.Session.EndAt : b.CreatedAt,
+                Extensions = b.Session != null
+                    ? b.Session.Extensions.OrderBy(e => e.CreatedAt).Select(e => new MyBillExtension(e.CreatedAt, e.AddedMinutes, e.Price)).ToList()
+                    : new List<MyBillExtension>(),
+                Items = b.Items.OrderBy(i => i.CreatedAt)
                     .Select(i => new BillItemView(i.Id, i.Name, i.UnitPrice, i.Quantity, i.Amount, i.PaymentMethod, i.CreatedAt)).ToList(),
                 b.CashPaidTotal,
                 b.VietQrPaidTotal,
                 b.Total,
                 b.CreatedAt,
-                b.ClaimedByCustomer != null ? b.ClaimedByCustomer.User.FullName : null,
-                b.PointTransactions.Sum(p => p.Points)))
+                MemberName = b.ClaimedByCustomer != null ? b.ClaimedByCustomer.User.FullName : null,
+                Points = b.PointTransactions.Sum(p => p.Points),
+            })
             .SingleOrDefaultAsync(ct);
+        return row is null ? null : new ReceiptData(row.Code, row.BranchName, row.BranchAddress, row.SeatCode, row.PlanName, row.StartAt, row.EndAt,
+            row.Extensions, row.Items, row.CashPaidTotal, row.VietQrPaidTotal, row.Total, row.CreatedAt, row.MemberName, row.Points, row.Kind);
     }
 
     /// <summary>Customer claim page with the bill code prefilled.</summary>

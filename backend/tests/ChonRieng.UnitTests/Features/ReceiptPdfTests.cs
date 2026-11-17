@@ -59,6 +59,28 @@ public sealed class ReceiptPdfTests
     }
 
     [Fact]
+    public void Add_on_receipt_prints_only_its_items_without_plan_times_or_extensions()
+    {
+        var addOn = new ReceiptData("ZX98CV76", "Chốn Riêng – Chi nhánh Đống Đa", "12 Đường Láng, Hà Nội", "A-01", "", Start.AddHours(1), Start.AddHours(1), [],
+            [new BillItemView(Guid.NewGuid(), "Mì ly", 7_000, 1, 7_000, PaymentMethod.Cash, Start.AddHours(1))],
+            CashPaidTotal: 7_000, VietQrPaidTotal: 0, Total: 7_000, CreatedAt: Start.AddHours(1), null, 0, BillKind.AddOn);
+
+        var text = Text(ReceiptPdf.Render(addOn, "Nguyễn Thị Hương", "https://cafe.example/claim?code=ZX98CV76", Start.AddHours(1)), out _, out _);
+
+        foreach (var expected in new[] { "HÓA ĐƠN ĐỒ THÊM", "ZX98CV76", "Chỗ ngồi A-01", "Mì ly × 1", "Tiền mặt 7.000đ", "TỔNG CỘNG 7.000đ", "Quét để tích điểm", "Nhân viên Nguyễn Thị Hương" })
+        {
+            Assert.Contains(Nfc(expected), text);
+        }
+
+        foreach (var absent in new[] { "Gói", "Lượt ngồi", "Bắt đầu", "Kết thúc", "Gia hạn" })
+        {
+            Assert.DoesNotContain(Nfc(absent), text);
+        }
+
+        Assert.Equal(0, addOn.PlanAmount);
+    }
+
+    [Fact]
     public void Plan_amount_is_the_total_minus_extensions_and_add_ons()
     {
         Assert.Equal(45_000, Bill().PlanAmount);
