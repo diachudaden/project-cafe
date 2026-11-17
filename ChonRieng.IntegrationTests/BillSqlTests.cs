@@ -1,4 +1,8 @@
+using ChonRieng.Api.Features.Common;
+using ChonRieng.Api.Features.Finance;
+using ChonRieng.Api.Features.Reports;
 using ChonRieng.Api.Features.Sales;
+using ChonRieng.Api.Features.Scheduling;
 using ChonRieng.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -73,6 +77,29 @@ public sealed class BillSqlTests(SqlServerFixture sql)
         Assert.Equal((sessionId, BillKind.AddOn), (view.Value!.Id, view.Value.Kind));
         Assert.Equal(40_000, view.Value.Bill.Total);
         Assert.Equal(addOn.Code, Assert.Single(view.Value.AddOnBills!).Code);
+    }
+
+    [Fact]
+    public async Task Closing_preview_and_reports_with_add_on_bills_run_on_sql_server()
+    {
+        var bed = await SqlBed.CreateAsync(sql);
+        var (_, sessionBillId) = await NewSessionAsync(bed);
+        await using (var db = sql.NewContext())
+        {
+            db.Bills.AddRange(AddOnBill(bed, sessionBillId, 7_000), AddOnBill(bed, sessionBillId, 7_000));
+            await db.SaveChangesAsync();
+        }
+
+        await using var check = sql.NewContext();
+        var clock = TimeProvider.System;
+        var preview = (await new FinanceService(check, new ShiftService(check, clock), clock).PreviewAsync(bed.Manager, bed.ShiftId, default)).Value!;
+        Assert.Equal((54_000m, 3), (preview.ExpectedCash, preview.BillCount));
+
+        var reports = new ReportService(check, clock);
+        var compare = (await reports.CompareBranchesAsync(bed.Manager, ReportPeriod.Week, clock.Today(), default)).Value!.Single();
+        Assert.Equal((54_000m, 1), (compare.Revenue, compare.Sessions));
+        var revenue = (await reports.RevenueAsync(bed.Manager, bed.BranchId, ReportPeriod.Week, clock.Today(), default)).Value!;
+        Assert.Equal((54_000m, 3), (revenue.Total, revenue.Bills));
     }
 
     internal async Task<(Guid SessionId, Guid BillId)> NewSessionAsync(SqlBed bed)

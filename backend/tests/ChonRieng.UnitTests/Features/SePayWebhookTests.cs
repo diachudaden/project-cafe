@@ -5,6 +5,7 @@ using ChonRieng.Api.Features.Catalog;
 using ChonRieng.Api.Features.Common;
 using ChonRieng.Api.Features.Engagement;
 using ChonRieng.Api.Features.Finance;
+using ChonRieng.Api.Features.Reports;
 using ChonRieng.Api.Features.Sales;
 using ChonRieng.Api.Features.Scheduling;
 using ChonRieng.Api.Services;
@@ -350,6 +351,26 @@ public sealed class SePayWebhookTests : IDisposable
         await sessions.CloseAsync(manager, session.Id, default);
         Assert.False((await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(egg.Id, 1)]), default)).IsSuccess);
         Assert.Equal(3, await _db.Bills.CountAsync());
+    }
+
+    [Fact]
+    public async Task Reports_keep_revenue_and_count_sessions_not_add_on_bills()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (noodle, _, _, _) = await SeedMenuAsync(branch);
+        var checkedIn = (await new SessionService(_db, _clock).CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null), default)).Value!;
+        var addOns = new AddOnService(_db, _clock);
+        Assert.True((await addOns.SellCashAsync(manager, checkedIn.Id, new AddOnSaleRequest([new(noodle.Id, 1)]), default)).IsSuccess);
+        Assert.True((await addOns.SellCashAsync(manager, checkedIn.Id, new AddOnSaleRequest([new(noodle.Id, 1)]), default)).IsSuccess);
+        var reports = new ReportService(_db, _clock);
+        var today = _clock.Today();
+
+        var revenue = (await reports.RevenueAsync(manager, branch.Id, ReportPeriod.Week, today, default)).Value!;
+        Assert.Equal((75_000m, 75_000m, 3), (revenue.Total, revenue.Cash, revenue.Bills));
+        var compare = (await reports.CompareBranchesAsync(manager, ReportPeriod.Week, today, default)).Value!.Single(r => r.BranchId == branch.Id);
+        Assert.Equal((75_000m, 1), (compare.Revenue, compare.Sessions));
+        var dashboard = (await reports.DashboardAsync(manager, branch.Id, default)).Value!;
+        Assert.Equal((75_000m, 3, 1), (dashboard.RevenueToday, dashboard.BillsToday, dashboard.ActiveSessions));
     }
 
     [Fact]

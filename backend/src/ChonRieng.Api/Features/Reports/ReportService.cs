@@ -138,7 +138,7 @@ public sealed class ReportService(AppDbContext db, TimeProvider clock)
             var payroll = await PayrollCostAsync([b.Id], from, to, ct);
             var occ = occupancy.Where(o => o.BranchId == b.Id).ToList();
             var available = occ.Sum(o => o.AvailableHours);
-            rows.Add(new BranchComparisonRow(b.Id, b.Name, revenue, bills.Count(x => x.BranchId == b.Id),
+            rows.Add(new BranchComparisonRow(b.Id, b.Name, revenue, bills.Count(x => x.BranchId == b.Id && x.IsSession),
                 available == 0 ? 0 : Math.Round(occ.Sum(o => o.SoldHours) / available * 100, 1),
                 payroll, revenue == 0 ? null : Math.Round(payroll / revenue * 100, 1), 0));
         }
@@ -231,7 +231,8 @@ public sealed class ReportService(AppDbContext db, TimeProvider clock)
     private IQueryable<Branch> BranchesInScope(Guid[]? ids) =>
         db.Branches.AsNoTracking().Where(b => ids == null || ids.Contains(b.Id)).OrderBy(b => b.Name);
 
-    private sealed record BillRow(Guid BranchId, DateOnly Day, decimal Total, decimal CashPaidTotal, decimal VietQrPaidTotal);
+    /// <summary>IsSession: a session bill (one per session); add-on bills (D34) add revenue but are not a session.</summary>
+    private sealed record BillRow(Guid BranchId, DateOnly Day, decimal Total, decimal CashPaidTotal, decimal VietQrPaidTotal, bool IsSession);
 
     private async Task<List<BillRow>> BillsAsync(Guid[]? ids, DateOnly from, DateOnly toExclusive, CancellationToken ct)
     {
@@ -239,10 +240,10 @@ public sealed class ReportService(AppDbContext db, TimeProvider clock)
         var end = VietnamTime.StartOfDay(toExclusive);
         var rows = await db.Bills.AsNoTracking()
             .Where(b => b.CreatedAt >= start && b.CreatedAt < end && (ids == null || ids.Contains(b.BranchId)))
-            .Select(b => new { b.BranchId, b.CreatedAt, b.Total, b.CashPaidTotal, b.VietQrPaidTotal })
+            .Select(b => new { b.BranchId, b.CreatedAt, b.Total, b.CashPaidTotal, b.VietQrPaidTotal, b.Kind })
             .ToListAsync(ct);
         return rows.Select(r => new BillRow(r.BranchId, DateOnly.FromDateTime(r.CreatedAt.ToVietnam().DateTime), r.Total,
-            r.CashPaidTotal, r.VietQrPaidTotal)).ToList();
+            r.CashPaidTotal, r.VietQrPaidTotal, r.Kind == BillKind.Session)).ToList();
     }
 
     private async Task<List<Expense>> ExpensesAsync(Guid[]? ids, DateOnly from, DateOnly toExclusive, CancellationToken ct)
