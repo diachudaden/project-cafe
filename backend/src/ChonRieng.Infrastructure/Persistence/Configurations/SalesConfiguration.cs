@@ -58,19 +58,27 @@ internal sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
 {
     public void Configure(EntityTypeBuilder<Bill> builder)
     {
-        builder.ToTable("Bills");
+        builder.ToTable("Bills", table =>
+        {
+            // D34: a session bill has its session; an add-on bill has a parent session bill instead.
+            table.HasCheckConstraint("CK_Bills_Kind",
+                "([Kind] = 1 AND [SessionId] IS NOT NULL AND [ParentBillId] IS NULL) OR ([Kind] = 2 AND [SessionId] IS NULL AND [ParentBillId] IS NOT NULL)");
+        });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Code).HasMaxLength(8).IsRequired();
         builder.Property(x => x.Total).HasColumnType("decimal(12,0)");
         builder.Property(x => x.CashPaidTotal).HasColumnType("decimal(12,0)");
         builder.Property(x => x.VietQrPaidTotal).HasColumnType("decimal(12,0)");
         builder.Property(x => x.PaymentMethod).HasConversion<byte>();
+        builder.Property(x => x.Kind).HasConversion<byte>().HasDefaultValue(BillKind.Session).HasSentinel((BillKind)0);
         builder.HasIndex(x => x.Code).IsUnique();
         builder.HasIndex(x => x.ClaimedByCustomerId);
         builder.HasIndex(x => new { x.BranchId, x.CreatedAt });
         // A concurrent second claim fails instead of awarding points twice.
         builder.Property(x => x.ClaimedByCustomerId).IsConcurrencyToken();
+        // One session bill per session; add-on bills have no SessionId (EF filters the index on IS NOT NULL).
         builder.HasIndex(x => x.SessionId).IsUnique();
+        builder.HasIndex(x => x.ParentBillId);
         builder.HasOne(x => x.Branch)
             .WithMany()
             .HasForeignKey(x => x.BranchId)
@@ -82,6 +90,11 @@ internal sealed class BillConfiguration : IEntityTypeConfiguration<Bill>
         builder.HasOne(x => x.Session)
             .WithOne(x => x.Bill)
             .HasForeignKey<Bill>(x => x.SessionId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.ParentBill)
+            .WithMany(x => x.AddOnBills)
+            .HasForeignKey(x => x.ParentBillId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.ClaimedByCustomer)
             .WithMany(x => x.ClaimedBills)

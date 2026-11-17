@@ -56,6 +56,13 @@ public enum PaymentMethod : byte
     Mixed = 3,
 }
 
+/// <summary>Session = the seat bill (plan, add-ons bought at check-in, extensions); AddOn = one add-on sale after check-in (D34).</summary>
+public enum BillKind : byte
+{
+    Session = 1,
+    AddOn = 2,
+}
+
 public enum PaymentRequestKind : byte
 {
     CheckIn = 1,

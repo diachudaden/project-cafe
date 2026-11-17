@@ -138,7 +138,7 @@ public static class AdminCrudEndpoints
 
         admin.MapGroup("/bills").MapReadOnlyCrud<Bill, BillResponse>(
             "Bills",
-            entity => new BillResponse(entity.Id, entity.Code, entity.BranchId, entity.ShiftId, entity.SessionId, entity.Total, entity.PaymentMethod, entity.ClaimedByCustomerId, entity.ClaimedAt));
+            entity => new BillResponse(entity.Id, entity.Code, entity.Kind, entity.BranchId, entity.ShiftId, entity.SessionId, entity.ParentBillId, entity.Total, entity.PaymentMethod, entity.ClaimedByCustomerId, entity.ClaimedAt));
 
         admin.MapGroup("/point-transactions").MapReadOnlyCrud<PointTransaction, PointTransactionResponse>(
             "PointTransactions",
