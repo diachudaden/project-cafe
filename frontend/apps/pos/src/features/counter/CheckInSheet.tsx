@@ -10,6 +10,7 @@ import { PaymentDoneModal } from "./PaymentDoneModal";
 import { PaymentRequestModal } from "./PaymentRequestModal";
 import { AddOnGrid, CartChips, useMenu } from "./AddOnGrid";
 import { cartLines, checkInTotals, type Cart } from "./addOnMenu";
+import { afterPaymentClose } from "./paymentStatus";
 
 const hours = (minutes: number) => `${Number((minutes / 60).toFixed(2))} tiếng`;
 const planLabel = (p: PricePlanView) => `${displayName(p.name)} · ${hours(p.durationMinutes)} · ${vnd(p.price)}`;
@@ -75,16 +76,19 @@ export function CheckInSheet({ branchId, seat, onClose }: { branchId: string; se
         request={paymentRequest}
         title={`Thanh toán check-in ${seat.code}`}
         description={[plan ? `${seat.code} · ${planLabel(plan)}` : `${seat.code} · Check-in`, itemsSummary && `Đồ thêm: ${itemsSummary}`].filter(Boolean).join(" · ")}
-        onClose={() => {
-          setPaymentRequest(null);
+        onClose={(status) => {
           void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
+          void queryClient.invalidateQueries({ queryKey: ["current-shift"] });
+          // Paid: the seat is taken now, so go to the floor. Expired / cancelled: back to the check-in drawer to retry.
+          if (afterPaymentClose(status) === "floor") onClose();
+          else setPaymentRequest(null);
         }}
       />
     );
   }
 
   if (done && addingItems) {
-    return <AddOnSheet branchId={branchId} sessionId={done.id} seatCode={done.seatCode} onClose={onClose} />;
+    return <AddOnSheet branchId={branchId} sessionId={done.id} seatCode={done.seatCode} onCancel={onClose} onDone={onClose} />;
   }
 
   if (done) {

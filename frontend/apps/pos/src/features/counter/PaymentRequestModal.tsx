@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Modal, Result, Space, Spin, Tag, Typography } from "antd";
-import type { PaymentRequestView } from "@cafecr/api-client";
+import type { PaymentRequestStatus, PaymentRequestView } from "@cafecr/api-client";
 import { errorText, vnd } from "@cafecr/ui";
 import { api } from "../../api";
 import { useNotify } from "../useNotify";
@@ -28,7 +28,8 @@ export function PaymentRequestModal({
   description: string;
   /** What is being paid for, shown on the success screen: "Check-in", "Gia hạn", "Đồ thêm". */
   what: "Check-in" | "Gia hạn" | "Đồ thêm";
-  onClose: () => void;
+  /** Called with the final status, so the caller can go to the floor (paid) or back (expired / cancelled). */
+  onClose: (status: PaymentRequestStatus | undefined) => void;
 }) {
   const notify = useNotify();
   const queryClient = useQueryClient();
@@ -75,14 +76,14 @@ export function PaymentRequestModal({
     if (paymentStatus === "Paid") {
       void queryClient.invalidateQueries({ queryKey: ["floor", branchId] });
       void queryClient.invalidateQueries({ queryKey: ["current-shift"] });
-      // Add-on and extension lines are on the seat's bill (SeatActionsSheet: ["seat-bill", billCode]).
+      // Extensions change the seat bill and add-on bills are listed on it (SeatActionsSheet: ["seat-bill", billCode]).
       void queryClient.invalidateQueries({ queryKey: ["seat-bill"] });
     }
   }, [branchId, paymentStatus, queryClient]);
 
   const terminal = isPaymentTerminal(paymentStatus);
   const close = () => {
-    if (terminal) onClose();
+    if (terminal) onClose(paymentStatus);
   };
   const cancelRequest = () => Modal.confirm({
     title: "Hủy yêu cầu thanh toán?",
@@ -111,8 +112,9 @@ export function PaymentRequestModal({
         seatCode: session.data.seatCode,
         amount: request.amount,
         method: "VietQr",
-        billCode: session.data.bill.code,
-        billTotal: session.data.bill.total,
+        // The bill this payment made: an add-on payment has its own bill (D34), check-in/extension the seat bill.
+        billCode: billCode!,
+        billTotal: what === "Đồ thêm" ? request.amount : session.data.bill.total,
         endAt: what === "Đồ thêm" ? undefined : session.data.endAt,
         customerName: status.data?.customerName ?? session.data.customer?.fullName,
         pointsAwarded: status.data?.pointsAwarded ?? 0,
@@ -158,7 +160,7 @@ export function PaymentRequestModal({
       title={title}
       footer={terminal
         ? <Space>
-            {paymentStatus === "Paid" && session.data && <PrintBillButton billCode={session.data.bill.code} />}
+            {paymentStatus === "Paid" && billCode && <PrintBillButton billCode={billCode} />}
             <Button type="primary" onClick={close}>Đóng</Button>
           </Space>
         : <Button danger loading={cancel.isPending} onClick={cancelRequest}>Hủy yêu cầu</Button>}

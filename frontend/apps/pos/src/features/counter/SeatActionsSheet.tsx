@@ -10,6 +10,7 @@ import { AddOnSheet } from "./AddOnSheet";
 import { PaymentRequestModal } from "./PaymentRequestModal";
 import { PaymentDoneModal, type PaymentDone } from "./PaymentDoneModal";
 import { PrintBillButton } from "./PrintBillButton";
+import { afterPaymentClose } from "./paymentStatus";
 
 /** One tap to extend or free a seat; money actions always confirm first. */
 export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string; seat: FloorSeat; onClose: () => void }) {
@@ -21,7 +22,7 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
   const [addingItems, setAddingItems] = useState(false);
   const [paid, setPaid] = useState<PaymentDone | null>(null);
   const plans = useQuery({ queryKey: ["active-plans", branchId], queryFn: () => api.catalog.activePlans(branchId) });
-  // The bill view carries the session's own plan and its add-on lines.
+  // The bill view carries the session's own plan, the add-ons bought at check-in and the later add-on bills (D34).
   const bill = useQuery({ queryKey: ["seat-bill", session.billCode], queryFn: () => api.sessions.bill(session.billCode) });
   const sessionPlan = plans.data?.find((p) => p.id === bill.data?.pricePlanId);
   const extendPrice = sessionPlan?.extendPrice;
@@ -67,7 +68,9 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
   }
 
   if (addingItems) {
-    return <AddOnSheet branchId={branchId} sessionId={session.sessionId} seatCode={seat.code} onClose={() => { setAddingItems(false); void bill.refetch(); }} />;
+    // Cancel → back to this seat; paid → straight to the floor for the next customer.
+    return <AddOnSheet branchId={branchId} sessionId={session.sessionId} seatCode={seat.code}
+      onCancel={() => setAddingItems(false)} onDone={() => { refresh(); onClose(); }} />;
   }
 
   if (paymentRequest) {
@@ -77,10 +80,11 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
       request={paymentRequest}
       title={`Thanh toán gia hạn ${seat.code}`}
       description="Gia hạn lượt ngồi"
-      onClose={() => {
-        setPaymentRequest(null);
+      onClose={(status) => {
         refresh();
-        onClose();
+        // Paid → floor; expired / cancelled → back to this seat to retry.
+        if (afterPaymentClose(status) === "floor") onClose();
+        else setPaymentRequest(null);
       }}
     />;
   }
@@ -94,15 +98,27 @@ export function SeatActionsSheet({ branchId, seat, onClose }: { branchId: string
           : []),
         { label: "Khách", children: session.customerName ?? "Khách lẻ" },
         { label: "Gói", children: (bill.data ? displayName(bill.data.planName) : "…") },
-        { label: "Bill", children: `${session.billCode} · ${vnd(bill.data?.bill.total ?? session.billTotal)}` },
+        { label: "Bill chỗ ngồi", children: `${session.billCode} · ${vnd(bill.data?.bill.total ?? session.billTotal)}` },
       ]} />
       {(bill.data?.items.length ?? 0) > 0 && (
         <>
-          <Divider orientation="left" plain style={{ margin: "8px 0" }}>Đồ thêm</Divider>
+          <Divider orientation="left" plain style={{ margin: "8px 0" }}>Đồ thêm trong bill chỗ ngồi</Divider>
           <List size="small" dataSource={bill.data!.items}
             renderItem={(i) => (
               <List.Item extra={<Tag>{paymentLabels[i.paymentMethod]}</Tag>}>
                 {i.quantity} × {displayName(i.name)} · {vnd(i.amount)} <Typography.Text type="secondary">({time(i.createdAt)})</Typography.Text>
+              </List.Item>
+            )} />
+        </>
+      )}
+      {(bill.data?.addOnBills?.length ?? 0) > 0 && (
+        <>
+          <Divider orientation="left" plain style={{ margin: "8px 0" }}>Bill đồ thêm ({bill.data!.addOnBills!.length})</Divider>
+          <List size="small" dataSource={bill.data!.addOnBills!}
+            renderItem={(b) => (
+              <List.Item extra={<PrintBillButton billCode={b.code} size="small" />}>
+                <Typography.Text strong>{b.code}</Typography.Text> · {vnd(b.total)} · <Tag>{paymentLabels[b.paymentMethod]}</Tag>
+                <Typography.Text type="secondary">{time(b.createdAt)}</Typography.Text>
               </List.Item>
             )} />
         </>
