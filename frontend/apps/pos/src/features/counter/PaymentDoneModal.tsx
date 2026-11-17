@@ -11,6 +11,7 @@ export interface PaymentDone {
   amount: number;
   method: PaymentMethod;
   billCode: string;
+  /** Total of the bill shown (for an add-on sale = the new add-on bill, i.e. what was just paid). */
   billTotal?: number;
   endAt?: string;
   customerName?: string | null;

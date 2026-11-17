@@ -94,10 +94,15 @@ export interface ProductView { id: string; branchId: string | null; name: string
 export type ProductInput = Omit<ProductView, "id">;
 export interface AddOnLine { productId: string; quantity: number }
 export interface BillItemView { id: string; name: string; unitPrice: number; quantity: number; amount: number; paymentMethod: PaymentMethod; createdAt: string }
-/** Cash add-on sale result: the bill after the sale and the member points it earned. */
+/** Session = the seat bill (plan, check-in add-ons, extensions); AddOn = one add-on sale after check-in (D34). */
+export type BillKind = "Session" | "AddOn";
+/** An add-on bill sold after check-in, linked to the seat bill. */
+export interface AddOnBillSummary { code: string; total: number; paymentMethod: PaymentMethod; createdAt: string }
+/** Cash add-on sale result: the new add-on bill (its own code and total) and the member points it earned. */
 export interface AddOnSaleResult { items: BillItemView[]; billCode: string; billTotal: number; pointsAwarded: number; customerName: string | null }
 export interface MyBillDetail {
-  code: string; branchName: string; seatCode: string; planName: string; startAt: string; endAt: string;
+  /** AddOn bills (D34) have no plan, times or extensions: planName/startAt/endAt are null. */
+  code: string; kind: BillKind; branchName: string; seatCode: string; planName: string | null; startAt: string | null; endAt: string | null;
   sessionStatus: SessionStatus; closeReason: SessionCloseReason | null;
   extensions: { createdAt: string; addedMinutes: number; price: number }[];
   items: BillItemView[];
@@ -111,7 +116,12 @@ export interface SessionView {
   customer: { id: string; fullName: string; tier: string } | null;
   bill: { id: string; code: string; total: number; paymentMethod: PaymentMethod; claimed: boolean; createdAt: string };
   pointsAwarded: number;
+  /** Add-ons bought in the check-in payment (on the seat bill). Later add-ons are in addOnBills. */
   items: BillItemView[];
+  /** Add-on bills sold after check-in, oldest first. */
+  addOnBills?: AddOnBillSummary[] | null;
+  /** Kind of the looked-up code (GET /api/bills/{code}); AddOn when an add-on bill code was used. */
+  kind?: BillKind;
 }
 export const paymentLogStages = [
   "RequestCreated", "StatusPolled", "WebhookReceived", "WebhookRejected", "WebhookDuplicate", "TransactionRecorded",
@@ -156,7 +166,7 @@ export interface MyPoints {
   points: number; tier: string; totalSpent: number; nextTier: string | null; amountToNextTier: number; memberCode: string;
   history: { id: string; points: number; reason: string; billCode: string | null; createdAt: string }[];
 }
-export interface MyBill { code: string; branchName: string; total: number; createdAt: string; claimedAt: string | null; points: number }
+export interface MyBill { code: string; branchName: string; total: number; createdAt: string; claimedAt: string | null; points: number; kind: BillKind }
 export interface MyActiveSession { sessionId: string; branchName: string; seatCode: string; startAt: string; endAt: string; minutesLeft: number }
 
 // ---- Finance ----

@@ -9,9 +9,15 @@ import { cartLines, checkInTotals, type Cart } from "./addOnMenu";
 import { AddOnGrid, CartChips, useMenu } from "./AddOnGrid";
 import { PaymentRequestModal } from "./PaymentRequestModal";
 import { PaymentDoneModal, type PaymentDone } from "./PaymentDoneModal";
+import { addOnSheetExit, type AddOnSheetEvent } from "./paymentStatus";
 
-/** Sell add-on items (mì, trứng, bánh...) onto the seat's current bill; separate from extending the session. */
-export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchId: string; sessionId: string; seatCode: string; onClose: () => void }) {
+/**
+ * Sell add-on items (mì, trứng, bánh...) after check-in: each sale is its own bill (D34), separate from the seat bill
+ * and from extending the session. onCancel = closed before selling; onDone = paid (the caller returns to the floor).
+ */
+export function AddOnSheet({ branchId, sessionId, seatCode, onCancel, onDone }: {
+  branchId: string; sessionId: string; seatCode: string; onCancel: () => void; onDone: () => void;
+}) {
   const notify = useNotify();
   const queryClient = useQueryClient();
   const screens = Grid.useBreakpoint();
@@ -44,6 +50,12 @@ export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchI
     },
     onError: notify.fail,
   });
+  const exit = (event: AddOnSheetEvent) => {
+    const next = addOnSheetExit(event);
+    if (next === "done") { refresh(); onDone(); }
+    else if (next === "cancel") onCancel();
+    else setPaymentRequest(null); // QR expired or cancelled: back to the cart to try again
+  };
   const createQr = useMutation({
     mutationFn: () => api.payments.createAddOn(sessionId, items),
     onSuccess: setPaymentRequest,
@@ -51,7 +63,7 @@ export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchI
   });
 
   if (paid) {
-    return <PaymentDoneModal done={paid} onClose={onClose} />;
+    return <PaymentDoneModal done={paid} onClose={() => exit({ type: "sale-done" })} />;
   }
 
   if (paymentRequest) {
@@ -62,13 +74,13 @@ export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchI
         request={paymentRequest}
         title={`Thanh toán đồ thêm ${seatCode}`}
         description={summary}
-        onClose={() => { setPaymentRequest(null); refresh(); onClose(); }}
+        onClose={(status) => exit({ type: "qr-closed", status })}
       />
     );
   }
 
   return (
-    <Drawer open placement="bottom" height="85%" onClose={onClose} title={`Thêm đồ · ${seatCode}`}
+    <Drawer open placement="bottom" height="85%" onClose={() => exit({ type: "drawer-closed" })} title={`Thêm đồ · ${seatCode}`}
       afterOpenChange={(open) => { if (open && screens.md) searchRef.current?.focus(); }}
       footer={
         <Space direction="vertical" style={{ width: "100%" }}>
@@ -92,7 +104,7 @@ export function AddOnSheet({ branchId, sessionId, seatCode, onClose }: { branchI
         </Space>
       }>
       <Space direction="vertical" style={{ width: "100%" }} size="middle">
-        <Typography.Text type="secondary">Đồ thêm được cộng vào bill hiện tại của chỗ, không thay đổi thời gian ngồi.</Typography.Text>
+        <Typography.Text type="secondary">Đồ thêm được tính thành bill riêng, không thay đổi bill chỗ ngồi và thời gian ngồi.</Typography.Text>
         <AddOnGrid ref={searchRef} branchId={branchId} cart={cart} onCartChange={setCart} />
       </Space>
     </Drawer>

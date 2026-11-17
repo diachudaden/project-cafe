@@ -127,10 +127,18 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<byte>("Kind")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint")
+                        .HasDefaultValue((byte)1);
+
+                    b.Property<Guid?>("ParentBillId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<byte>("PaymentMethod")
                         .HasColumnType("tinyint");
 
-                    b.Property<Guid>("SessionId")
+                    b.Property<Guid?>("SessionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("ShiftId")
@@ -149,14 +157,20 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
+                    b.HasIndex("ParentBillId");
+
                     b.HasIndex("SessionId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[SessionId] IS NOT NULL");
 
                     b.HasIndex("ShiftId");
 
                     b.HasIndex("BranchId", "CreatedAt");
 
-                    b.ToTable("Bills", (string)null);
+                    b.ToTable("Bills", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Bills_Kind", "([Kind] = 1 AND [SessionId] IS NOT NULL AND [ParentBillId] IS NULL) OR ([Kind] = 2 AND [SessionId] IS NULL AND [ParentBillId] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("ChonRieng.Domain.Entities.BillItem", b =>
@@ -1942,11 +1956,15 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ClaimedByCustomerId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("ChonRieng.Domain.Entities.Bill", "ParentBill")
+                        .WithMany("AddOnBills")
+                        .HasForeignKey("ParentBillId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ChonRieng.Domain.Entities.Session", "Session")
                         .WithOne("Bill")
                         .HasForeignKey("ChonRieng.Domain.Entities.Bill", "SessionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("ChonRieng.Domain.Entities.Shift", "Shift")
                         .WithMany("Bills")
@@ -1957,6 +1975,8 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
                     b.Navigation("Branch");
 
                     b.Navigation("ClaimedByCustomer");
+
+                    b.Navigation("ParentBill");
 
                     b.Navigation("Session");
 
@@ -2553,6 +2573,8 @@ namespace ChonRieng.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ChonRieng.Domain.Entities.Bill", b =>
                 {
+                    b.Navigation("AddOnBills");
+
                     b.Navigation("Items");
 
                     b.Navigation("PointTransactions");

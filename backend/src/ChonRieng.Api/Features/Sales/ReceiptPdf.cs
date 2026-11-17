@@ -61,18 +61,30 @@ public static class ReceiptPdf
                 col.Item().AlignCenter().Text(bill.BranchAddress).FontSize(7);
                 Divider(col);
 
-                col.Item().AlignCenter().Text("HÓA ĐƠN").Bold().FontSize(10);
+                col.Item().AlignCenter().Text(bill.IsAddOn ? "HÓA ĐƠN ĐỒ THÊM" : "HÓA ĐƠN").Bold().FontSize(10);
                 col.Item().AlignCenter().Text(bill.Code).Bold().FontSize(14).LetterSpacing(0.1f);
                 Pair(col, "Chỗ ngồi", bill.SeatCode);
-                Pair(col, "Gói", bill.PlanName);
-                Pair(col, "Bắt đầu", Time(bill.StartAt));
-                Pair(col, "Kết thúc", Time(bill.EndAt));
+                if (bill.IsAddOn)
+                {
+                    // D34: an add-on bill is only the items sold; the plan, times and extensions are on the seat's bill.
+                    Pair(col, "Thời gian", Time(bill.CreatedAt));
+                }
+                else
+                {
+                    Pair(col, "Gói", bill.PlanName);
+                    Pair(col, "Bắt đầu", Time(bill.StartAt));
+                    Pair(col, "Kết thúc", Time(bill.EndAt));
+                }
+
                 Divider(col);
 
-                Pair(col, $"Lượt ngồi · {bill.PlanName}", Money(bill.PlanAmount));
-                foreach (var e in bill.Extensions)
+                if (!bill.IsAddOn)
                 {
-                    Pair(col, $"Gia hạn +{e.AddedMinutes} phút ({e.CreatedAt.ToVietnam():HH:mm})", Money(e.Price));
+                    Pair(col, $"Lượt ngồi · {bill.PlanName}", Money(bill.PlanAmount));
+                    foreach (var e in bill.Extensions)
+                    {
+                        Pair(col, $"Gia hạn +{e.AddedMinutes} phút ({e.CreatedAt.ToVietnam():HH:mm})", Money(e.Price));
+                    }
                 }
 
                 if (bill.Items.Count > 0)

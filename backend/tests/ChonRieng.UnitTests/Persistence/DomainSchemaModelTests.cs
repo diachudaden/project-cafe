@@ -120,7 +120,9 @@ public sealed class DomainSchemaModelTests
         Assert.Contains(bill.GetIndexes(), index =>
             index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual([nameof(Bill.Code)]));
         Assert.Contains(bill.GetIndexes(), index =>
-            index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual([nameof(Bill.SessionId)]));
+            index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual([nameof(Bill.SessionId)])
+            && index.GetFilter() == "[SessionId] IS NOT NULL");
+        Assert.Equal(BillKind.Session, bill.FindProperty(nameof(Bill.Kind))!.GetDefaultValue());
 
         var userSession = db.Model.FindEntityType(typeof(UserSession))!;
         Assert.Contains(userSession.GetIndexes(), index =>
@@ -183,7 +185,7 @@ public sealed class DomainSchemaModelTests
 
         var migrations = db.Database.GetMigrations().ToArray();
 
-        Assert.Equal(10, migrations.Length);
+        Assert.Equal(11, migrations.Length);
         Assert.EndsWith("_InitialCafeCrSchema", migrations[0], StringComparison.Ordinal);
         Assert.EndsWith("_AddRefreshTokenExpiry", migrations[1], StringComparison.Ordinal);
         Assert.EndsWith("_RoleWorkflows", migrations[2], StringComparison.Ordinal);
@@ -194,6 +196,7 @@ public sealed class DomainSchemaModelTests
         Assert.EndsWith("_SessionCloseReason", migrations[7], StringComparison.Ordinal);
         Assert.EndsWith("_NotificationPaymentLinks", migrations[8], StringComparison.Ordinal);
         Assert.EndsWith("_InventoryModule", migrations[9], StringComparison.Ordinal);
+        Assert.EndsWith("_SeparateAddOnBills", migrations[10], StringComparison.Ordinal);
     }
 
     [Fact]

@@ -56,7 +56,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             return lines.Error;
         }
 
-        var shift = await ResolveShiftAsync(user, branchId, now, ct);
+        var shift = await ResolveShiftAsync(db, user, branchId, now, ct);
         if (shift.Error is not null)
         {
             return shift.Error;
@@ -84,7 +84,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         };
         var bill = new Bill
         {
-            Code = await NewUniqueBillCodeAsync(ct),
+            Code = await NewUniqueBillCodeAsync(db, ct),
             BranchId = branchId,
             ShiftId = shift.Value,
             SessionId = session.Id,
@@ -174,7 +174,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             return snapshot.Error;
         }
 
-        var shift = await ResolveShiftAsync(user, seat.Zone.BranchId, now, ct);
+        var shift = await ResolveShiftAsync(db, user, seat.Zone.BranchId, now, ct);
         if (shift.Error is not null)
         {
             return shift.Error;
@@ -348,7 +348,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             };
             var bill = new Bill
             {
-                Code = await NewUniqueBillCodeAsync(ct),
+                Code = await NewUniqueBillCodeAsync(db, ct),
                 BranchId = paymentRequest.BranchId,
                 ShiftId = paymentRequest.ShiftId,
                 SessionId = session.Id,
@@ -496,8 +496,16 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
     public async Task<Result<SessionView>> GetByBillCodeAsync(CurrentUser user, string code, CancellationToken ct)
     {
         var normalized = Loyalty.NormalizeCode(code);
-        var view = (await Query(db.Sessions.Where(s => s.Bill != null && s.Bill.Code == normalized), 0, ct)).SingleOrDefault();
-        return view is null || !user.CanAccessBranch(view.BranchId) ? ServiceError.NotFound("Không tìm thấy hóa đơn.") : view;
+        // An add-on bill (D34) resolves to the session of its parent bill.
+        var found = await db.Bills.AsNoTracking().Where(b => b.Code == normalized)
+            .Select(b => new { b.Kind, SessionId = b.SessionId ?? b.ParentBill!.SessionId })
+            .SingleOrDefaultAsync(ct);
+        var view = found?.SessionId is { } sessionId
+            ? (await Query(db.Sessions.Where(s => s.Id == sessionId), 0, ct)).SingleOrDefault()
+            : null;
+        return view is null || !user.CanAccessBranch(view.BranchId)
+            ? ServiceError.NotFound("Không tìm thấy hóa đơn.")
+            : view with { Kind = found!.Kind };
     }
 
     public async Task<IReadOnlyList<CustomerLookupResult>> LookupCustomersAsync(string q, CancellationToken ct)
@@ -520,7 +528,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
     /// Every bill belongs to a shift (Bill.ShiftId is required). Staff sell in the shift they checked in to;
     /// Admin/Manager not on the rota use the branch's shift running right now.
     /// </summary>
-    private async Task<Result<Guid>> ResolveShiftAsync(CurrentUser user, Guid branchId, DateTimeOffset now, CancellationToken ct)
+    internal static async Task<Result<Guid>> ResolveShiftAsync(AppDbContext db, CurrentUser user, Guid branchId, DateTimeOffset now, CancellationToken ct)
     {
         var ownShift = await db.Attendances
             .Where(a => a.Employee.UserId == user.UserId && a.CheckInAt != null && a.CheckOutAt == null && a.Shift.BranchId == branchId)
@@ -549,7 +557,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         return ServiceError.Conflict("Bạn chưa tham gia ca", "Hãy bấm 'Tham gia ca' tại chi nhánh này trước khi bán.");
     }
 
-    private async Task<string> NewUniqueBillCodeAsync(CancellationToken ct)
+    internal static async Task<string> NewUniqueBillCodeAsync(AppDbContext db, CancellationToken ct)
     {
         for (var attempt = 0; attempt < 5; attempt++)
         {
@@ -598,11 +606,15 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
                 Items = s.Bill.Items.OrderBy(i => i.CreatedAt)
                     .Select(i => new BillItemView(i.Id, i.Name, i.UnitPrice, i.Quantity, i.Amount, i.PaymentMethod, i.CreatedAt))
                     .ToList(),
+                AddOnBills = s.Bill.AddOnBills.OrderBy(b => b.CreatedAt)
+                    .Select(b => new AddOnBillSummary(b.Code, b.Total, b.PaymentMethod, b.CreatedAt))
+                    .ToList(),
             })
             .ToListAsync(ct);
 
         return rows.Select(r => new SessionView(r.Id, r.BranchId, r.SeatId, r.SeatCode, r.PricePlanId, r.PlanName, r.StartAt, r.EndAt,
-            r.Status, (int)Math.Floor((r.EndAt - now).TotalMinutes), r.Extensions, r.Customer, r.Bill, pointsAwarded, r.Items, r.CloseReason)).ToList();
+            r.Status, (int)Math.Floor((r.EndAt - now).TotalMinutes), r.Extensions, r.Customer, r.Bill, pointsAwarded, r.Items, r.CloseReason,
+            r.AddOnBills)).ToList();
     }
 
     /// <summary>NeedsAttention text for a payment that arrives after its session ended.</summary>

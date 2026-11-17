@@ -88,7 +88,7 @@ public sealed record CreateSessionExtensionRequest(Guid SessionId, int AddedMinu
 public sealed record UpdateSessionExtensionRequest(Guid SessionId, int AddedMinutes, decimal Price, DateTimeOffset CreatedAt);
 
 /// <summary>Bill data returned by the administrator API.</summary>
-public sealed record BillResponse(Guid Id, string Code, Guid BranchId, Guid ShiftId, Guid SessionId, decimal Total, PaymentMethod PaymentMethod, Guid? ClaimedByCustomerId, DateTimeOffset? ClaimedAt);
+public sealed record BillResponse(Guid Id, string Code, BillKind Kind, Guid BranchId, Guid ShiftId, Guid? SessionId, Guid? ParentBillId, decimal Total, PaymentMethod PaymentMethod, Guid? ClaimedByCustomerId, DateTimeOffset? ClaimedAt);
 /// <summary>Payload for creating a bill.</summary>
 public sealed record CreateBillRequest([property: Required, MaxLength(64)] string Code, Guid BranchId, Guid ShiftId, Guid SessionId, decimal Total, PaymentMethod PaymentMethod, Guid? ClaimedByCustomerId, DateTimeOffset? ClaimedAt);
 /// <summary>Payload for replacing a bill.</summary>

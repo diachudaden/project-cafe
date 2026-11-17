@@ -31,7 +31,7 @@ public sealed record AddOnLineRequest(Guid ProductId, [property: Range(1, 99)] i
 public sealed record AddOnSaleResponse(
     IReadOnlyList<BillItemView> Items,
     string BillCode,
-    [property: Description("Tổng hóa đơn sau khi thêm đồ.")] decimal BillTotal,
+    [property: Description("Tổng của bill đồ thêm vừa tạo (= số tiền vừa thu). Bill chỗ ngồi không đổi.")] decimal BillTotal,
     [property: Description("Điểm thành viên được cộng cho lần bán này (0 nếu khách lẻ).")] int PointsAwarded,
     [property: Description("Tên thành viên được cộng điểm, null nếu khách lẻ.")] string? CustomerName);
 
@@ -142,7 +142,7 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
 
     // ---- Selling ----
 
-    /// <summary>Cash sale: lines go on the session's bill immediately.</summary>
+    /// <summary>Cash sale: a new add-on bill (D34); the session bill is not changed.</summary>
     public async Task<Result<AddOnSaleResponse>> SellCashAsync(CurrentUser user, Guid sessionId, AddOnSaleRequest request, CancellationToken ct)
     {
         var session = await ActiveSessionAsync(user, sessionId, ct);
@@ -157,7 +157,14 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
             return lines.Error;
         }
 
-        var sale = await AddToBillAsync(session.Value.Bill!, session.Value.Seat.Code, lines.Value!, PaymentMethod.Cash, null, user.UserId, clock.GetUtcNow(), ct);
+        var now = clock.GetUtcNow();
+        var shift = await SessionService.ResolveShiftAsync(db, user, session.Value.Seat.Zone.BranchId, now, ct);
+        if (shift.Error is not null)
+        {
+            return shift.Error;
+        }
+
+        var sale = await NewAddOnBillAsync(session.Value, shift.Value, lines.Value!, PaymentMethod.Cash, null, user.UserId, now, ct);
         // Include the session row in the save so its Status/EndAt concurrency tokens are checked: a seat
         // auto-released a moment ago (TASK-024) must not receive new items.
         db.Entry(session.Value).Property(s => s.Status).IsModified = true;
@@ -171,8 +178,7 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
             return SessionService.SessionChanged();
         }
 
-        var bill = session.Value.Bill!;
-        return new AddOnSaleResponse(sale.Items.Select(ToView).ToList(), bill.Code, bill.Total, sale.PointsAwarded, sale.CustomerName);
+        return new AddOnSaleResponse(sale.Items.Select(ToView).ToList(), sale.Bill.Code, sale.Bill.Total, sale.PointsAwarded, sale.CustomerName);
     }
 
     /// <summary>VietQR: computes the amount server-side and snapshots the lines on the payment request.</summary>
@@ -202,8 +208,15 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
             return snapshot.Error;
         }
 
+        // The add-on bill created on settlement belongs to the shift selling it now, not the check-in shift (D34).
+        var shift = await SessionService.ResolveShiftAsync(db, user, s.Seat.Zone.BranchId, clock.GetUtcNow(), ct);
+        if (shift.Error is not null)
+        {
+            return shift.Error;
+        }
+
         return new PaymentRequestContext(PaymentRequestKind.AddOn, s.Seat.Zone.BranchId, s.SeatId, s.Seat.Type, s.PricePlanId, s.CustomerId, s.Id,
-            s.Bill!.ShiftId, lines.Value!.Sum(l => l.Amount), snapshot.Value);
+            shift.Value, lines.Value!.Sum(l => l.Amount), snapshot.Value);
     }
 
     /// <summary>Called when SePay confirms an AddOn request; amounts come from the snapshot taken at request time.</summary>
@@ -222,46 +235,57 @@ public sealed class AddOnService(AppDbContext db, TimeProvider clock)
         }
 
         // One timestamp for the lines, the points and PaidAt, so the POS can find this payment's points.
+        // Settlement runs once per request (Pending → Paid in the same save), so a resent webhook never makes a second bill.
         var now = clock.GetUtcNow();
-        await AddToBillAsync(session.Bill, session.Seat.Code, lines, PaymentMethod.VietQr, paymentRequest.Id, paymentRequest.CreatedByUserId, now, ct);
-        paymentRequest.BillId = session.Bill.Id;
+        var sale = await NewAddOnBillAsync(session, paymentRequest.ShiftId, lines, PaymentMethod.VietQr, paymentRequest.Id,
+            paymentRequest.CreatedByUserId, now, ct);
+        paymentRequest.BillId = sale.Bill.Id;
         paymentRequest.PaidAt = now;
-        return new PaymentSettlementOutcome(true, null, session.Bill.Id, session.Bill.Code, session.Seat.Code, session.Id);
+        return new PaymentSettlementOutcome(true, null, sale.Bill.Id, sale.Bill.Code, session.Seat.Code, session.Id);
     }
 
-    private sealed record AddedToBill(List<BillItem> Items, int PointsAwarded, string? CustomerName);
+    private sealed record AddOnSale(Bill Bill, List<BillItem> Items, int PointsAwarded, string? CustomerName);
 
-    private async Task<AddedToBill> AddToBillAsync(
-        Bill bill, string seatCode, IReadOnlyList<AddOnLine> lines, PaymentMethod method, Guid? paymentRequestId, Guid? userId,
+    /// <summary>
+    /// One add-on sale after check-in = one new bill (D34): <see cref="BillKind.AddOn"/>, its own code, linked to the session
+    /// bill through <see cref="Bill.ParentBillId"/>. The session bill's totals are not touched. If the session bill belongs to a
+    /// member, the new bill is claimed for them and earns points on its own total; otherwise its code can be claimed later.
+    /// </summary>
+    private async Task<AddOnSale> NewAddOnBillAsync(
+        Session session, Guid shiftId, IReadOnlyList<AddOnLine> lines, PaymentMethod method, Guid? paymentRequestId, Guid? userId,
         DateTimeOffset now, CancellationToken ct)
     {
+        var parent = session.Bill!;
+        var total = lines.Sum(l => l.Amount);
+        var bill = new Bill
+        {
+            Code = await SessionService.NewUniqueBillCodeAsync(db, ct),
+            Kind = BillKind.AddOn,
+            BranchId = parent.BranchId,
+            ShiftId = shiftId,
+            ParentBillId = parent.Id,
+            Total = total,
+            CashPaidTotal = method == PaymentMethod.Cash ? total : 0,
+            VietQrPaidTotal = method == PaymentMethod.VietQr ? total : 0,
+            PaymentMethod = method,
+            CreatedAt = now,
+        };
+        db.Bills.Add(bill);
         var items = NewItems(bill, lines, method, paymentRequestId, userId, now);
         db.BillItems.AddRange(items);
 
-        var total = items.Sum(i => i.Amount);
-        bill.Total += total;
-        if (method == PaymentMethod.VietQr)
-        {
-            bill.VietQrPaidTotal += total;
-        }
-        else
-        {
-            bill.CashPaidTotal += total;
-        }
-
-        bill.PaymentMethod = bill.CashPaidTotal > 0 && bill.VietQrPaidTotal > 0 ? PaymentMethod.Mixed
-            : bill.VietQrPaidTotal > 0 ? PaymentMethod.VietQr : PaymentMethod.Cash;
-
-        if (bill.ClaimedByCustomerId is { } customerId && total > 0)
+        if (parent.ClaimedByCustomerId is { } customerId && total > 0)
         {
             var customer = await db.Customers.Include(c => c.User).SingleAsync(c => c.Id == customerId, ct);
+            bill.ClaimedByCustomerId = customerId;
+            bill.ClaimedAt = now;
             var tx = Loyalty.Award(customer, bill, total, now, $"Đồ thêm hóa đơn {bill.Code}");
             db.PointTransactions.Add(tx);
-            db.PaymentCompleted(customer, bill, seatCode, PaymentKind.AddOn, total, method, tx.Points, now);
-            return new AddedToBill(items, tx.Points, customer.User.FullName);
+            db.PaymentCompleted(customer, bill, session.Seat.Code, PaymentKind.AddOn, total, method, tx.Points, now);
+            return new AddOnSale(bill, items, tx.Points, customer.User.FullName);
         }
 
-        return new AddedToBill(items, 0, null);
+        return new AddOnSale(bill, items, 0, null);
     }
 
     private Task<Result<IReadOnlyList<AddOnLine>>> PriceLinesAsync(Guid branchId, AddOnSaleRequest request, CancellationToken ct) =>

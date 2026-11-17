@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Card, Descriptions, List, Typography, theme } from "antd";
+import { Button, Card, Descriptions, List, Tag, Typography, theme } from "antd";
 import { ChangePasswordModal, dateTime, minutesLeftText, time, vnd } from "@cafecr/ui";
 import { api, useAuth } from "../api";
 import { EnableNotifications } from "../components/EnableNotifications";
@@ -48,7 +48,8 @@ export function MePage() {
         <List dataSource={bills.data} locale={{ emptyText: "Chưa có hóa đơn." }}
           renderItem={(b) => (
             <BillRow billCode={b.code} extra={`+${b.points}`}>
-              <List.Item.Meta title={`${b.code} · ${vnd(b.total)}`} description={`${b.branchName} · ${dateTime(b.createdAt)}`} />
+              <List.Item.Meta title={<>{b.code} · {vnd(b.total)}{b.kind === "AddOn" && <Tag style={{ marginLeft: 8 }}>Đồ thêm</Tag>}</>}
+                description={`${b.branchName} · ${dateTime(b.createdAt)}`} />
             </BillRow>
           )} />
       </Card>

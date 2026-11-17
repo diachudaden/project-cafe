@@ -17,7 +17,7 @@ public sealed class LoyaltyService(AppDbContext db, TimeProvider clock)
         }
 
         var normalized = Loyalty.NormalizeCode(code);
-        var bill = await db.Bills.Include(b => b.Session).ThenInclude(s => s.Seat).SingleOrDefaultAsync(b => b.Code == normalized, ct);
+        var bill = await db.Bills.SingleOrDefaultAsync(b => b.Code == normalized, ct);
         if (bill is null)
         {
             return ServiceError.NotFound("Mã bill không đúng. Hãy kiểm tra lại 8 ký tự trên hóa đơn.");
@@ -34,11 +34,15 @@ public sealed class LoyaltyService(AppDbContext db, TimeProvider clock)
             return ServiceError.Conflict("Bill đã quá hạn", $"Chỉ tích điểm trong {Loyalty.ClaimWindowDays} ngày kể từ lúc thanh toán.");
         }
 
+        // Add-on bills (D34) have no session of their own: the seat comes from the session bill.
+        var seatCode = await db.Bills.Where(b => b.Id == bill.Id)
+            .Select(b => b.SessionId != null ? b.Session!.Seat.Code : b.ParentBill!.Session!.Seat.Code)
+            .SingleOrDefaultAsync(ct);
         bill.ClaimedByCustomerId = customer.Id;
         bill.ClaimedAt = now;
         var tx = Loyalty.Award(customer, bill, bill.Total, now, $"Tích điểm hóa đơn {bill.Code}");
         db.PointTransactions.Add(tx);
-        db.PointsClaimed(customer, bill, bill.Session?.Seat?.Code, tx.Points, now);
+        db.PointsClaimed(customer, bill, seatCode, tx.Points, now);
         try
         {
             await db.SaveChangesAsync(ct);
@@ -90,7 +94,7 @@ public sealed class LoyaltyService(AppDbContext db, TimeProvider clock)
             .Where(b => b.ClaimedByCustomer != null && b.ClaimedByCustomer.UserId == user.UserId)
             .OrderByDescending(b => b.CreatedAt)
             .Take(100)
-            .Select(b => new MyBill(b.Code, b.Branch.Name, b.Total, b.CreatedAt, b.ClaimedAt, b.PointTransactions.Sum(p => p.Points)))
+            .Select(b => new MyBill(b.Code, b.Branch.Name, b.Total, b.CreatedAt, b.ClaimedAt, b.PointTransactions.Sum(p => p.Points), b.Kind))
             .ToListAsync(ct);
 
     /// <summary>One bill of the signed-in customer (claimed by them); NotFound for anyone else's bill.</summary>
@@ -99,16 +103,20 @@ public sealed class LoyaltyService(AppDbContext db, TimeProvider clock)
         var normalized = Loyalty.NormalizeCode(code);
         var detail = await db.Bills.AsNoTracking()
             .Where(b => b.Code == normalized && b.ClaimedByCustomer != null && b.ClaimedByCustomer.UserId == user.UserId)
+            // Add-on bills (D34): seat and session status come from the parent session bill; no plan, times or extensions.
             .Select(b => new MyBillDetail(
                 b.Code,
+                b.Kind,
                 b.Branch.Name,
-                b.Session.Seat.Code,
-                b.Session.PricePlan.Name,
-                b.Session.StartAt,
-                b.Session.EndAt,
-                b.Session.Status,
-                b.Session.CloseReason,
-                b.Session.Extensions.OrderBy(e => e.CreatedAt).Select(e => new MyBillExtension(e.CreatedAt, e.AddedMinutes, e.Price)).ToList(),
+                b.Session != null ? b.Session.Seat.Code : b.ParentBill!.Session!.Seat.Code,
+                b.Session != null ? b.Session.PricePlan.Name : null,
+                b.Session != null ? b.Session.StartAt : null,
+                b.Session != null ? b.Session.EndAt : null,
+                b.Session != null ? b.Session.Status : b.ParentBill!.Session!.Status,
+                b.Session != null ? b.Session.CloseReason : b.ParentBill!.Session!.CloseReason,
+                b.Session != null
+                    ? b.Session.Extensions.OrderBy(e => e.CreatedAt).Select(e => new MyBillExtension(e.CreatedAt, e.AddedMinutes, e.Price)).ToList()
+                    : new List<MyBillExtension>(),
                 b.Items.OrderBy(i => i.CreatedAt)
                     .Select(i => new BillItemView(i.Id, i.Name, i.UnitPrice, i.Quantity, i.Amount, i.PaymentMethod, i.CreatedAt)).ToList(),
                 b.CashPaidTotal,
