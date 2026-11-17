@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Card, Empty, FloatButton, List, Space, Spin, Tag, Typography } from "antd";
-import { InboxOutlined } from "@ant-design/icons";
+import { DeleteOutlined, InboxOutlined } from "@ant-design/icons";
 import type { FloorSeat } from "@cafecr/api-client";
 import { addDays, autoReleaseText, closeReasonLabels, displayName, minutesLeftText, seatStateStyles, seatTypeLabels, shiftTypeLabels, time, todayVn, vnd } from "@cafecr/ui";
 import { api } from "../../api";
@@ -10,6 +10,7 @@ import { useNotify } from "../useNotify";
 import { CheckInSheet } from "./CheckInSheet";
 import { SeatActionsSheet } from "./SeatActionsSheet";
 import { RestockSheet } from "../inventory/RestockSheet";
+import { WasteSheet } from "../inventory/WasteSheet";
 
 export function CounterPage() {
   const current = useCurrentShift();
@@ -59,6 +60,7 @@ function Floor({ branchId }: { branchId: string }) {
   const [checkIn, setCheckIn] = useState<FloorSeat | null>(null);
   const [actions, setActions] = useState<FloorSeat | null>(null);
   const [restock, setRestock] = useState(false);
+  const [waste, setWaste] = useState(false);
   const seats = floor.data?.zones.flatMap((z) => z.seats) ?? [];
   const ending = seats.filter((s) => s.state === "EndingSoon" || s.state === "Overdue");
 
@@ -106,9 +108,14 @@ function Floor({ branchId }: { branchId: string }) {
       <RecentlyClosed branchId={branchId} />
       {checkIn && <CheckInSheet branchId={branchId} seat={checkIn} onClose={() => setCheckIn(null)} />}
       {actions && <SeatActionsSheet branchId={branchId} seat={actions} onClose={() => setActions(null)} />}
-      <FloatButton type="primary" icon={<InboxOutlined />} description="Lôi hàng" shape="square" style={{ width: 72, height: 72 }}
-        tooltip="Lôi hàng ra kho ngoài" onClick={() => setRestock(true)} />
+      <FloatButton.Group shape="square" style={{ insetInlineEnd: 24 }}>
+        <FloatButton icon={<DeleteOutlined />} description="Huỷ hàng" style={{ width: 72, height: 72 }}
+          tooltip="Huỷ hàng hỏng / đổ vỡ" onClick={() => setWaste(true)} />
+        <FloatButton type="primary" icon={<InboxOutlined />} description="Lôi hàng" style={{ width: 72, height: 72 }}
+          tooltip="Lôi hàng ra kho ngoài" onClick={() => setRestock(true)} />
+      </FloatButton.Group>
       <RestockSheet branchId={branchId} open={restock} onClose={() => setRestock(false)} />
+      <WasteSheet branchId={branchId} open={waste} onClose={() => setWaste(false)} />
     </Space>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Card, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Radio, Segmented, Select, Space, Switch, Table, Tabs, Tag, Typography } from "antd";
-import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import type { CountSummary, InventoryItem, ReceiptLineInput, StockDocument, StockDocumentType, WarehouseType } from "@cafecr/api-client";
 import {
@@ -31,11 +31,13 @@ function Balances({ branchId }: { branchId: string }) {
   const balances = useQuery({ queryKey: ["balances", branchId, warehouse], queryFn: () => api.inventory.balances(branchId, warehouse), refetchInterval: 60_000 });
   const units = (id: string) => items.data?.find((i) => i.id === id)?.units ?? [];
   const [receipt, setReceipt] = useState(false);
+  const [waste, setWaste] = useState(false);
 
   return (
     <Card title="Tồn kho" extra={
       <Space>
         <Segmented value={warehouse} onChange={(v) => setWarehouse(v as WarehouseType)} options={[{ value: "Inner", label: "Kho trong (theo sổ)" }, { value: "Outer", label: "Kho ngoài (dự kiến)" }]} />
+        <Button danger icon={<DeleteOutlined />} onClick={() => setWaste(true)}>Lập phiếu huỷ</Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setReceipt(true)}>Lập phiếu nhập</Button>
       </Space>
     }>
@@ -50,6 +52,7 @@ function Balances({ branchId }: { branchId: string }) {
           { title: "", render: (_, r) => (r.belowMin ? <Tag color="red">{warehouse === "Inner" ? "Nên đặt hàng" : "Dưới mức tối thiểu"}</Tag> : null) },
         ]} />
       {receipt && <ReceiptModal branchId={branchId} items={items.data ?? []} onClose={() => setReceipt(false)} />}
+      {waste && <WasteModal branchId={branchId} warehouse={warehouse} items={items.data ?? []} onClose={() => setWaste(false)} />}
     </Card>
   );
 }
@@ -121,6 +124,72 @@ function ReceiptModal({ branchId, items, onClose }: { branchId: string; items: I
           )}
         </Space>
         <Form.Item label="Ghi chú" name="note" style={{ marginTop: 12 }}><Input.TextArea maxLength={1000} /></Form.Item>
+      </Form>
+    </Modal>
+  );
+}
+
+type WasteForm = { warehouse: WarehouseType; reason: string; photoUrl?: string; lines: { itemId?: string; unitName: string | null; unitQty: number }[] };
+
+/** Phiếu huỷ (PH): spoiled / broken stock. The inner book cannot go negative (409 INSUFFICIENT_STOCK). */
+function WasteModal({ branchId, warehouse, items, onClose }: { branchId: string; warehouse: WarehouseType; items: InventoryItem[]; onClose: () => void }) {
+  const notify = useNotify();
+  const queryClient = useQueryClient();
+  const [form] = Form.useForm<WasteForm>();
+  const lines = Form.useWatch("lines", form) ?? [];
+  const selected = Form.useWatch("warehouse", form) ?? warehouse;
+  const balances = useQuery({ queryKey: ["balances", branchId, selected], queryFn: () => api.inventory.balances(branchId, selected) });
+  const onHand = (itemId?: string) => balances.data?.find((b) => b.itemId === itemId)?.qty;
+  const factor = (item: InventoryItem | undefined, unitName: string | null) => item?.units.find((u) => u.unitName === unitName)?.factor ?? 1;
+  const create = useMutation({
+    mutationFn: (v: WasteForm) => api.inventory.createWaste(branchId, v.warehouse,
+      v.lines.map((l) => ({ itemId: l.itemId!, qty: l.unitQty * factor(items.find((i) => i.id === l.itemId), l.unitName) })),
+      v.reason.trim(), v.photoUrl?.trim() || null),
+    onSuccess: (doc) => {
+      notify.ok(`Đã ghi phiếu huỷ ${doc.code}.`);
+      void queryClient.invalidateQueries({ queryKey: ["balances", branchId] });
+      void queryClient.invalidateQueries({ queryKey: ["stock-documents", branchId] });
+      onClose();
+    },
+    onError: notify.fail,
+  });
+
+  return (
+    <Modal open width={720} title="Phiếu huỷ hàng hỏng / đổ vỡ" okText="Ghi huỷ" okButtonProps={{ danger: true }} cancelText="Đóng" onCancel={onClose}
+      onOk={() => form.submit()} confirmLoading={create.isPending}>
+      <Form form={form} layout="vertical" initialValues={{ warehouse, lines: [{ itemId: undefined, unitName: null, unitQty: 1 }] }}
+        onFinish={(v) => create.mutate(v)}>
+        <Form.Item label="Kho" name="warehouse">
+          <Radio.Group options={[{ value: "Inner", label: "Kho trong" }, { value: "Outer", label: "Kho ngoài" }]} />
+        </Form.Item>
+        <Form.List name="lines">
+          {(fields, { add, remove }) => (
+            <>
+              {fields.map((f) => {
+                const item = items.find((i) => i.id === lines[f.name]?.itemId);
+                const qty = onHand(item?.id);
+                return (
+                  <Space key={f.key} align="baseline" wrap>
+                    <Form.Item name={[f.name, "itemId"]} rules={[{ required: true, message: "Chọn mặt hàng" }]}>
+                      <Select style={{ width: 220 }} placeholder="Mặt hàng" showSearch optionFilterProp="label" options={items.map((i) => ({ value: i.id, label: i.name }))} />
+                    </Form.Item>
+                    <Form.Item name={[f.name, "unitQty"]} rules={[{ required: true }]}><InputNumber min={1} style={{ width: 90 }} /></Form.Item>
+                    <Form.Item name={[f.name, "unitName"]}>
+                      <Select style={{ width: 120 }} options={[{ value: null, label: item?.baseUnit ?? "đơn vị gốc" }, ...(item?.units ?? []).map((u) => ({ value: u.unitName, label: `${u.unitName} (${u.factor})` }))]} />
+                    </Form.Item>
+                    {item && qty !== undefined && <Typography.Text type="secondary">Tồn sổ {qty} {item.baseUnit}</Typography.Text>}
+                    {fields.length > 1 && <MinusCircleOutlined onClick={() => remove(f.name)} />}
+                  </Space>
+                );
+              })}
+              <Button type="dashed" icon={<PlusOutlined />} onClick={() => add({ unitName: null, unitQty: 1 })}>Thêm dòng</Button>
+            </>
+          )}
+        </Form.List>
+        <Form.Item label="Lý do" name="reason" style={{ marginTop: 12 }} rules={[{ required: true, whitespace: true, message: "Phiếu huỷ cần ghi lý do" }]}>
+          <Input.TextArea maxLength={1000} placeholder="Ví dụ: hết hạn, đổ vỡ khi vận chuyển" />
+        </Form.Item>
+        <Form.Item label="Ảnh (link)" name="photoUrl"><Input placeholder="https://…" /></Form.Item>
       </Form>
     </Modal>
   );

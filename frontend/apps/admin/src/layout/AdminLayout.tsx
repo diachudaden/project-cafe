@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Dropdown, Layout, List, Menu, Popover, Select, Space, Typography, theme } from "antd";
 import {
   ApartmentOutlined, AppstoreOutlined, AuditOutlined, BarChartOutlined, CalendarOutlined, ClockCircleOutlined, DashboardOutlined, DollarOutlined,
-  AlertOutlined, DatabaseOutlined, LineChartOutlined, FileDoneOutlined, FormOutlined, InboxOutlined, SafetyCertificateOutlined, TagsOutlined, TeamOutlined, WalletOutlined,
+  AlertOutlined, DatabaseOutlined, LineChartOutlined, FileDoneOutlined, FormOutlined, InboxOutlined, SafetyCertificateOutlined, ShopOutlined, TagsOutlined, TeamOutlined, WalletOutlined,
 } from "@ant-design/icons";
 import { ChangePasswordModal, ThemeToggle, dateTime, hasRole, roleLabels } from "@cafecr/ui";
 import { api, useAuth } from "../api";
@@ -17,10 +17,15 @@ const managementMenu = [
   { key: "/attendance", icon: <ClockCircleOutlined />, label: "Chấm công" },
   { key: "/closings", icon: <FileDoneOutlined />, label: "Kết ca" },
   { key: "/expenses", icon: <WalletOutlined />, label: "Thu chi" },
-  { key: "/inventory/attention", icon: <AlertOutlined />, label: "Kho · Cần xử lý" },
-  { key: "/inventory/stock", icon: <InboxOutlined />, label: "Kho · Tồn & phiếu" },
-  { key: "/inventory/items", icon: <DatabaseOutlined />, label: "Kho · Mặt hàng" },
-  { key: "/inventory/reports", icon: <LineChartOutlined />, label: "Kho · Báo cáo" },
+  {
+    key: "inventory", icon: <ShopOutlined />, label: "Kho",
+    children: [
+      { key: "/inventory/attention", icon: <AlertOutlined />, label: "Cần xử lý" },
+      { key: "/inventory/stock", icon: <InboxOutlined />, label: "Tồn & phiếu" },
+      { key: "/inventory/items", icon: <DatabaseOutlined />, label: "Mặt hàng" },
+      { key: "/inventory/reports", icon: <LineChartOutlined />, label: "Báo cáo kho" },
+    ],
+  },
   { key: "/payment-logs", icon: <AuditOutlined />, label: "Nhật ký thanh toán" },
   { key: "/payroll", icon: <DollarOutlined />, label: "Lương" },
   { key: "/reports", icon: <BarChartOutlined />, label: "Báo cáo" },
@@ -91,6 +96,7 @@ export function AdminLayout() {
         <Menu
           mode="inline"
           selectedKeys={[location.pathname]}
+          defaultOpenKeys={location.pathname.startsWith("/inventory") ? ["inventory"] : []}
           items={[
             ...managementMenu,
             ...(isAdmin ? [{ type: "divider" as const }, { type: "group" as const, label: "Quản trị", children: adminMenu }] : []),
