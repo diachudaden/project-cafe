@@ -22,7 +22,7 @@ export function BillPage() {
       {b && (
         <>
           <Card>
-            <Typography.Text type="secondary">Mã bill</Typography.Text>
+            <Typography.Text type="secondary">{b.kind === "AddOn" ? "Mã bill đồ thêm" : "Mã bill"}</Typography.Text>
             <Typography.Title level={2} copyable style={{ letterSpacing: 4, margin: 0 }}>{b.code}</Typography.Title>
             <Typography.Title level={3} style={{ margin: "8px 0 0" }}>{vnd(b.total)}</Typography.Title>
             <Typography.Text type="secondary">{b.branchName} · {b.seatCode} · {dateTime(b.createdAt)}</Typography.Text>
@@ -32,10 +32,10 @@ export function BillPage() {
             </div>
           </Card>
 
-          <Card title="Lượt ngồi" style={{ marginTop: 16 }}>
+          {b.kind !== "AddOn" && <Card title="Lượt ngồi" style={{ marginTop: 16 }}>
             <Descriptions column={1} size="small" items={[
-              { label: "Gói", children: displayName(b.planName) },
-              { label: "Thời gian", children: `${time(b.startAt)} → ${time(b.endAt)}` },
+              { label: "Gói", children: displayName(b.planName ?? "") },
+              { label: "Thời gian", children: b.startAt && b.endAt ? `${time(b.startAt)} → ${time(b.endAt)}` : "—" },
               { label: "Gia hạn", children: b.extensions.length ? `${b.extensions.length} lần` : "Không" },
             ]} />
             {b.extensions.length > 0 && (
@@ -48,7 +48,7 @@ export function BillPage() {
                 </List.Item>
               )} />
             )}
-          </Card>
+          </Card>}
 
           {b.items.length > 0 && (
             <Card title="Đồ thêm" style={{ marginTop: 16 }}>

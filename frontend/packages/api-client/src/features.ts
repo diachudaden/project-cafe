@@ -101,7 +101,8 @@ export interface AddOnBillSummary { code: string; total: number; paymentMethod: 
 /** Cash add-on sale result: the new add-on bill (its own code and total) and the member points it earned. */
 export interface AddOnSaleResult { items: BillItemView[]; billCode: string; billTotal: number; pointsAwarded: number; customerName: string | null }
 export interface MyBillDetail {
-  code: string; branchName: string; seatCode: string; planName: string; startAt: string; endAt: string;
+  /** AddOn bills (D34) have no plan, times or extensions: planName/startAt/endAt are null. */
+  code: string; kind: BillKind; branchName: string; seatCode: string; planName: string | null; startAt: string | null; endAt: string | null;
   sessionStatus: SessionStatus; closeReason: SessionCloseReason | null;
   extensions: { createdAt: string; addedMinutes: number; price: number }[];
   items: BillItemView[];
@@ -165,7 +166,7 @@ export interface MyPoints {
   points: number; tier: string; totalSpent: number; nextTier: string | null; amountToNextTier: number; memberCode: string;
   history: { id: string; points: number; reason: string; billCode: string | null; createdAt: string }[];
 }
-export interface MyBill { code: string; branchName: string; total: number; createdAt: string; claimedAt: string | null; points: number }
+export interface MyBill { code: string; branchName: string; total: number; createdAt: string; claimedAt: string | null; points: number; kind: BillKind }
 export interface MyActiveSession { sessionId: string; branchName: string; seatCode: string; startAt: string; endAt: string; minutesLeft: number }
 
 // ---- Finance ----

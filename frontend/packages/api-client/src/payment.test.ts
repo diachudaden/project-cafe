@@ -37,4 +37,23 @@ describe("payment API client", () => {
       ["DELETE", "/api/payments/requests/TT%2FA"],
     ]);
   });
+
+  it("sells add-ons as a separate bill and looks up add-on bills by code (TASK-029)", async () => {
+    const request = vi.fn<Http["request"]>()
+      .mockResolvedValueOnce({ items: [], billCode: "ADDON001", billTotal: 7000, pointsAwarded: 0, customerName: null })
+      .mockResolvedValueOnce({ id: "session-1", kind: "AddOn", bill: { code: "SEAT0001", total: 40000 }, addOnBills: [{ code: "ADDON001", total: 7000, paymentMethod: "Cash", createdAt: "2026-11-17T10:00:00Z" }] });
+    const api = createFeatureApi({ request, download: vi.fn() } as Http);
+
+    const sale = await api.sessions.sellItems("session-1", [{ productId: "noodle", quantity: 1 }]);
+    const view = await api.sessions.bill("ADDON001");
+
+    expect([sale.billCode, sale.billTotal]).toEqual(["ADDON001", 7000]);
+    expect(view.kind).toBe("AddOn");
+    expect(view.bill.total).toBe(40000);
+    expect(view.addOnBills?.map((b) => b.code)).toEqual(["ADDON001"]);
+    expect(request.mock.calls).toEqual([
+      ["POST", "/api/sessions/session-1/items", { items: [{ productId: "noodle", quantity: 1 }] }],
+      ["GET", "/api/bills/ADDON001"],
+    ]);
+  });
 });
