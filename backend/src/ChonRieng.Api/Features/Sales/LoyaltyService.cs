@@ -17,7 +17,7 @@ public sealed class LoyaltyService(AppDbContext db, TimeProvider clock)
         }
 
         var normalized = Loyalty.NormalizeCode(code);
-        var bill = await db.Bills.Include(b => b.Session).ThenInclude(s => s.Seat).SingleOrDefaultAsync(b => b.Code == normalized, ct);
+        var bill = await db.Bills.SingleOrDefaultAsync(b => b.Code == normalized, ct);
         if (bill is null)
         {
             return ServiceError.NotFound("Mã bill không đúng. Hãy kiểm tra lại 8 ký tự trên hóa đơn.");
@@ -34,11 +34,15 @@ public sealed class LoyaltyService(AppDbContext db, TimeProvider clock)
             return ServiceError.Conflict("Bill đã quá hạn", $"Chỉ tích điểm trong {Loyalty.ClaimWindowDays} ngày kể từ lúc thanh toán.");
         }
 
+        // Add-on bills (D34) have no session of their own: the seat comes from the session bill.
+        var seatCode = await db.Bills.Where(b => b.Id == bill.Id)
+            .Select(b => b.SessionId != null ? b.Session!.Seat.Code : b.ParentBill!.Session!.Seat.Code)
+            .SingleOrDefaultAsync(ct);
         bill.ClaimedByCustomerId = customer.Id;
         bill.ClaimedAt = now;
         var tx = Loyalty.Award(customer, bill, bill.Total, now, $"Tích điểm hóa đơn {bill.Code}");
         db.PointTransactions.Add(tx);
-        db.PointsClaimed(customer, bill, bill.Session?.Seat?.Code, tx.Points, now);
+        db.PointsClaimed(customer, bill, seatCode, tx.Points, now);
         try
         {
             await db.SaveChangesAsync(ct);

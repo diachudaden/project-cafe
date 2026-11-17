@@ -56,7 +56,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             return lines.Error;
         }
 
-        var shift = await ResolveShiftAsync(user, branchId, now, ct);
+        var shift = await ResolveShiftAsync(db, user, branchId, now, ct);
         if (shift.Error is not null)
         {
             return shift.Error;
@@ -84,7 +84,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         };
         var bill = new Bill
         {
-            Code = await NewUniqueBillCodeAsync(ct),
+            Code = await NewUniqueBillCodeAsync(db, ct),
             BranchId = branchId,
             ShiftId = shift.Value,
             SessionId = session.Id,
@@ -174,7 +174,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             return snapshot.Error;
         }
 
-        var shift = await ResolveShiftAsync(user, seat.Zone.BranchId, now, ct);
+        var shift = await ResolveShiftAsync(db, user, seat.Zone.BranchId, now, ct);
         if (shift.Error is not null)
         {
             return shift.Error;
@@ -348,7 +348,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
             };
             var bill = new Bill
             {
-                Code = await NewUniqueBillCodeAsync(ct),
+                Code = await NewUniqueBillCodeAsync(db, ct),
                 BranchId = paymentRequest.BranchId,
                 ShiftId = paymentRequest.ShiftId,
                 SessionId = session.Id,
@@ -520,7 +520,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
     /// Every bill belongs to a shift (Bill.ShiftId is required). Staff sell in the shift they checked in to;
     /// Admin/Manager not on the rota use the branch's shift running right now.
     /// </summary>
-    private async Task<Result<Guid>> ResolveShiftAsync(CurrentUser user, Guid branchId, DateTimeOffset now, CancellationToken ct)
+    internal static async Task<Result<Guid>> ResolveShiftAsync(AppDbContext db, CurrentUser user, Guid branchId, DateTimeOffset now, CancellationToken ct)
     {
         var ownShift = await db.Attendances
             .Where(a => a.Employee.UserId == user.UserId && a.CheckInAt != null && a.CheckOutAt == null && a.Shift.BranchId == branchId)
@@ -549,7 +549,7 @@ public sealed class SessionService(AppDbContext db, TimeProvider clock)
         return ServiceError.Conflict("Bạn chưa tham gia ca", "Hãy bấm 'Tham gia ca' tại chi nhánh này trước khi bán.");
     }
 
-    private async Task<string> NewUniqueBillCodeAsync(CancellationToken ct)
+    internal static async Task<string> NewUniqueBillCodeAsync(AppDbContext db, CancellationToken ct)
     {
         for (var attempt = 0; attempt < 5; attempt++)
         {

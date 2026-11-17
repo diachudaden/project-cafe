@@ -298,22 +298,38 @@ public sealed class SePayWebhookTests : IDisposable
     }
 
     [Fact]
-    public async Task Cash_add_on_items_go_on_the_session_bill_with_snapshot_prices()
+    public async Task Each_cash_add_on_sale_is_its_own_bill_and_the_session_bill_does_not_change()
     {
-        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (manager, branch, seat, plan, shift) = await SeedCheckInAsync();
         var sessions = new SessionService(_db, _clock);
         var session = (await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null), default)).Value!;
         var (noodle, egg, inactive, foreign) = await SeedMenuAsync(branch);
         var addOns = new AddOnService(_db, _clock);
 
-        var sold = await addOns.SellCashAsync(manager, session.Id,
-            new AddOnSaleRequest([new(noodle.Id, 2), new(egg.Id, 1), new(noodle.Id, 1)]), default);
+        var first = (await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(noodle.Id, 2), new(egg.Id, 1), new(noodle.Id, 1)]), default)).Value!;
+        _clock.Advance(TimeSpan.FromMinutes(5));
+        var second = (await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(egg.Id, 1)]), default)).Value!;
 
-        Assert.True(sold.IsSuccess);
-        var bill = await _db.Bills.SingleAsync();
-        Assert.Equal(45_000 + 3 * 15_000 + 8_000, bill.Total);
-        Assert.Equal(bill.Total, bill.CashPaidTotal);
-        var lines = await _db.BillItems.OrderBy(i => i.Name).ToListAsync();
+        // D34: the response is the new bill, and the session bill keeps only the plan.
+        Assert.Equal(3 * 15_000 + 8_000, first.BillTotal);
+        Assert.Equal(8_000, second.BillTotal);
+        var bills = await _db.Bills.AsNoTracking().ToListAsync();
+        Assert.Equal(3, bills.Count);
+        var sessionBill = bills.Single(b => b.Kind == BillKind.Session);
+        Assert.Equal((session.Bill.Code, 45_000m, 45_000m), (sessionBill.Code, sessionBill.Total, sessionBill.CashPaidTotal));
+        Assert.Empty(await _db.BillItems.Where(i => i.BillId == sessionBill.Id).ToListAsync());
+        var addOnBills = bills.Where(b => b.Kind == BillKind.AddOn).OrderBy(b => b.CreatedAt).ToList();
+        Assert.Equal([first.BillCode, second.BillCode], addOnBills.Select(b => b.Code));
+        Assert.NotEqual(first.BillCode, second.BillCode);
+        Assert.All(addOnBills, b =>
+        {
+            Assert.Null(b.SessionId);
+            Assert.Equal(sessionBill.Id, b.ParentBillId);
+            Assert.Equal(shift.Id, b.ShiftId);
+            Assert.Equal((PaymentMethod.Cash, b.Total), (b.PaymentMethod, b.CashPaidTotal));
+            Assert.Equal(8, b.Code.Length);
+        });
+        var lines = await _db.BillItems.Where(i => i.BillId == addOnBills[0].Id).ToListAsync();
         Assert.Equal(2, lines.Count);
         Assert.Equal((3, 45_000m), (lines.Single(l => l.ProductId == noodle.Id).Quantity, lines.Single(l => l.ProductId == noodle.Id).Amount));
 
@@ -321,20 +337,63 @@ public sealed class SePayWebhookTests : IDisposable
         noodle.Price = 99_000;
         await _db.SaveChangesAsync();
         Assert.Equal(15_000, (await _db.BillItems.SingleAsync(l => l.ProductId == noodle.Id)).UnitPrice);
-        var view = (await sessions.ActiveAsync(manager, branch.Id, default)).Value!.Single();
-        Assert.Equal(2, view.Items.Count);
+
+        // Closing: same cash as before the change, one bill per sale; still one session for occupancy.
+        var preview = (await new FinanceService(_db, new ShiftService(_db, _clock), _clock).PreviewAsync(manager, shift.Id, default)).Value!;
+        Assert.Equal(45_000 + 53_000 + 8_000, preview.ExpectedCash);
+        Assert.Equal(3, preview.BillCount);
+        Assert.Equal(1, await _db.Sessions.CountAsync());
 
         Assert.False((await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(inactive.Id, 1)]), default)).IsSuccess);
         Assert.False((await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(foreign.Id, 1)]), default)).IsSuccess);
         Assert.False((await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(egg.Id, 0)]), default)).IsSuccess);
         await sessions.CloseAsync(manager, session.Id, default);
         Assert.False((await addOns.SellCashAsync(manager, session.Id, new AddOnSaleRequest([new(egg.Id, 1)]), default)).IsSuccess);
+        Assert.Equal(3, await _db.Bills.CountAsync());
     }
 
     [Fact]
-    public async Task Vietqr_add_on_items_are_added_when_sepay_confirms()
+    public async Task Check_in_add_ons_and_extensions_stay_on_the_session_bill()
     {
         var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (noodle, _, _, _) = await SeedMenuAsync(branch);
+        var sessions = new SessionService(_db, _clock);
+
+        var checkedIn = (await sessions.CheckInAsync(manager,
+            new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null, [new(noodle.Id, 1)]), default)).Value!;
+        Assert.True((await sessions.ExtendAsync(manager, checkedIn.Id, default)).IsSuccess);
+
+        var bill = await _db.Bills.AsNoTracking().SingleAsync();
+        Assert.Equal(BillKind.Session, bill.Kind);
+        Assert.Equal(45_000 + 15_000 + 40_000, bill.Total);
+        Assert.Single(await _db.BillItems.Where(i => i.BillId == bill.Id).ToListAsync());
+    }
+
+    [Fact]
+    public async Task Walk_in_claims_an_add_on_bill_once_for_that_bill_total()
+    {
+        var (manager, branch, seat, plan, _) = await SeedCheckInAsync();
+        var (owner, member) = await SeedMemberAsync("addon@test.invalid", "CRADDON1");
+        var (noodle, _, _, _) = await SeedMenuAsync(branch);
+        var checkedIn = (await new SessionService(_db, _clock).CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null), default)).Value!;
+        var sale = (await new AddOnService(_db, _clock).SellCashAsync(manager, checkedIn.Id, new AddOnSaleRequest([new(noodle.Id, 1)]), default)).Value!;
+        Assert.Equal(0, sale.PointsAwarded);
+
+        var loyalty = new LoyaltyService(_db, _clock);
+        var claimed = await loyalty.ClaimAsync(AsCustomer(owner), sale.BillCode.ToLowerInvariant(), default);
+
+        Assert.True(claimed.IsSuccess);
+        Assert.Equal((15_000m, 15), (claimed.Value!.Total, claimed.Value.PointsEarned));
+        Assert.Contains(seat.Code, (await _db.Notifications.AsNoTracking().SingleAsync(n => n.Type == Notifier.PointsEarned)).Body);
+        Assert.Equal(409, (await loyalty.ClaimAsync(AsCustomer(owner), sale.BillCode, default)).Error!.Status);
+        Assert.Null((await _db.Bills.AsNoTracking().SingleAsync(b => b.Code == checkedIn.Bill.Code)).ClaimedByCustomerId);
+        Assert.Equal(15, (await _db.Customers.AsNoTracking().SingleAsync(c => c.Id == member.Id)).Points);
+    }
+
+    [Fact]
+    public async Task Vietqr_add_on_settles_into_one_new_bill_even_if_sepay_resends()
+    {
+        var (manager, branch, seat, plan, shift) = await SeedCheckInAsync();
         var sessions = new SessionService(_db, _clock);
         var session = (await sessions.CheckInAsync(manager, new CheckInSessionRequest(seat.Id, plan.Id, PaymentMethod.Cash, null), default)).Value!;
         var (noodle, egg, _, _) = await SeedMenuAsync(branch);
@@ -349,13 +408,18 @@ public sealed class SePayWebhookTests : IDisposable
         var body = Payload("tx-add-on", AccountNumber, paymentRequest.Code, 31_000);
         var timestamp = Timestamp();
         await SendAsync(body, timestamp, Sign(timestamp, body));
+        await SendAsync(body, timestamp, Sign(timestamp, body));
 
         Assert.Equal(PaymentRequestStatus.Paid, paymentRequest.Status);
-        var bill = await _db.Bills.SingleAsync();
-        Assert.Equal(45_000 + 31_000, bill.Total);
-        Assert.Equal(31_000, bill.VietQrPaidTotal);
-        Assert.Equal(PaymentMethod.Mixed, bill.PaymentMethod);
-        Assert.Equal(2, await _db.BillItems.CountAsync(i => i.PaymentMethod == PaymentMethod.VietQr && i.PaymentRequestId == paymentRequest.Id));
+        var sessionBill = await _db.Bills.AsNoTracking().SingleAsync(b => b.Kind == BillKind.Session);
+        Assert.Equal((45_000m, 0m, PaymentMethod.Cash), (sessionBill.Total, sessionBill.VietQrPaidTotal, sessionBill.PaymentMethod));
+        var addOnBill = await _db.Bills.AsNoTracking().SingleAsync(b => b.Kind == BillKind.AddOn);
+        Assert.Equal((31_000m, 31_000m, PaymentMethod.VietQr), (addOnBill.Total, addOnBill.VietQrPaidTotal, addOnBill.PaymentMethod));
+        Assert.Equal((sessionBill.Id, shift.Id), (addOnBill.ParentBillId!.Value, addOnBill.ShiftId));
+        Assert.Equal(addOnBill.Id, paymentRequest.BillId);
+        Assert.Equal(2, await _db.BillItems.CountAsync(i => i.BillId == addOnBill.Id && i.PaymentMethod == PaymentMethod.VietQr && i.PaymentRequestId == paymentRequest.Id));
+        Assert.Equal(addOnBill.Code, (await new PaymentRequestService(_db, Options.Create(_options), _clock, sessions, TestPaymentLog.For(_db, _clock))
+            .GetStatusAsync(paymentRequest.Code, default)).Value!.BillCode);
         Assert.Equal(PaymentLogLevel.Info, (await _db.PaymentLogs.SingleAsync(l => l.Stage == PaymentLogStage.Settled)).Level);
     }
 
@@ -617,10 +681,12 @@ public sealed class SePayWebhookTests : IDisposable
         var sale = (await new AddOnService(_db, _clock).SellCashAsync(manager, checkedIn.Id, new AddOnSaleRequest([new(noodle.Id, 1)]), default)).Value!;
         Assert.Equal(15, sale.PointsAwarded);
         Assert.Equal(user.FullName, sale.CustomerName);
-        Assert.Equal(checkedIn.Bill.Code, sale.BillCode);
+        Assert.NotEqual(checkedIn.Bill.Code, sale.BillCode);
         list = await PaymentNotificationsFor(user);
         Assert.Equal(3, list.Count);
-        AssertPaymentNotification(list[2], checkedIn.Bill.Code, "15.000đ (Tiền mặt)", 15, 100);
+        AssertPaymentNotification(list[2], sale.BillCode, "15.000đ (Tiền mặt)", 15, 100);
+        // The member's add-on bill is claimed for them, so it shows in their bills and cannot be claimed by someone else.
+        Assert.Equal(member.Id, (await _db.Bills.AsNoTracking().SingleAsync(b => b.Code == sale.BillCode)).ClaimedByCustomerId);
     }
 
     [Fact]
@@ -651,7 +717,8 @@ public sealed class SePayWebhookTests : IDisposable
         var addOnRequest = await PayLatestRequestAsync("tx-noti-addon");
         list = await PaymentNotificationsFor(user);
         Assert.Equal(3, list.Count);
-        AssertPaymentNotification(list[2], billCode, "30.000đ (VietQR)", 30, 115);
+        var addOnBillCode = (await _db.Bills.AsNoTracking().SingleAsync(b => b.Kind == BillKind.AddOn)).Code;
+        AssertPaymentNotification(list[2], addOnBillCode, "30.000đ (VietQR)", 30, 115);
         Assert.Equal(30, (await Payments().GetStatusAsync(addOnRequest.Code, default)).Value!.PointsAwarded);
     }
 
