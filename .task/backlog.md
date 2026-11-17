@@ -1,15 +1,46 @@
 # Task backlog
 
-This backlog is intentionally small and requirement-driven. It stores the project’s active tasks and dependencies without creating speculative work beyond the current repo scope.
+This backlog tracks requirement-driven implementation tasks. Feature tasks include developer deliverables and tester-ready evidence: Vietnamese OpenAPI/Swagger documentation, reproducible requests, test data, expected outcomes, and verification results.
 
 ## Current backlog
 
 | ID | Status | Title | Notes |
 | --- | --- | --- | --- |
 | TASK-001 | Completed | Establish GitHub Copilot workflow for Cafe CR | Creates the repository-level rules, prompts, and task structure.
+| TASK-002 | Completed | Create the Cafe CR domain schema with EF Core Code First | Added 22 business entities, Identity-backed user schema, SQL Server mappings and initial migration; verified on disposable SQL Server 2025. See [TASK-002](./TASK-002-code-first-domain-schema.md).
+| TASK-003 | Completed | Add authentication, authorization, and admin CRUD API | JWT/refresh-token baseline, customer registration, environment-provisioned Admin, and protected business-resource management. See [TASK-003](./TASK-003-api-auth-crud.md).
+| TASK-004 | Completed | Define roles and branch-scoped authorization | Approved Admin/BranchManager/Staff/Customer roles, branch/self-scope policies, and Admin-only generic CRUD. See [TASK-004](./TASK-004-role-authorization.md).
+| TASK-005 | Completed | Add repeatable development seed data | Opt-in Development/Testing seed command, local-only test accounts, and synthetic cafe records; depends on TASK-004. See [TASK-005](./TASK-005-development-seed.md).
+| TASK-006 | Completed | Manage branches, pricing, and seat availability | Admin/Manager setup plus customer availability lookup; depends on TASK-004 and TASK-005. See [TASK-006](./TASK-006-reference-data-availability.md).
+| TASK-007 | Completed | Implement the POS session lifecycle | Check-in, extend, checkout, and seat/session consistency; depends on TASK-004, TASK-005, and TASK-006. See [TASK-007](./TASK-007-pos-session-lifecycle.md).
+| TASK-008 | Completed | Implement billing and customer points | Session bills, claiming, and points; depends on TASK-007. See [TASK-008](./TASK-008-billing-customer-points.md).
+| TASK-009 | Completed | Implement workforce scheduling and attendance | Branch-scoped staff assignments, shifts, requests, and attendance; depends on TASK-004 and TASK-005. See [TASK-009](./TASK-009-workforce-scheduling-attendance.md).
+| TASK-010 | Completed | Implement shift closing and payroll | Cash reconciliation, expenses, payroll, and approvals; depends on TASK-008 and TASK-009. See [TASK-010](./TASK-010-shift-closing-finance.md).
+| TASK-011 | Completed | Admin web app on the existing API | React/Vite/Ant Design Admin app with real sign-in and CRUD for branches, zones, seats, price plans, and users; no backend changes. See [TASK-011](./TASK-011-admin-frontend.md).
+| TASK-012 | Completed | Role apps: Web Quản lý, POS, Web Khách | Manager/Admin management screens, staff POS and customer mobile web on the role APIs; see [TASK-012](./TASK-012-role-apps.md).
+| TASK-013 | In progress | VietQR + SePay payment and realtime bill flow | TASK-014…016 implement payment requests, webhook ingestion, and settlement; TASK-018 adds the POS QR-and-polling flow. TASK-017 actual provider/deployment validation remains blocked; SignalR/customer realtime work remains pending.
+| TASK-014 | Completed | VietQR payment requests, seat holds, and expiry | Server-priced check-in/extension QR requests, temporary seat holds, expiry, and focused tests; see [TASK-014](./TASK-014-payment-requests-vietqr.md).
+| TASK-015 | Implemented | Secure SePay webhook verification and ingestion | Raw-body HMAC, timestamp, payload validation, and idempotent recording; SQL Server concurrency verification pending. See [TASK-015](./TASK-015-sepay-webhook-ingestion.md).
+| TASK-016 | Implemented | Settle SePay payments into sessions and bills | Exact verified payments settle through check-in/extension rules; SQL Server concurrency verification pending. See [TASK-016](./TASK-016-sepay-payment-settlement.md).
+| TASK-017 | Blocked | Verify SePay Test-mode end-to-end readiness | Synthetic signed-request script and runbook are ready; actual SePay/deployment verification requires provider and deployment access. See [TASK-017](./TASK-017-sepay-test-mode-e2e.md).
+| TASK-018 | Implemented | Add VietQR payment flow to POS | Demo-first check-in and extension QR screens with status polling, terminal states, and refreshed bill/session results; no SignalR. Automated checks pass; actual SePay Test-mode demo verification remains pending. See [TASK-018](./TASK-018-pos-vietqr-payment-flow.md).
+| TASK-019 | Implemented | Admin menu icons, employee/account filters, cross-branch open shifts | Icons in the admin menu; filters and show-all on Nhân viên; search and Staff/Manager/Customer tabs on Tài khoản; open shifts visible and claimable across branches. See [TASK-019](./TASK-019-admin-filters-open-shifts.md).
+| TASK-020 | Implemented | Payment trace log (create bill → done) | `PaymentLogs` table written by `PaymentLogService` at every payment step (incl. rejected SePay callbacks) and an admin "Nhật ký thanh toán" page with per-code timeline. See [TASK-020](./TASK-020-payment-trace-log.md).
+| TASK-021 | Implemented | All price plans in POS + add-on items | Every valid plan in a POS dropdown (D4 relaxed); sell mì/trứng/bánh... on the active bill by cash or VietQR, managed in Bảng giá. See [TASK-021](./TASK-021-plans-dropdown-and-add-on-items.md).
+| TASK-022 | Implemented | Modern Lịch ca grid with pre-defined shift slots | Shift-type × day grid, coloured day columns, click a Sáng/Chiều/Tối/Đêm slot and switch "Kích hoạt" to create it (24/7: Sáng/Chiều/Đêm, others: Sáng/Tối); phone day view. Bulk row/day activation deferred. See [TASK-022](./TASK-022-schedule-grid-redesign.md).
+| TASK-024 | Implemented | Auto-release overdue seats after a grace period | Background worker closes sessions overdue > `Sessions__AutoReleaseGraceMinutes` (default 10) unless a VietQR payment is pending; `CloseReason` audit, floor `autoReleaseAt`, member notification, POS "Vừa trả chỗ". Server: apply migration `SessionCloseReason`. See [TASK-024](./TASK-024-auto-release-overdue-seats.md).
+| TASK-025 | Implemented | Payment completion: POS done state, customer notification, live points | One notification helper for every member payment (cash + VietQR) and claims, `GET /api/me/bills/{code}`, customer bell + toast + live points, POS "Đã thanh toán" for cash and VietQR. Server: apply migration `NotificationPaymentLinks`. See [TASK-025](./TASK-025-payment-completion-customer-updates.md).
+| TASK-023 | Implemented | Fix POS add-on menu (empty list) and search | Error/empty/no-result states, diacritic-insensitive multi-token search, "Đã chọn" summary, bill refresh after QR, pending-migration Error log + `GET /api/health`. Server: apply migrations, add items in Bảng giá. See [TASK-023](./TASK-023-pos-addon-menu-and-search.md).
+| TASK-026 | Implemented | Add-ons at check-in, POS menu 500 fix, points history → bill, receipt PDF | Menu 500 fixed (untranslatable `Where` on the `ProductView` projection; POS shows HTTP status + traceId). Plan + add-ons in one check-in payment (cash: one transaction; VietQR: one QR with a lines snapshot), 80 mm receipt PDF (`GET /api/bills/{code}/receipt.pdf`, QuestPDF + bundled Noto Sans, claim QR), points history rows open `/bills/{code}`. No migration. See [TASK-026](./TASK-026-checkin-addons-receipt-pdf.md).
+| TASK-027 | Implemented | Kho trong / kho ngoài, đếm kho ngoài kết ca, đối soát 2 kho | Two warehouses per branch, PN/PC/PH/KK/DC documents on an append-only ledger, blind shift-close count with summary + confirm popup + next-shift handover, manager approvals/adjustments and "Cần xử lý", nightly reconciliation and norm learning, reports. Server: apply migration `InventoryModule`. See [TASK-027](./TASK-027-inventory-warehouses.md).
+| TASK-028 | Implemented | Quên mật khẩu, đặt lại mật khẩu, đổi mật khẩu (SMTP) | Forgot/reset/change password for the three apps, MailKit + Mailpit, per-IP/per-email rate limits, sessions revoked on reset (D33). No migration. Server: set `App__PublicBaseUrl` and the Gmail `Email__*` values in `.env`. See [TASK-028](./TASK-028-password-reset-email.md).
 
 ## Working rules
 
 - Keep tasks linked to the canonical spec in [../spec.md](../spec.md).
 - Prefer narrow tasks with explicit acceptance criteria and verification commands.
 - Treat missing or conflicting requirements as blocked rather than guessed behavior.
+- Do not seed development data into production or apply migrations to an unintended database.
+- Swagger-facing documentation for API tasks must be in Vietnamese for the Vietnamese frontend team and project demo. Keep routes, JSON property names, enum wire values, and operation IDs stable/English unless a task explicitly changes the API contract.
+- Each implemented API task must leave Swagger documentation and reproducible tester requests aligned with actual behavior.
+- Notifications are deferred until a user workflow defines when they are created and read.

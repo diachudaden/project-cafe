@@ -1,0 +1,176 @@
+@baseUrl = http://localhost:63842
+@adminAccessToken = replace-with-a-development-access-token
+@branchManagerAccessToken = replace-with-a-development-access-token
+@staffAccessToken = replace-with-a-development-access-token
+@customerAccessToken = replace-with-a-development-access-token
+@resourceId = 00000000-0000-7000-8000-000000000001
+
+### Đăng nhập tài khoản Admin đã cấu hình trong BootstrapAdmin__Email
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "replace-with-BootstrapAdmin__Email-from-local-env",
+  "password": "replace-with-BootstrapAdmin__Password-from-local-env"
+}
+
+### Đăng nhập BranchManager dữ liệu mẫu (chạy seed Development trước; chỉ có quyền chi nhánh A ở các API áp dụng BranchScope)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "manager.demo@cafecr.invalid",
+  "password": "replace-with-DevelopmentSeed__Password-from-local-env"
+}
+
+### Đăng nhập Staff dữ liệu mẫu (chạy seed Development trước; chỉ có quyền chi nhánh A ở các API áp dụng BranchScope)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "staff.demo@cafecr.invalid",
+  "password": "replace-with-DevelopmentSeed__Password-from-local-env"
+}
+
+### Đăng nhập Customer dữ liệu mẫu (chạy seed Development trước; chỉ truy cập dữ liệu của chính tài khoản)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "customer.demo@cafecr.invalid",
+  "password": "replace-with-DevelopmentSeed__Password-from-local-env"
+}
+
+### Đăng ký tài khoản khách hàng
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "customer@example.test",
+  "password": "ReplaceThis-123!",
+  "fullName": "Test Customer"
+}
+
+### Đăng nhập
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.test",
+  "password": "ReplaceThis-123!"
+}
+
+### Làm mới token
+POST {{baseUrl}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "replace-with-refresh-token"
+}
+
+### Thu hồi refresh token
+POST {{baseUrl}}/api/auth/logout
+Content-Type: application/json
+
+{
+  "refreshToken": "replace-with-refresh-token"
+}
+
+### Thông tin tài khoản hiện tại
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{adminAccessToken}}
+
+### Liệt kê chi nhánh (chỉ Admin; sau seed sẽ thấy 2 chi nhánh [DEMO DATA])
+GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
+Authorization: Bearer {{adminAccessToken}}
+
+### Lấy chi nhánh (chỉ Admin)
+GET {{baseUrl}}/api/admin/branches/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+
+### Tạo chi nhánh (chỉ Admin)
+POST {{baseUrl}}/api/admin/branches
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "name": "Example branch",
+  "address": "Example address",
+  "latitude": null,
+  "longitude": null,
+  "is24h": true,
+  "openTime": "00:00:00",
+  "closeTime": "00:00:00",
+  "phone": null,
+  "isActive": true
+}
+
+### Cập nhật chi nhánh (chỉ Admin)
+PUT {{baseUrl}}/api/admin/branches/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "name": "Updated branch",
+  "address": "Updated address",
+  "latitude": null,
+  "longitude": null,
+  "is24h": true,
+  "openTime": "00:00:00",
+  "closeTime": "00:00:00",
+  "phone": null,
+  "isActive": true
+}
+
+### Xóa chi nhánh (chỉ Admin)
+DELETE {{baseUrl}}/api/admin/branches/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+
+### Liệt kê tài khoản (chỉ Admin)
+GET {{baseUrl}}/api/admin/users?page=1&pageSize=20
+Authorization: Bearer {{adminAccessToken}}
+
+### Lấy tài khoản (chỉ Admin)
+GET {{baseUrl}}/api/admin/users/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+
+### Tạo tài khoản khách hàng
+POST {{baseUrl}}/api/admin/users
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "new-customer@example.test",
+  "password": "ReplaceThis-123!",
+  "fullName": "New Customer",
+  "phoneNumber": null,
+  "roles": ["Customer"]
+}
+
+### Cập nhật hồ sơ và vai trò tài khoản (chỉ Admin)
+PUT {{baseUrl}}/api/admin/users/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "new-customer@example.test",
+  "fullName": "Updated Customer",
+  "phoneNumber": null,
+  "roles": ["Customer"]
+}
+
+### Xóa tài khoản (chỉ Admin)
+DELETE {{baseUrl}}/api/admin/users/{{resourceId}}
+Authorization: Bearer {{adminAccessToken}}
+
+### Thử dùng BranchManager gọi CRUD tổng quát (dự kiến 403 vì endpoint hiện chỉ dành cho Admin)
+GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
+Authorization: Bearer {{branchManagerAccessToken}}
+
+### Thử dùng Staff gọi CRUD tổng quát (dự kiến 403 vì endpoint hiện chỉ dành cho Admin)
+GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
+Authorization: Bearer {{staffAccessToken}}
+
+### Thử dùng Customer gọi CRUD tổng quát (dự kiến 403 vì endpoint hiện chỉ dành cho Admin)
+GET {{baseUrl}}/api/admin/branches?page=1&pageSize=20
+Authorization: Bearer {{customerAccessToken}}

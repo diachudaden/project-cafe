@@ -42,3 +42,5 @@ Thumbs.db
 *.stackdump
 *.dmp
 *.log
+project-cafe.pem
+.docs/sepay/sepay-document.txt

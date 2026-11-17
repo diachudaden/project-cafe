@@ -1,0 +1,132 @@
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+
+namespace ChonRieng.Api.Endpoints;
+
+/// <summary>Dữ liệu đăng ký tài khoản khách hàng.</summary>
+public sealed record RegisterRequest
+{
+    [Required, EmailAddress, MaxLength(256), Description("Email dùng để đăng nhập.")]
+    public required string Email { get; init; }
+
+    [Required, MinLength(12), MaxLength(128), Description("Mật khẩu tối thiểu 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.")]
+    public required string Password { get; init; }
+
+    [Required, MaxLength(150), Description("Họ tên hiển thị của khách hàng.")]
+    public required string FullName { get; init; }
+
+    [Phone, MaxLength(32), Description("Số điện thoại tùy chọn.")]
+    public string? PhoneNumber { get; init; }
+
+    [MaxLength(200), Description("Tên thiết bị tùy chọn để nhận diện phiên đăng nhập.")]
+    public string? DeviceId { get; init; }
+}
+
+/// <summary>Thông tin đăng nhập của tài khoản hiện có.</summary>
+public sealed record LoginRequest
+{
+    [Required, EmailAddress, MaxLength(256), Description("Email đã đăng ký.")]
+    public required string Email { get; init; }
+
+    [Required, MaxLength(128), Description("Mật khẩu của tài khoản.")]
+    public required string Password { get; init; }
+
+    [MaxLength(200), Description("Tên thiết bị tùy chọn để nhận diện phiên đăng nhập.")]
+    public string? DeviceId { get; init; }
+}
+
+/// <summary>Dữ liệu đổi refresh token lấy cặp token mới.</summary>
+public sealed record RefreshTokenRequest
+{
+    [Required, Description("Refresh token hiện tại; token cũ sẽ bị thay thế sau khi làm mới thành công.")]
+    public required string RefreshToken { get; init; }
+}
+
+/// <summary>Dữ liệu thu hồi refresh token.</summary>
+public sealed record RevokeTokenRequest
+{
+    [Required, Description("Refresh token cần thu hồi.")]
+    public required string RefreshToken { get; init; }
+}
+
+/// <summary>Thông tin tài khoản an toàn do API xác thực trả về.</summary>
+public sealed record AuthUserResponse(
+    [property: Description("Mã định danh tài khoản.")] Guid Id,
+    [property: Description("Email đăng nhập.")] string Email,
+    [property: Description("Họ tên hiển thị.")] string FullName,
+    [property: Description("Số điện thoại nếu đã cung cấp.")] string? PhoneNumber,
+    [property: Description("Các vai trò hiện được gán cho tài khoản.")] IReadOnlyList<string> Roles,
+    [property: Description("Các chi nhánh được gán (BranchManager/Staff); rỗng với Admin và Customer.")] IReadOnlyList<Guid> BranchIds);
+
+/// <summary>Access token và refresh token được cấp sau khi xác thực.</summary>
+public sealed record AuthTokenResponse(
+    [property: Description("JWT dùng trong header Authorization: Bearer.")] string AccessToken,
+    [property: Description("Thời điểm access token hết hạn, bao gồm múi giờ.")] DateTimeOffset AccessTokenExpiresAt,
+    [property: Description("Refresh token dùng một lần để lấy cặp token mới.")] string RefreshToken,
+    [property: Description("Thời điểm refresh token hết hạn.")] DateTimeOffset RefreshTokenExpiresAt,
+    [property: Description("Thông tin tài khoản an toàn; không chứa thông tin xác thực.")] AuthUserResponse User);
+
+/// <summary>Kết quả tạo tài khoản, bao gồm lỗi xác thực dữ liệu an toàn nếu thất bại.</summary>
+public sealed record RegistrationResult(
+    AuthTokenResponse? Tokens,
+    IReadOnlyDictionary<string, string[]> Errors);
+
+/// <summary>Yêu cầu gửi liên kết đặt lại mật khẩu qua email.</summary>
+public sealed record ForgotPasswordRequest
+{
+    [Required, EmailAddress, MaxLength(256), Description("Email của tài khoản cần đặt lại mật khẩu.")]
+    public required string Email { get; init; }
+
+    [Required, AllowedValues("customer", "admin", "pos"), Description("Ứng dụng gửi yêu cầu: `customer` (Web khách), `admin` (Web quản lý) hoặc `pos`. Quyết định trang mở từ liên kết trong email; máy chủ tự dựng liên kết, không nhận URL từ client.")]
+    public required string App { get; init; }
+}
+
+/// <summary>Phản hồi chung của yêu cầu quên mật khẩu (giống nhau dù email có tồn tại hay không).</summary>
+public sealed record ForgotPasswordResponse(
+    [property: Description("Thông báo hiển thị cho người dùng.")] string Message)
+{
+    public static readonly ForgotPasswordResponse Accepted =
+        new("Nếu email đã đăng ký, bạn sẽ nhận được liên kết đặt lại mật khẩu trong vài phút.");
+}
+
+/// <summary>Dữ liệu đặt lại mật khẩu từ liên kết trong email.</summary>
+public sealed record ResetPasswordRequest
+{
+    [Required, EmailAddress, MaxLength(256), Description("Email lấy từ tham số `email` của liên kết.")]
+    public required string Email { get; init; }
+
+    [Required, MaxLength(2048), Description("Mã lấy từ tham số `token` của liên kết (base64url).")]
+    public required string Token { get; init; }
+
+    [Required, MaxLength(128), Description("Mật khẩu mới: tối thiểu 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.")]
+    public required string NewPassword { get; init; }
+}
+
+/// <summary>Dữ liệu đổi mật khẩu khi đang đăng nhập.</summary>
+public sealed record ChangePasswordRequest
+{
+    [Required, MaxLength(128), Description("Mật khẩu hiện tại.")]
+    public required string CurrentPassword { get; init; }
+
+    [Required, MaxLength(128), Description("Mật khẩu mới: tối thiểu 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt; phải khác mật khẩu hiện tại.")]
+    public required string NewPassword { get; init; }
+
+    [MaxLength(512), Description("Refresh token của phiên đang dùng. Nếu gửi, phiên này được giữ lại; mọi phiên khác bị đăng xuất. Không gửi thì đăng xuất mọi phiên.")]
+    public string? RefreshToken { get; init; }
+}
+
+/// <summary>Kết quả đặt lại hoặc đổi mật khẩu.</summary>
+public enum PasswordUpdateStatus
+{
+    Succeeded,
+    InvalidLink,
+    ValidationFailed,
+}
+
+public sealed record PasswordUpdateResult(PasswordUpdateStatus Status, IReadOnlyDictionary<string, string[]> Errors)
+{
+    public static readonly PasswordUpdateResult Success = new(PasswordUpdateStatus.Succeeded, new Dictionary<string, string[]>());
+    public static readonly PasswordUpdateResult InvalidLink = new(PasswordUpdateStatus.InvalidLink, new Dictionary<string, string[]>());
+
+    public static PasswordUpdateResult Invalid(IReadOnlyDictionary<string, string[]> errors) => new(PasswordUpdateStatus.ValidationFailed, errors);
+}

@@ -10,7 +10,7 @@ Read the relevant task and product requirements before changing tests or product
 
 - Prefer focused tests for the exact behavior under change.
 - Validate actual behavior, not mock-only expectations.
-- Add Add regression tests for edge cases specific to the changed behavior.
+- Add regression tests for edge cases specific to the changed behavior.
 - Keep fixtures realistic and aligned with the existing test generic patterns.
 
 ## Required workflow

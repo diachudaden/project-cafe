@@ -1,0 +1,11 @@
+set -a
+source .env
+set +a
+
+dotnet ef migrations list \
+  --project backend/src/ChonRieng.Infrastructure \
+  --startup-project backend/src/ChonRieng.Api
+
+dotnet ef database update \
+  --project backend/src/ChonRieng.Infrastructure \
+  --startup-project backend/src/ChonRieng.Api

@@ -12,7 +12,7 @@ Hệ thống quản lý chuỗi cà phê tự phục vụ theo mô hình Chốn 
 - **POS Nhân viên** (tablet tại quầy) – check-in khách, tính tiền, gia hạn, điểm danh, kết ca, xem lịch và lương.
 - **Web Khách** (mobile-first, PWA) – tìm chi nhánh còn chỗ, đặt chỗ, nhập bill, tích điểm, đổi quà.
 
-**Ngoài phạm vi (giữ đồ án gọn):** cổng thanh toán thật (chỉ giả lập VietQR/MoMo), app native, tích hợp máy in hóa đơn vật lý, kế toán thuế.
+**Ngoài phạm vi (đã thay thế bởi TASK-013):** SePay Test mode + máy in giả trên web; phần cổng thanh toán thật và máy in hóa đơn vật lý đã được chuyển sang task riêng.
 
 ## Vai trò & phân quyền
 
