@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chốn Riêng – Sơ đồ hệ thống</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4ebe0; --paper:#fbf6ef; --ink:#2b2622; --muted:#7a6f66; --line:#d9cbb9;
+    --accent:#d9643a; --accent-soft:#f6d9c8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Be Vietnam Pro",system-ui,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+  header h1{font-size:28px;margin:0 0 4px;letter-spacing:-.02em}
+  header p{margin:0;color:var(--muted)}
+  .tabs{display:flex;gap:8px;margin:22px 0 14px;flex-wrap:wrap}
+  .tab{border:1.5px solid var(--ink);background:transparent;color:var(--ink);padding:8px 16px;border-radius:999px;font:600 14px/1 inherit;cursor:pointer}
+  .tab[aria-selected=true]{background:var(--ink);color:var(--bg)}
+  .tab .n{opacity:.55;margin-right:6px}
+  .stage{display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:start}
+  @media (max-width:900px){.stage{grid-template-columns:1fr}}
+  .canvas{background:var(--paper);border:1.5px solid var(--line);border-radius:18px;padding:8px;position:relative}
+  .canvas svg{display:block;width:100%;height:auto}
+  .panel{background:var(--paper);border:1.5px solid var(--line);border-radius:18px;padding:18px 18px 16px;position:sticky;top:12px}
+  .stepno{font:500 12px "JetBrains Mono",monospace;color:var(--accent);letter-spacing:.05em}
+  .panel h2{font-size:20px;margin:6px 0 10px;letter-spacing:-.01em}
+  .panel .body{font-size:14.5px;line-height:1.6}
+  .panel .body p{margin:0 0 10px}
+  code,.mono{font-family:"JetBrains Mono",monospace;font-size:12.5px;background:#efe4d6;padding:1px 5px;border-radius:5px}
+  .say{margin-top:12px;background:var(--accent-soft);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.55}
+  .say b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#9a3f1c;margin-bottom:3px}
+  .file{margin-top:10px;font-size:12.5px;color:var(--muted)}
+  .nav{display:flex;align-items:center;gap:8px;margin-top:16px}
+  .nav button:not(.dot){white-space:nowrap;border:1.5px solid var(--ink);background:var(--ink);color:var(--bg);border-radius:10px;padding:9px 14px;font:600 14px inherit;cursor:pointer}
+  .nav button.ghost:not(.dot){background:transparent;color:var(--ink)}
+  .nav button:not(.dot):disabled{opacity:.3;cursor:default}
+  .dots{display:flex;gap:5px;margin-left:auto}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--line);cursor:pointer;border:0;padding:0}
+  .dot.on{background:var(--accent)}
+  .qa{margin-top:26px}
+  .qa h3{font-size:18px;margin:0 0 10px}
+  details{background:var(--paper);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+  summary{cursor:pointer;font-weight:600;font-size:15px}
+  details p{margin:8px 0 0;font-size:14.5px;line-height:1.6}
+  .hint{color:var(--muted);font-size:12.5px;margin-top:8px}
+  /* svg */
+  .node{transition:opacity .35s}
+  .node.dim{opacity:.22}
+  .edge{fill:none;stroke:#b9a892;stroke-width:1.6;stroke-dasharray:4 5;transition:opacity .3s}
+  .edge.dim{opacity:.25}
+  .edge.on{stroke:var(--accent);stroke-width:2.6;stroke-dasharray:none;opacity:1}
+  .lbl{font:600 12.5px "Be Vietnam Pro",system-ui,sans-serif;fill:var(--ink)}
+  .lbl,.sub{paint-order:stroke;stroke:#fbf6ef;stroke-width:3.5px;stroke-linejoin:round}
+  .tl{transition:opacity .35s}.tl.dim{opacity:.22}
+  .sub{font:400 10.5px "Be Vietnam Pro",system-ui,sans-serif;fill:var(--muted)}
+  .plat-lbl{font:600 11px "JetBrains Mono",monospace;fill:#9b8b78;letter-spacing:.04em}
+  .elbl rect{fill:var(--ink)}
+  .elbl text{font:500 11px "JetBrains Mono",monospace;fill:#fbf6ef}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Chốn Riêng: hệ thống chạy thế nào</h1>
+    <p>Bấm <b>Tiếp</b> (hoặc phím →) để xem từng bước. Mỗi bước có câu "nói với thầy" để ní đọc theo.</p>
+  </header>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="stage">
+    <div class="canvas"><svg id="svg" role="img" aria-label="Sơ đồ isometric"></svg></div>
+    <aside class="panel" aria-live="polite">
+      <div class="stepno" id="stepno"></div>
+      <h2 id="stitle"></h2>
+      <div class="body" id="sbody"></div>
+      <div class="say" id="ssay"><b>Nói với thầy</b><span></span></div>
+      <div class="file" id="sfile"></div>
+      <div class="nav">
+        <button class="ghost" id="prev">← Trước</button>
+        <button id="next">Tiếp →</button>
+        <div class="dots" id="dots"></div>
+      </div>
+    </aside>
+  </div>
+  <section class="qa">
+    <h3>Câu thầy hay hỏi</h3>
+    <div id="qa"></div>
+    <div class="hint">Bấm vào câu hỏi để xem gợi ý trả lời.</div>
+  </section>
+</div>
+
+<script>
+const C = {
+  client:'#e8a87c', edge:'#c9b28f', proxy:'#8fb8a8', api:'#7d9cc4', db:'#c98a6b',
+  worker:'#d8b85c', ext:'#a99bc7', gate:'#d9643a', mail:'#9fb87d'
+};
+
+const SCENES = {
+overview:{
+  name:'Toàn cảnh',
+  platforms:[
+    {x:3,y:-1.2,w:14.6,d:10.6,label:'MÁY CHỦ · DOCKER COMPOSE'},
+    {x:9.6,y:0.6,w:6.6,d:8.2,label:'TIẾN TRÌNH API'}
+  ],
+  nodes:[
+    {id:'kh',label:'App Khách',sub:'điện thoại',x:0,y:0,w:0.9,d:0.5,h:1.5,c:C.client},
+    {id:'pos',label:'App POS',sub:'nhân viên quầy',x:0,y:3.2,w:1.4,d:1.1,h:0.9,c:C.client},
+    {id:'admin',label:'App Admin',sub:'quản lý',x:0,y:6.4,w:1.5,d:1.2,h:0.7,c:C.client},
+    {id:'caddy',label:'Caddy',sub:'HTTPS',x:4.2,y:3.2,w:1.4,d:1.4,h:1.6,c:C.proxy,shape:'gate'},
+    {id:'web',label:'nginx (web)',sub:'3 app React',x:6.8,y:3,w:1.8,d:1.8,h:1.3,c:C.proxy},
+    {id:'api',label:'API .NET 10',sub:'Minimal API',x:10.4,y:2.4,w:2.6,d:2.6,h:2.2,c:C.api},
+    {id:'w1',label:'Nhả chỗ',sub:'60s',x:10.2,y:6.6,w:1.2,d:1.2,h:0.8,c:C.worker},
+    {id:'w2',label:'Hết hạn QR',sub:'30s',x:12.1,y:6.6,w:1.2,d:1.2,h:0.8,c:C.worker},
+    {id:'w3',label:'Gửi email',sub:'hàng đợi',x:14,y:6.6,w:1.2,d:1.2,h:0.8,c:C.worker},
+    {id:'mail',label:'SMTP',sub:'Mailpit / Gmail',x:14.2,y:10.6,w:1.3,d:1.3,h:0.9,c:C.mail},
+    {id:'db',label:'SQL Server',sub:'EF Core',x:19.4,y:2.6,w:2.2,d:2.2,h:1.9,c:C.db,shape:'stack'},
+    {id:'sepay',label:'SePay',sub:'cổng báo tiền',x:10.8,y:-4.6,w:1.6,d:1.6,h:1.3,c:C.ext}
+  ],
+  edges:[
+    {id:'kh-caddy',from:'kh',to:'caddy',pts:[[0.45,0.25],[2.6,0.25],[2.6,3.9],[4.9,3.9]],label:'HTTPS'},
+    {id:'pos-caddy',from:'pos',to:'caddy',pts:[[0.7,3.75],[2.6,3.75],[2.6,3.9],[4.9,3.9]],label:'HTTPS'},
+    {id:'admin-caddy',from:'admin',to:'caddy',pts:[[0.75,7],[2.6,7],[2.6,3.9],[4.9,3.9]],label:'HTTPS'},
+    {id:'caddy-web',pts:[[4.9,3.9],[7.7,3.9]],label:'reverse_proxy web:80'},
+    {id:'web-api',pts:[[7.7,3.9],[11.7,3.9]],label:'/api/* → api:8080'},
+    {id:'api-db',pts:[[11.7,3.7],[20.5,3.7]],label:'EF Core / SQL'},
+    {id:'sepay-caddy',pts:[[11.6,-3.8],[4.9,-3.8],[4.9,3.9]],label:'POST webhook'},
+    {id:'w-db',pts:[[12.7,7.2],[18.2,7.2],[18.2,3.7],[20.5,3.7]],label:'đọc / ghi DB'},
+    {id:'w3-mail',pts:[[14.6,7.2],[14.6,9.4],[14.85,9.4],[14.85,11.25]],label:'SMTP 587 / 1025'}
+  ],
+  steps:[
+    {t:'Hệ thống gồm những gì?',hl:'*',flow:[],
+     b:'<p>Có 3 app web cho 3 nhóm người dùng, chạy chung <b>1 API</b> và <b>1 cơ sở dữ liệu SQL Server</b>.</p><p>Toàn bộ nằm trên 1 máy chủ, chạy bằng Docker Compose. Bên ngoài chỉ có <b>SePay</b> (báo tiền vào) và <b>SMTP</b> (gửi mail).</p>',
+     say:'Hệ thống em gồm 3 ứng dụng frontend cho khách, nhân viên và quản lý, dùng chung một API viết bằng .NET 10 và một cơ sở dữ liệu SQL Server.',
+     f:'compose.yaml · compose.server.yaml'},
+    {t:'3 app React, 1 container nginx',hl:['kh','pos','admin','caddy','web'],flow:['kh-caddy','caddy-web',{e:'caddy-web',rev:1,label:'HTML / JS'},{e:'kh-caddy',rev:1,label:'HTML / JS'}],
+     b:'<p>3 app là <b>React + TypeScript</b>, viết trong 1 monorepo, dùng chung gói <code>ui</code> và <code>api-client</code>.</p><p>Sau khi build, cả 3 nằm trong 1 container nginx, chia theo đường dẫn: <code>/</code> là app khách, <code>/pos/</code> là POS, <code>/admin/</code> là admin.</p>',
+     say:'Ba app được build thành file tĩnh và phục vụ bằng một container nginx, phân theo đường dẫn. Hai app dùng chung thư viện giao diện và thư viện gọi API.',
+     f:'frontend/apps/* · frontend/packages/* · frontend/nginx.conf'},
+    {t:'Caddy giữ cổng HTTPS',hl:['caddy'],flow:['pos-caddy'],
+     b:'<p>Caddy là cửa duy nhất mở ra Internet. Nó tự xin và gia hạn chứng chỉ HTTPS, rồi chuyển mọi request vào <code>web:80</code>.</p><p>Tên miền <code>sslip.io</code> là tên miền miễn phí trỏ thẳng về IP máy chủ.</p>',
+     say:'Caddy đứng ngoài cùng làm reverse proxy: lo HTTPS tự động và chuyển request vào nginx trong mạng nội bộ của Docker.',
+     f:'Caddyfile'},
+    {t:'Gọi API',hl:['pos','caddy','web','api','db'],flow:['pos-caddy','caddy-web','web-api','api-db'],
+     b:'<p>Request nào bắt đầu bằng <code>/api/</code> thì nginx chuyển sang container <code>api:8080</code>.</p><p>API chia thư mục theo nghiệp vụ trong <code>Features/</code>: Sales, Scheduling, Finance, Catalog, Reports… Mỗi thư mục có <b>Endpoints</b> (khai báo URL) và <b>Service</b> (xử lý logic).</p><p>Đăng nhập dùng ASP.NET Identity và token <b>JWT</b>, phân quyền theo vai trò.</p>',
+     say:'API tổ chức theo từng tính năng. Endpoint chỉ nhận request và kiểm quyền, còn logic nằm trong Service, rồi Service đọc ghi DB qua EF Core.',
+     f:'backend/src/ChonRieng.Api/Features/'},
+    {t:'Cơ sở dữ liệu',hl:['api','db'],flow:['api-db'],
+     b:'<p>Dùng <b>EF Core Code First</b>: viết class C# trước, EF sinh bảng. Có 22 bảng nghiệp vụ và 6 bảng của Identity, khoá chính kiểu <code>Guid</code>.</p><p>Migration <b>không</b> tự chạy khi khởi động mà chạy tay bằng <code>dotnet ef database update</code> sau khi backup.</p>',
+     say:'Em dùng Code First nên cấu trúc bảng nằm trong code, thay đổi được quản lý bằng migration và chỉ áp dụng chủ động để tránh làm hỏng dữ liệu thật.',
+     f:'ChonRieng.Domain/Entities · ChonRieng.Infrastructure/Persistence'},
+    {t:'SePay gọi vào',hl:['sepay','caddy','web','api'],flow:['sepay-caddy','caddy-web','web-api'],
+     b:'<p>Khi tài khoản ngân hàng có tiền vào, SePay chủ động gọi <code>POST /api/hooks/sepay-payment</code>. Request này đi cùng đường với request của người dùng.</p><p>Chi tiết xem ở tab <b>Thanh toán VietQR</b>.</p>',
+     say:'Ngược với việc mình gọi API, ở đây SePay gọi vào hệ thống của mình qua webhook mỗi khi có tiền về.',
+     f:'Features/Sales/SePayWebhookService.cs'},
+    {t:'Việc chạy nền',hl:['w1','w2','w3','db','mail'],flow:['w-db','w3-mail'],
+     b:'<p>Có 3 worker chạy <b>chung tiến trình với API</b> (BackgroundService), không cần ai bấm:</p><p>• <b>Nhả chỗ</b>: mỗi 60s, khách quá giờ 10 phút thì trả ghế.<br>• <b>Hết hạn QR</b>: mỗi 30s, mã QR quá hạn mà chưa trả thì huỷ.<br>• <b>Gửi email</b>: lấy mail từ hàng đợi <code>Channel</code> rồi gửi qua SMTP, để API không phải chờ gửi xong.</p>',
+     say:'Những việc định kỳ như nhả ghế hay huỷ mã QR hết hạn chạy bằng background service ngay trong API. Mọi trạng thái đều lưu trong DB nên khởi động lại không mất gì.',
+     f:'SessionAutoReleaseWorker.cs · PaymentRequestExpiryWorker.cs · Services/Email/EmailQueue.cs'}
+  ],
+  qa:[
+    ['Sao không làm 1 app mà tách 3?','Mỗi nhóm dùng một thiết bị và có quyền khác nhau: khách dùng điện thoại, nhân viên dùng máy quầy, quản lý dùng máy tính. Tách app thì mỗi app gọn hơn, nhưng vẫn dùng chung code giao diện và code gọi API trong monorepo nên không bị trùng code.'],
+    ['Có Caddy rồi sao còn nginx?','Mỗi cái một việc. Caddy đứng ngoài cùng lo HTTPS và chứng chỉ tự động. nginx bên trong phục vụ file tĩnh của 3 app và chuyển /api/ sang API. Thay Caddy bằng cái khác thì không phải đụng đến nginx.'],
+    ['Worker chạy ở đâu? API sập thì sao?','Worker là IHostedService chạy trong cùng tiến trình API, nên API dừng thì worker cũng dừng. Vì mọi trạng thái (ghế, mã QR) đều nằm trong DB nên khi API chạy lại, worker quét lại và xử lý tiếp các việc còn tồn.'],
+    ['Sao migration không tự chạy khi khởi động?','Để tránh việc deploy nhầm làm thay đổi bảng trên dữ liệu thật. Mỗi lần có migration mới thì backup DB trước rồi mới chạy tay.'],
+    ['Mật khẩu, khoá bí mật để ở đâu?','Nằm trong file .env, file này không đưa lên git. Code chỉ đọc từ biến môi trường, và API kiểm tra cấu hình ngay lúc khởi động, thiếu là báo lỗi luôn.']
+  ]
+},
+layers:{
+  name:'Backend 4 tầng',
+  platforms:[],
+  nodes:[
+    {id:'dom',label:'Domain',sub:'Entities · Enums',x:4,y:0,z:0,w:5,d:5,h:0.9,c:'#c98a6b',side:1},
+    {id:'app',label:'Application',sub:'IBranchAccessService · IEntityCrudService',x:4,y:0,z:1.7,w:5,d:5,h:0.9,c:'#9fb87d',side:1},
+    {id:'inf',label:'Infrastructure',sub:'AppDbContext · Configurations · Migrations',x:4,y:0,z:3.4,w:5,d:5,h:0.9,c:'#d8b85c',side:1},
+    {id:'api',label:'Api',sub:'Program · Endpoints · Features · Services',x:4,y:0,z:5.1,w:5,d:5,h:0.9,c:'#7d9cc4',side:1},
+    {id:'cli',label:'3 app React',sub:'gọi /api/...',x:0,y:8.8,w:1.4,d:1.1,h:0.9,c:'#e8a87c'},
+    {id:'db',label:'SQL Server',sub:'',x:13,y:2,w:2,d:2,h:1.6,c:'#c98a6b',shape:'stack'}
+  ],
+  edges:[
+    {id:'c-api',pts:[[0.7,9.4,0.02],[9.4,9.4,0.02],[9.4,5.4,0.02],[9.4,5.4,5.55]],label:'HTTP request'},
+    {id:'v1',pts:[[9.4,5.4,5.55],[9.4,5.4,3.85]],label:'tham chiếu'},
+    {id:'v2',pts:[[9.4,5.4,3.85],[9.4,5.4,2.15]],label:'tham chiếu'},
+    {id:'v3',pts:[[9.4,5.4,2.15],[9.4,5.4,0.45]],label:'tham chiếu'},
+    {id:'i-db',pts:[[9.4,5.4,3.85],[9.4,5.4,0.02],[14,5.4,0.02],[14,3,0.02]],label:'SQL qua EF Core'}
+  ],
+  steps:[
+    {t:'4 project, 4 tầng',hl:'*',flow:[],
+     b:'<p>Backend là 1 solution gồm 4 project, xếp chồng như toà nhà. Tầng trên được dùng tầng dưới, <b>tầng dưới không biết gì về tầng trên</b>.</p><p>Từ dưới lên: <b>Domain</b> → <b>Application</b> → <b>Infrastructure</b> → <b>Api</b>.</p>',
+     say:'Em chia backend theo kiểu Clean Architecture: lõi nghiệp vụ nằm dưới cùng và không phụ thuộc vào framework hay database.',
+     f:'backend/src/ · CafeCR.slnx'},
+    {t:'Domain: lõi nghiệp vụ',hl:['dom'],flow:[],
+     b:'<p>Chứa các <b>Entity</b> (Bill, Seat, Session, Shift, Employee, Customer…) và <b>Enum</b> trạng thái (SeatStatus, SessionStatus…).</p><p>Project này <b>không tham chiếu project nào</b>, nên đổi database hay web framework thì Domain vẫn giữ nguyên.</p>',
+     say:'Domain là các class thuần C# mô tả dữ liệu nghiệp vụ, không phụ thuộc thư viện nào nên dễ test.',
+     f:'ChonRieng.Domain/Entities · Enums.cs'},
+    {t:'Application: hợp đồng',hl:['app'],flow:['v3'],
+     b:'<p>Khai báo <b>interface</b> mà tầng trên phải cài đặt, ví dụ <code>IBranchAccessService</code> (người này được xem chi nhánh nào) và <code>IEntityCrudService</code> (CRUD chung cho trang admin).</p><p>Chỉ tham chiếu <b>Domain</b>.</p>',
+     say:'Tầng Application định nghĩa "cần làm gì" bằng interface, còn "làm thế nào" để tầng Infrastructure lo.',
+     f:'ChonRieng.Application/Persistence'},
+    {t:'Infrastructure: nói chuyện với DB',hl:['inf','db'],flow:['v2','i-db'],
+     b:'<p><code>AppDbContext</code> (EF Core) chứa các DbSet ứng với bảng. Thư mục <code>Configurations</code> cấu hình bảng bằng Fluent API (khoá, độ dài cột, index), còn <code>Migrations</code> lưu lịch sử thay đổi bảng.</p><p>Cài đặt các interface của Application, ví dụ <code>BranchAccessService</code>, <code>EfEntityCrudService</code>.</p>',
+     say:'Mọi chi tiết về SQL Server đều gói trong Infrastructure, nên muốn đổi sang database khác chỉ phải sửa tầng này.',
+     f:'ChonRieng.Infrastructure/Persistence'},
+    {t:'Api: cửa vào',hl:['cli','api','inf','db'],flow:['c-api','v1','i-db'],
+     b:'<p><code>Program.cs</code> đăng ký mọi thứ (DI, JWT, rate limit, worker). Endpoint khai báo URL và quyền, rồi gọi <b>Service</b> trong <code>Features/</code>.</p><p>Service trả về <code>ServiceResult</code>: thành công thì ra 200, lỗi thì ra 400/404/409 kèm thông báo tiếng Việt.</p>',
+     say:'Một request đi từ trên xuống: Endpoint kiểm quyền, Service xử lý nghiệp vụ, DbContext lưu xuống SQL Server, rồi kết quả đi ngược lên thành HTTP response.',
+     f:'ChonRieng.Api/Program.cs · Features/Common/ServiceResult.cs'}
+  ],
+  qa:[
+    ['Sao phải chia 4 project?','Để tách trách nhiệm. Nghiệp vụ (Domain) không dính vào database hay web, nên test được riêng và đổi công nghệ ít ảnh hưởng. Compiler cũng chặn luôn: Domain không tham chiếu Infrastructure nên không thể vô tình gọi DB từ Domain.'],
+    ['Sao không có lớp Repository?','DbContext của EF Core bản thân đã là Unit of Work, còn mỗi DbSet đã là một Repository. Bọc thêm một lớp Repository nữa chỉ lặp lại code mà không thêm giá trị. Chỗ nào cần dùng chung thì em có interface riêng như IEntityCrudService.'],
+    ['Code First là gì?','Viết class C# trước, EF Core sinh bảng từ class. Mỗi lần sửa class thì tạo một migration ghi lại thay đổi, nhờ vậy cấu trúc DB được quản lý bằng git như code.'],
+    ['Dependency Injection dùng ở đâu?','Trong Program.cs và FeatureRegistration.cs: các service đăng ký Scoped (mỗi request một bản), riêng những thứ dùng chung như PaymentLogService thì Singleton. Endpoint chỉ cần khai báo tham số là được framework truyền vào.']
+  ]
+},
+auth:{
+  name:'Đăng nhập & phân quyền',
+  platforms:[
+    {x:6,y:-4.4,w:8.2,d:13.6,label:'API'},
+    {x:15.4,y:-1,w:3.4,d:10.2,label:'SQL SERVER'}
+  ],
+  nodes:[
+    {id:'app',label:'App',sub:'Khách / POS / Admin',x:0,y:3,w:1.2,d:1.2,h:0.9,c:C.client},
+    {id:'rl',label:'Rate limit',sub:'chặn đoán mật khẩu',x:3.6,y:3,w:1.3,d:1.2,h:1.5,c:C.gate,shape:'gate'},
+    {id:'svc',label:'AuthService',sub:'/api/auth/*',x:7,y:2.6,w:2,d:1.8,h:1.4,c:C.api},
+    {id:'idn',label:'Identity',sub:'UserManager',x:11,y:0,w:1.6,d:1.6,h:1.1,c:C.api},
+    {id:'tok',label:'TokenService',sub:'JWT · refresh',x:11,y:4,w:1.6,d:1.6,h:1.1,c:C.api},
+    {id:'jwt',label:'JwtBearer + Policy',sub:'kiểm token, vai trò',x:7.6,y:7.2,w:1.4,d:1.2,h:1.5,c:C.proxy,shape:'gate'},
+    {id:'feat',label:'Features/*',sub:'API nghiệp vụ',x:11,y:7.4,w:1.6,d:1.6,h:1.1,c:C.api},
+    {id:'q',label:'EmailQueue',sub:'Channel',x:7.2,y:-3.2,w:1.4,d:1.4,h:0.8,c:C.worker},
+    {id:'ew',label:'EmailWorker',sub:'gửi nền',x:10.2,y:-3.2,w:1.4,d:1.4,h:0.8,c:C.worker},
+    {id:'smtp',label:'SMTP',sub:'Gmail / Mailpit',x:15.8,y:-5,w:1.4,d:1.4,h:0.9,c:C.mail},
+    {id:'t_u',label:'Users',sub:'hash mật khẩu',x:16,y:0,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'},
+    {id:'t_s',label:'UserSessions',sub:'hash refresh token',x:16,y:3.6,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'},
+    {id:'t_b',label:'Bảng nghiệp vụ',sub:'',x:16,y:7.4,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'}
+  ],
+  edges:[
+    {id:'a1',pts:[[0.6,3.6],[4.25,3.6]],label:'POST /api/auth/login'},
+    {id:'a2',pts:[[4.25,3.6],[8,3.6]],label:'qua giới hạn'},
+    {id:'a3',pts:[[8,3.5],[8,0.8],[11.8,0.8]],label:'kiểm mật khẩu'},
+    {id:'a4',pts:[[11.8,0.8],[16.8,0.8]],label:'so hash'},
+    {id:'a5',pts:[[8,3.5],[8,4.8],[11.8,4.8]],label:'tạo token'},
+    {id:'a6',pts:[[11.8,4.8],[14.8,4.8],[14.8,4.4],[16.8,4.4]],label:'lưu hash refresh'},
+    {id:'a7',pts:[[0.6,3.6],[0.6,7.8],[8.3,7.8]],label:'Authorization: Bearer <JWT>'},
+    {id:'a8',pts:[[8.3,7.8],[11.8,7.8]],label:'đúng vai trò + chi nhánh'},
+    {id:'a9',pts:[[11.8,8.2],[16.8,8.2]],label:'đọc / ghi'},
+    {id:'a10',pts:[[7.9,3.5],[7.9,-2.5]],label:'xếp mail vào hàng đợi'},
+    {id:'a11',pts:[[7.9,-2.5],[10.9,-2.5]],label:'lấy ra'},
+    {id:'a12',pts:[[10.9,-2.5],[13.6,-2.5],[13.6,-4.3],[16.5,-4.3]],label:'SMTP'}
+  ],
+  steps:[
+    {t:'Đăng nhập',hl:['app','rl','svc','idn','t_u'],flow:['a1','a2','a3','a4'],
+     b:'<p>App gọi <code>POST /api/auth/login</code>. Trước tiên request phải qua <b>rate limit</b>: tối đa 30 lần / 5 phút / IP.</p><p><code>AuthService</code> nhờ <b>ASP.NET Identity</b> kiểm mật khẩu. DB chỉ lưu <b>hash</b>, không lưu mật khẩu gốc.</p><p>Sai <b>5 lần</b> thì tài khoản bị khoá <b>15 phút</b>.</p>',
+     say:'Em dùng ASP.NET Identity để quản lý tài khoản: mật khẩu được băm, có khoá tài khoản khi sai nhiều lần và có giới hạn tần suất theo IP để chống dò mật khẩu.',
+     f:'Endpoints/AuthEndpoints.cs · Services/AuthService.cs · Program.cs (Lockout)'},
+    {t:'Cấp 2 loại token',hl:['svc','tok','t_s'],flow:['a5','a6',{e:'a1',rev:1,label:'access + refresh token'}],
+     b:'<p><b>Access token (JWT)</b> sống <b>15 phút</b>, bên trong có id người dùng, vai trò và <code>branch_id</code> (chi nhánh được làm).</p><p><b>Refresh token</b> sống <b>7 ngày</b>, dùng để xin access token mới. DB chỉ lưu <b>hash</b> của nó trong <code>UserSessions</code>.</p>',
+     say:'Access token ngắn hạn để lỡ bị lộ thì cũng nhanh hết hạn. Refresh token dài hạn nhưng chỉ lưu dạng băm, nên lộ DB cũng không dùng được.',
+     f:'Services/TokenService.cs · JwtOptions.cs'},
+    {t:'Gọi API có token',hl:['app','jwt','feat','t_b'],flow:['a7','a8','a9'],
+     b:'<p>Mỗi request gửi kèm header <code>Authorization: Bearer &lt;JWT&gt;</code>. JwtBearer kiểm chữ ký và hạn của token, <b>không cần đọc DB</b>.</p><p>Sau đó endpoint áp <b>Policy</b>:</p><p>• <code>Workforce</code>: Admin, BranchManager, Staff<br>• <code>Management</code>: Admin, BranchManager<br>• <code>CustomerOnly</code>, <code>AdminOnly</code></p><p>Trong service còn kiểm <code>CanAccessBranch</code>: quản lý chi nhánh A không xem được dữ liệu chi nhánh B.</p>',
+     say:'Phân quyền 2 lớp: lớp vai trò ở endpoint và lớp chi nhánh trong service, nên nhân viên chỉ thấy dữ liệu chi nhánh mình.',
+     f:'Features/Common/Policies.cs · CurrentUser.cs'},
+    {t:'Hết 15 phút thì sao?',hl:['app','rl','svc','tok','t_s'],flow:[{e:'a1',label:'POST /api/auth/refresh'},'a2','a5','a6'],
+     b:'<p>App gửi refresh token lên <code>/api/auth/refresh</code>. Server tìm theo hash, còn hạn thì cấp <b>cặp token mới</b> và <b>thay luôn refresh token</b> (rotation). Token cũ không dùng lại được.</p><p>Đăng xuất thì đánh dấu phiên là đã thu hồi.</p>',
+     say:'Em xoay vòng refresh token: mỗi lần dùng là đổi token mới, nên token cũ bị đánh cắp cũng không dùng lại được.',
+     f:'AuthService.cs → RefreshAsync / RevokeAsync'},
+    {t:'Quên mật khẩu',hl:['app','rl','svc','q','ew','smtp'],flow:[{e:'a1',label:'POST /api/auth/forgot-password'},'a2','a10','a11','a12'],
+     b:'<p>Luôn trả <b>202</b> dù email có tồn tại hay không, để người ngoài <b>không dò được</b> email nào đã đăng ký.</p><p>Nếu có tài khoản: Identity tạo token reset (hạn 15 phút), đưa mail vào <code>EmailQueue</code>. Worker nền gửi qua SMTP, nên API trả lời ngay mà không phải chờ.</p><p>Giới hạn 5 lần / 15 phút theo IP và theo email.</p>',
+     say:'Chức năng quên mật khẩu không tiết lộ email nào có trong hệ thống, link reset chỉ sống 15 phút, và mail được gửi bất đồng bộ qua hàng đợi.',
+     f:'AuthService.cs → RequestPasswordResetAsync · Services/Email/'},
+    {t:'Đặt lại / đổi mật khẩu',hl:['svc','idn','t_s','q','ew','smtp'],flow:['a3','a6','a10','a11','a12'],
+     b:'<p><b>Đặt lại</b> bằng link: Identity kiểm token rồi đổi mật khẩu, <b>thu hồi tất cả phiên</b> đang đăng nhập và mở khoá tài khoản.</p><p><b>Đổi mật khẩu</b> khi đang đăng nhập: thu hồi các phiên <b>khác</b>, giữ phiên hiện tại, và gửi mail báo "mật khẩu vừa được đổi".</p>',
+     say:'Đổi mật khẩu xong thì các thiết bị khác bị đăng xuất, và chủ tài khoản nhận được mail báo để phát hiện nếu không phải mình đổi.',
+     f:'AuthService.cs → ResetPasswordAsync / ChangePasswordAsync'}
+  ],
+  qa:[
+    ['Sao dùng JWT mà không dùng session cookie?','Có 3 app khác nhau gọi chung một API. JWT tự chứa thông tin người dùng và vai trò nên API không phải tra DB ở mỗi request, và app nào gửi kèm header cũng dùng được như nhau.'],
+    ['JWT bị lộ thì sao?','Access token chỉ sống 15 phút. Refresh token được xoay vòng và lưu dạng hash, đổi mật khẩu thì thu hồi toàn bộ phiên.'],
+    ['Phân quyền theo chi nhánh làm thế nào?','Token có claim branch_id. CurrentUser đọc claim đó ra phạm vi chi nhánh, và service gọi CanAccessBranch trước khi trả dữ liệu. Admin thì xem được tất cả.'],
+    ['Sao quên mật khẩu lại luôn trả 202?','Nếu trả "email không tồn tại" thì kẻ xấu dò được ai đã đăng ký. Trả cùng một kết quả cho mọi trường hợp thì không lộ gì.'],
+    ['Sao gửi mail phải qua hàng đợi?','Gửi SMTP mất vài giây và có thể lỗi mạng. Đưa vào Channel rồi để worker gửi thì API trả lời ngay, người dùng không phải chờ.']
+  ]
+},
+sales:{
+  name:'Bán chỗ ngồi',
+  platforms:[
+    {x:4,y:-1.6,w:8.6,d:11.6,label:'API'},
+    {x:14,y:-1.4,w:3.6,d:11.2,label:'SQL SERVER'}
+  ],
+  nodes:[
+    {id:'pos',label:'POS',sub:'nhân viên',x:0,y:0,w:1.5,d:1.2,h:1,c:C.client},
+    {id:'kh',label:'App Khách',sub:'',x:0.2,y:11,w:0.9,d:0.5,h:1.5,c:C.client},
+    {id:'ss',label:'SessionService',sub:'vào chỗ · gia hạn · kết thúc',x:5,y:0.4,w:2.2,d:2,h:1.5,c:C.api},
+    {id:'ao',label:'AddOnService',sub:'gọi thêm đồ',x:5,y:4.5,w:1.8,d:1.6,h:1.1,c:C.api},
+    {id:'rc',label:'ReceiptService',sub:'PDF hoá đơn',x:5,y:8,w:1.6,d:1.6,h:1.1,c:C.api},
+    {id:'wk',label:'AutoReleaseWorker',sub:'mỗi 60s',x:9.8,y:-1,w:1.4,d:1.4,h:0.8,c:C.worker},
+    {id:'ly',label:'LoyaltyService',sub:'tích điểm',x:9.5,y:7.5,w:1.6,d:1.6,h:1.1,c:C.api},
+    {id:'t_seat',label:'Seats · PricePlans',sub:'',x:14.6,y:-0.6,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'},
+    {id:'t_bill',label:'Bills · Sessions',sub:'',x:14.6,y:2.8,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'},
+    {id:'t_cus',label:'Customers',sub:'điểm · hạng',x:14.6,y:7.4,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'}
+  ],
+  edges:[
+    {id:'s1',pts:[[0.75,0.9],[6.1,0.9]],label:'POST /api/sessions'},
+    {id:'s2',pts:[[6.1,0.2],[15.4,0.2]],label:'ghế trống? bảng giá?'},
+    {id:'s3',pts:[[6.6,1.9],[13.2,1.9],[13.2,3.6],[15.4,3.6]],label:'Bill + Session (Active)'},
+    {id:'s4',pts:[[0.75,0.6],[0.75,5.3],[5.9,5.3]],label:'POST /sessions/{id}/items · /extend'},
+    {id:'s5',pts:[[5.9,5.3],[13.2,5.3],[13.2,3.9],[15.4,3.9]],label:'cộng vào bill'},
+    {id:'s7',pts:[[10.5,-0.3],[13.8,-0.3],[13.8,3.3],[15.4,3.3]],label:'quá EndAt 10 phút → Expired'},
+    {id:'s8',pts:[[0.75,0.6],[0.75,8.8],[5.8,8.8]],label:'GET /bills/{code}/receipt.pdf'},
+    {id:'s9',pts:[[0.65,11.25],[10.3,11.25],[10.3,8.3]],label:'POST /api/me/bills/claim'},
+    {id:'s10',pts:[[10.3,8.3],[15.4,8.3]],label:'cộng điểm, xét hạng'},
+    {id:'s11',pts:[[6.6,1.6],[12.9,1.6],[12.9,8],[15.4,8]],label:'khách quen: cộng điểm ngay'}
+  ],
+  steps:[
+    {t:'Nhân viên cho khách vào chỗ',hl:['pos','ss','t_seat'],flow:['s1','s2'],
+     b:'<p>Trên POS, nhân viên chọn <b>ghế</b>, <b>gói giờ</b> (PricePlan) và cách trả (<b>tiền mặt</b> hoặc <b>VietQR</b>), rồi gọi <code>POST /api/sessions</code>.</p><p><code>SessionService</code> kiểm tra trước:</p><p>• Ghế có đang bảo trì không<br>• Ghế đã có lượt ngồi <b>Active</b> chưa<br>• Ghế có đang được giữ bởi một mã QR <b>Pending</b> còn hạn không<br>• Gói giờ có áp dụng cho chi nhánh này và còn hiệu lực không</p>',
+     say:'Trước khi bán chỗ, hệ thống kiểm tra ghế không bảo trì, không có người ngồi và không bị giữ bởi một giao dịch QR đang chờ, để tránh bán trùng một ghế cho hai người.',
+     f:'Features/Sales/SessionService.cs → CheckInAsync'},
+    {t:'Tạo Bill + lượt ngồi',hl:['ss','t_bill','t_cus'],flow:['s3','s11'],
+     b:'<p>Trả <b>tiền mặt</b>: tạo ngay <b>Bill</b> (mã 8 ký tự ngẫu nhiên) và <b>Session</b> trạng thái <b>Active</b> với giờ kết thúc <code>EndAt</code> theo gói.</p><p>Trả <b>VietQR</b>: chưa tạo bill mà tạo yêu cầu thanh toán, khi tiền về mới tạo (xem tab <b>Thanh toán VietQR</b>).</p><p>Nếu nhân viên đã chọn khách quen thì cộng điểm luôn.</p>',
+     say:'Bill chỉ được tạo khi đã chắc chắn nhận được tiền: tiền mặt thì tạo ngay, chuyển khoản thì đợi webhook xác nhận.',
+     f:'SessionService.cs → CheckInAsync / SettlePaymentRequestAsync'},
+    {t:'Gọi thêm đồ, gia hạn',hl:['pos','ao','ss','t_bill'],flow:['s4','s5'],
+     b:'<p>Khách gọi thêm đồ: <code>POST /sessions/{id}/items</code>. Khách muốn ngồi thêm: <code>POST /sessions/{id}/extend</code>, lùi <code>EndAt</code> theo gói gia hạn.</p><p>Cả hai đều cộng tiền vào <b>cùng bill</b>. Trả bằng QR thì đi qua endpoint <code>…/payment-request</code>.</p>',
+     say:'Một lượt ngồi chỉ có một bill, mọi khoản phát sinh như đồ uống hay gia hạn đều cộng vào bill đó.',
+     f:'AddOnService.cs · SessionService.cs → ExtendAsync'},
+    {t:'Kết thúc lượt ngồi',hl:['pos','ss','t_bill'],flow:[{e:'s1',label:'POST /sessions/{id}/close'},'s3'],
+     b:'<p>Khách về, nhân viên bấm kết thúc. Session chuyển sang:</p><p>• <b>Closed</b> nếu về trước <code>EndAt</code><br>• <b>Expired</b> nếu đã ngồi quá giờ</p><p>Ghế tự thành trống, vì "ghế đang có người" được suy ra từ việc có session Active hay không, không lưu cờ riêng.</p>',
+     say:'Trạng thái ghế được tính từ lượt ngồi đang hoạt động chứ không lưu riêng, nên không bao giờ lệch giữa ghế và lượt ngồi.',
+     f:'SessionService.cs → CloseAsync'},
+    {t:'Quên bấm kết thúc?',hl:['wk','t_bill'],flow:['s7'],
+     b:'<p><code>SessionAutoReleaseWorker</code> cứ <b>60 giây</b> quét một lần. Session nào vẫn Active mà đã quá <code>EndAt</code> <b>10 phút</b> thì chuyển thành <b>Expired</b> và báo cho nhân viên.</p><p>Câu UPDATE có điều kiện <code>Status = Active</code>. Ngoài ra <code>Status</code> và <code>EndAt</code> là <b>concurrency token</b>, nên nếu nhân viên vừa đóng tay hoặc gia hạn cùng lúc thì không ai ghi đè ai.</p>',
+     say:'Ghế không bị kẹt khi nhân viên quên thao tác: hệ thống tự trả chỗ sau 10 phút quá giờ và gửi thông báo.',
+     f:'SessionAutoReleaseService.cs · SessionAutoReleaseWorker.cs'},
+    {t:'Hoá đơn & tích điểm',hl:['pos','rc','kh','ly','t_cus'],flow:['s8','s9','s10'],
+     b:'<p>POS in hoá đơn <b>PDF</b> (thư viện QuestPDF), có <b>mã QR</b> dẫn tới trang tích điểm.</p><p>Khách mở app, nhập hoặc quét mã bill trong vòng <b>7 ngày</b>. Mỗi bill chỉ tích <b>1 lần</b>, tối đa 10 lần thử / phút để không đoán mã được.</p><p><b>1.000đ = 1 điểm</b>. Hạng theo tổng chi: Bronze, Silver từ 500k, Gold từ 2 triệu.</p>',
+     say:'Khách vãng lai vẫn tích điểm được: quét QR trên hoá đơn để nhận điểm về tài khoản, có giới hạn thời gian và số lần thử để chống gian lận.',
+     f:'ReceiptPdf.cs · LoyaltyService.cs → ClaimAsync · Loyalty.cs'}
+  ],
+  qa:[
+    ['Hai máy POS bán cùng 1 ghế cùng lúc thì sao?','Service kiểm tra trước, nhưng 2 request có thể cùng qua bước kiểm tra. Lớp chặn cuối nằm ở DB: unique index có filter IX_Sessions_SeatId_Active (SeatId duy nhất khi Status = Active). Bản ghi thứ hai vi phạm index nên SQL Server từ chối, code bắt DbUpdateException và trả lỗi "chỗ đã có người".'],
+    ['Sao không lưu trạng thái "đang có người" vào bảng Seat?','Lưu 2 nơi thì dễ lệch nhau. Ghế có người khi và chỉ khi có session Active, nên tính ra từ đó là luôn đúng. Seat chỉ lưu trạng thái bảo trì.'],
+    ['Closed khác Expired thế nào?','Closed là khách về đúng hoặc trước giờ đã trả. Expired là khách ngồi quá giờ, do nhân viên đóng muộn hoặc worker tự trả chỗ. Báo cáo dùng phân biệt này để biết ghế hay bị ngồi lố.'],
+    ['Gia hạn đúng lúc worker đang tự trả chỗ thì sao?','Status và EndAt là concurrency token (optimistic locking). EF chỉ lưu được khi dòng đó vẫn đúng như lúc đọc, nên bên nào ghi sau sẽ nhận DbUpdateConcurrencyException thay vì âm thầm ghi đè.'],
+    ['Mã bill có bị đoán được không?','Mã 8 ký tự lấy ngẫu nhiên bằng RandomNumberGenerator từ bảng 32 ký tự (bỏ các ký tự dễ nhầm như 0/O, 1/I), tức khoảng 1 nghìn tỷ tổ hợp. Thêm giới hạn 10 lần / phút nên đoán gần như không thể.']
+  ]
+},
+payment:{
+  name:'Thanh toán VietQR',
+  platforms:[
+    {x:5.4,y:-1.4,w:8.4,d:9.4,label:'API'},
+    {x:15.2,y:-1.4,w:3.6,d:9.4,label:'SQL SERVER'}
+  ],
+  nodes:[
+    {id:'pos',label:'POS',sub:'nhân viên',x:0,y:0,w:1.5,d:1.2,h:1,c:C.client},
+    {id:'kh',label:'Khách',sub:'app ngân hàng',x:0.2,y:5.2,w:0.9,d:0.5,h:1.5,c:C.client},
+    {id:'bank',label:'Ngân hàng',sub:'',x:0,y:10.4,w:1.6,d:1.6,h:1.2,c:C.ext},
+    {id:'sepay',label:'SePay',sub:'',x:4.2,y:10.4,w:1.6,d:1.6,h:1.2,c:C.ext},
+    {id:'prs',label:'PaymentRequestService',sub:'tạo mã QR',x:6.4,y:-0.4,w:2,d:1.8,h:1.4,c:C.api},
+    {id:'gate',label:'Cổng kiểm tra',sub:'HMAC · timestamp',x:8.6,y:6.2,w:1.6,d:1.2,h:1.6,c:C.gate,shape:'gate'},
+    {id:'wh',label:'SePayWebhookService',sub:'khớp tiền',x:8.6,y:3,w:2,d:1.8,h:1.4,c:C.api},
+    {id:'exp',label:'ExpiryWorker',sub:'mỗi 30s',x:11.6,y:-0.4,w:1.4,d:1.4,h:0.9,c:C.worker},
+    {id:'t_req',label:'PaymentRequests',sub:'',x:15.8,y:-0.4,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'},
+    {id:'t_tx',label:'PaymentTransactions',sub:'',x:15.8,y:2.9,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'},
+    {id:'t_bill',label:'Bills · Sessions',sub:'ghế',x:15.8,y:6.2,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'}
+  ],
+  edges:[
+    {id:'pos-prs',pts:[[0.75,0.6],[7.4,0.6]],label:'POST /api/payments/requests'},
+    {id:'prs-req',pts:[[7.4,0.4],[16.6,0.4]],label:'INSERT Pending'},
+    {id:'pos-kh',pts:[[0.65,0.6],[0.65,5.45]],label:'hiện QR'},
+    {id:'kh-bank',pts:[[0.65,5.45],[0.65,11.2],[0.8,11.2]],label:'chuyển khoản'},
+    {id:'bank-sepay',pts:[[0.8,11.2],[5,11.2]],label:'báo số dư'},
+    {id:'sepay-gate',pts:[[5,11.2],[5,9],[9.4,9],[9.4,6.8]],label:'POST /api/hooks/sepay-payment'},
+    {id:'gate-wh',pts:[[9.4,6.8],[9.4,3.9]],label:'hợp lệ'},
+    {id:'wh-tx',pts:[[9.6,3.7],[16.6,3.7]],label:'lưu giao dịch'},
+    {id:'wh-req',pts:[[10.6,3.4],[14.4,3.4],[14.4,0.9],[16.6,0.9]],label:'tìm theo mã'},
+    {id:'wh-bill',pts:[[9.6,4.2],[14.4,4.2],[14.4,7],[16.6,7]],label:'tạo Bill + Session'},
+    {id:'exp-req',pts:[[12.3,0.2],[16.6,0.2]],label:'Pending quá hạn → Expired'}
+  ],
+  steps:[
+    {t:'Nhân viên tạo yêu cầu thanh toán',hl:['pos','prs','t_req'],flow:['pos-prs','prs-req'],
+     b:'<p>Nhân viên chọn ghế trên POS, POS gọi <code>POST /api/payments/requests</code>.</p><p><code>PaymentRequestService</code> tạo 1 dòng <b>PaymentRequest</b> với:</p><p>• Mã ngẫu nhiên, ví dụ <code>TT</code> + 8 ký tự<br>• Trạng thái <b>Pending</b><br>• Hạn = bây giờ + <b>10 phút</b> (cấu hình <code>HoldMinutes</code>)</p><p>Trước khi tạo, các yêu cầu cũ đã quá hạn của cùng ghế sẽ được huỷ.</p>',
+     say:'Mỗi lần thu tiền, hệ thống tạo một yêu cầu thanh toán có mã duy nhất và chỉ có hiệu lực 10 phút.',
+     f:'Features/Sales/PaymentRequestService.cs'},
+    {t:'Hiện mã QR cho khách',hl:['pos','prs','kh'],flow:[{e:'pos-prs',rev:1,label:'mã + link ảnh QR'},'pos-kh'],
+     b:'<p>API trả về mã và link ảnh QR (<code>qr.sepay.vn/img</code>), trong đó đã có sẵn số tiền và nội dung chuyển khoản là mã thanh toán.</p><p>POS hiển thị QR kèm đồng hồ đếm ngược.</p>',
+     say:'Mã QR theo chuẩn VietQR nên khách quét bằng app ngân hàng nào cũng được, số tiền và nội dung điền sẵn nên khách không phải gõ.',
+     f:'frontend/apps/pos/src/features/counter/PaymentRequestModal.tsx'},
+    {t:'Khách chuyển khoản',hl:['kh','bank','sepay'],flow:['kh-bank','bank-sepay'],
+     b:'<p>Khách quét QR và chuyển tiền. Ngân hàng báo biến động số dư cho <b>SePay</b>, dịch vụ theo dõi tài khoản ngân hàng của quán.</p>',
+     say:'Hệ thống không kết nối trực tiếp với ngân hàng mà thông qua SePay, SePay báo cho mình khi có tiền vào.',
+     f:''},
+    {t:'SePay gọi webhook',hl:['sepay','gate'],flow:['sepay-gate'],
+     b:'<p>SePay gọi <code>POST /api/hooks/sepay-payment</code>, kèm 2 header:</p><p>• <code>X-SePay-Timestamp</code>: thời điểm gửi<br>• <code>X-SePay-Signature</code>: <code>sha256=…</code></p><p>Địa chỉ này công khai, ai cũng gọi được, nên bước tiếp theo là kiểm tra.</p>',
+     say:'Webhook là SePay chủ động gọi vào API của em, nên em phải xác minh đúng là SePay gửi chứ không phải ai đó giả mạo.',
+     f:'Features/Sales/PaymentEndpoints.cs'},
+    {t:'Cổng kiểm tra 3 lớp',hl:['gate','wh'],flow:['gate-wh'],
+     b:'<p>1. Body lớn hơn 256 KB thì trả <b>413</b>.</p><p>2. Timestamp lệch quá <b>±300 giây</b> so với giờ máy chủ thì từ chối, chống việc lấy request cũ gửi lại (replay).</p><p>3. Tự tính <b>HMAC-SHA256</b>(<code>timestamp + "." + body</code>, <code>WebhookSecret</code>) rồi so với chữ ký bằng <code>FixedTimeEquals</code>. Sai thì trả <b>401</b>.</p>',
+     say:'Chỉ SePay và hệ thống em biết khoá bí mật, nên chỉ SePay tạo được chữ ký đúng. Timestamp nằm trong phần được ký, nên kẻ gian không sửa được thời gian để gửi lại request cũ.',
+     f:'SePayWebhookService.cs → CheckSignature / IsValidSignature'},
+    {t:'Chống nhận tiền 2 lần',hl:['wh','t_tx'],flow:['wh-tx'],
+     b:'<p>SePay có thể gửi lại cùng 1 giao dịch. Hệ thống làm 2 lớp:</p><p>• Kiểm tra <code>ProviderTxId</code> đã có chưa<br>• Nếu 2 request đến cùng lúc thì <b>khoá unique</b> trong DB chặn bản thứ hai</p><p>Bị trùng thì ghi log <code>WebhookDuplicate</code> và vẫn trả <b>200</b>, để SePay biết là đã nhận và không gửi nữa.</p>',
+     say:'Em xử lý idempotent: cùng một giao dịch gửi bao nhiêu lần thì cũng chỉ được ghi nhận một lần.',
+     f:'SePayWebhookService.cs → ProcessAsync'},
+    {t:'Khớp tiền với yêu cầu',hl:['wh','t_req','t_bill'],flow:['wh-req','wh-bill'],
+     b:'<p>Dùng regex tìm mã <code>TT…</code> trong nội dung chuyển khoản, rồi tìm PaymentRequest tương ứng. Sau đó xét các trường hợp:</p><p>• Đã <b>Paid</b> rồi thì đánh dấu <i>Duplicate</i><br>• Hết hạn / đã huỷ thì <b>NeedsAttention</b><br>• Thiếu / thừa tiền thì <i>Underpaid</i> / <i>Overpaid</i> + NeedsAttention<br>• Đúng hết thì <b>Paid</b>, tạo <b>Bill + Session</b> và giữ ghế</p><p>Tất cả chạy trong <b>1 transaction DB</b>, lỗi giữa chừng thì rollback.</p>',
+     say:'Chỉ khi đúng mã, đúng số tiền, còn hạn thì hệ thống mới tự tạo bill. Trường hợp lệch thì không tự xử lý mà đưa vào danh sách cần xử lý cho quản lý.',
+     f:'SePayWebhookService.cs → MatchPaymentAsync'},
+    {t:'POS tự biết đã trả',hl:['pos','prs','t_req'],flow:[{e:'pos-prs',label:'GET /api/payments/{code}'},{e:'pos-prs',rev:1,label:'Paid + mã bill'}],
+     b:'<p>Trong lúc chờ, POS cứ <b>2,5 giây</b> gọi <code>GET /api/payments/{code}</code> một lần (polling). Khi thấy <b>Paid</b> thì dừng và hiện bill.</p><p>Mỗi bước đều ghi vào <code>PaymentLogs</code> để admin xem lại khi có tranh cãi.</p>',
+     say:'Em chọn polling vì đơn giản, ổn định, không cần duy trì kết nối realtime. 2,5 giây là đủ nhanh cho quầy thu ngân.',
+     f:'PaymentRequestModal.tsx (refetchInterval) · PaymentLogService.cs'},
+    {t:'Khách không trả thì sao?',hl:['exp','t_req'],flow:['exp-req'],
+     b:'<p><code>PaymentRequestExpiryWorker</code> cứ <b>30 giây</b> quét một lần. Yêu cầu nào còn <b>Pending</b> mà quá hạn thì chuyển thành <b>Expired</b>, ghế được giải phóng.</p><p>Nếu sau đó tiền mới về thì webhook vẫn lưu giao dịch nhưng đánh dấu <b>NeedsAttention</b> để quản lý xử lý.</p>',
+     say:'Ghế không bị giữ mãi: quá 10 phút không trả thì tự huỷ. Tiền về trễ cũng không mất mà được lưu lại để đối soát.',
+     f:'Features/Sales/PaymentRequestExpiryWorker.cs'}
+  ],
+  qa:[
+    ['Sao phải kiểm tra chữ ký webhook?','Địa chỉ webhook là công khai. Không kiểm tra thì ai cũng gửi được request kiểu "đã nhận 1 triệu" và lấy ghế miễn phí. HMAC-SHA256 dùng khoá bí mật chỉ SePay và hệ thống biết, nên chỉ SePay tạo được chữ ký đúng.'],
+    ['Timestamp để làm gì?','Chống replay. Kẻ gian bắt được một request thật rồi gửi lại sau đó thì timestamp đã lệch quá 300 giây nên bị từ chối. Timestamp cũng nằm trong phần được ký nên không sửa được.'],
+    ['Sao dùng FixedTimeEquals mà không dùng ==?','So sánh bằng == dừng ngay ở byte sai đầu tiên, kẻ gian có thể đo thời gian phản hồi để đoán dần chữ ký (timing attack). FixedTimeEquals luôn so hết nên thời gian như nhau.'],
+    ['SePay gửi 2 lần một giao dịch thì sao?','Kiểm tra ProviderTxId trước. Nếu 2 request đến cùng lúc thì khoá unique trong DB chặn bản thứ hai, code bắt lỗi trùng khoá đó. Cả hai trường hợp đều trả 200 để SePay ngừng gửi lại.'],
+    ['Khách chuyển thiếu, thừa hoặc trễ?','Không tự tạo bill. Giao dịch được lưu với trạng thái Underpaid/Overpaid, yêu cầu chuyển sang NeedsAttention, và quản lý xử lý trong mục giao dịch lệch.'],
+    ['Sao không dùng WebSocket để báo POS?','Polling 2,5 giây là đủ nhanh cho quầy, code đơn giản và không phải lo mất kết nối. Nếu một lần gọi lỗi thì POS thử lại sau 5 giây, không bị kẹt màn hình QR.']
+  ]
+},
+workforce:{
+  name:'Ca làm, lương & thu chi',
+  platforms:[
+    {x:4,y:-1.6,w:8.6,d:12.4,label:'API'},
+    {x:14,y:-1.4,w:6,d:11.2,label:'SQL SERVER'}
+  ],
+  nodes:[
+    {id:'adm',label:'Admin',sub:'quản lý',x:0,y:0,w:1.5,d:1.2,h:0.7,c:C.client},
+    {id:'pos',label:'POS',sub:'nhân viên',x:0,y:7,w:1.5,d:1.2,h:1,c:C.client},
+    {id:'sh',label:'ShiftService',sub:'xếp ca',x:5,y:0,w:2,d:1.8,h:1.4,c:C.api},
+    {id:'rule',label:'6 luật xếp ca',sub:'ShiftRules',x:9,y:0.3,w:1.4,d:1.2,h:1.5,c:C.gate,shape:'gate'},
+    {id:'at',label:'AttendanceService',sub:'chấm công',x:5,y:4.2,w:1.8,d:1.6,h:1.1,c:C.api},
+    {id:'fi',label:'FinanceService',sub:'kết ca · chi · lương',x:5,y:8,w:2,d:1.8,h:1.4,c:C.api},
+    {id:'rp',label:'ReportService',sub:'báo cáo',x:9.5,y:7.6,w:1.6,d:1.6,h:1.1,c:C.api},
+    {id:'t_sh',label:'Shifts · Assignments',sub:'',x:14.6,y:-0.4,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'},
+    {id:'t_nt',label:'Notifications',sub:'',x:18,y:1.4,w:1.4,d:1.4,h:1,c:C.db,shape:'stack'},
+    {id:'t_at',label:'Attendance',sub:'',x:14.6,y:3.4,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'},
+    {id:'t_fi',label:'Kết ca · Chi · Lương',sub:'',x:14.6,y:7.6,w:1.6,d:1.6,h:1.2,c:C.db,shape:'stack'}
+  ],
+  edges:[
+    {id:'w1',pts:[[0.75,0.6],[6,0.6]],label:'xếp ca, gán người'},
+    {id:'w2',pts:[[6,0.9],[9.7,0.9]],label:'kiểm tra'},
+    {id:'w3',pts:[[9.7,0.5],[15.4,0.5]],label:'lưu'},
+    {id:'w4',pts:[[6.6,1.6],[13.4,1.6],[13.4,2.4],[18.7,2.4]],label:'thông báo lịch mới'},
+    {id:'w5',pts:[[0.75,7.6],[3,7.6],[3,1.3],[6,1.3]],label:'nhận / từ chối ca'},
+    {id:'w6',pts:[[0.75,7.6],[3,7.6],[3,5],[5.9,5]],label:'check-in / check-out'},
+    {id:'w7',pts:[[5.9,4.2],[15.4,4.2]],label:'giờ vào / ra'},
+    {id:'w8',pts:[[0.75,7.6],[3,7.6],[3,8.9],[6,8.9]],label:'nộp biên bản kết ca'},
+    {id:'w9',pts:[[6,8.9],[13.4,8.9],[13.4,8.4],[15.4,8.4]],label:'Closing · Expense · Payroll'},
+    {id:'w10',pts:[[6.5,8.3],[12.9,8.3],[12.9,4.6],[15.4,4.6]],label:'đọc công đã duyệt'},
+    {id:'w11',pts:[[0.75,0.6],[2.2,0.6],[2.2,9.4],[6,9.4]],label:'duyệt, nhập chi, tính lương'},
+    {id:'w12',pts:[[10.3,8.4],[10.3,6.3],[13.9,6.3],[13.9,4.2],[15.4,4.2]],label:'tổng hợp số liệu'},
+    {id:'w13',pts:[[0.75,0.6],[2.2,0.6],[2.2,10.3],[10.3,10.3],[10.3,8.4]],label:'xem báo cáo'}
+  ],
+  steps:[
+    {t:'Quản lý xếp ca',hl:['adm','sh','rule','t_sh'],flow:['w1','w2','w3'],
+     b:'<p>Khi gán nhân viên vào ca, <code>ShiftConflictChecker</code> chạy <b>6 luật</b>:</p><p>⛔ <b>Chặn hẳn</b>: trùng giờ ca khác · chưa thuộc chi nhánh · đã được duyệt nghỉ · không đủ 60 phút di chuyển giữa 2 chi nhánh<br>⚠️ <b>Chặn, nhưng ghi lý do thì cho vượt</b>: nghỉ giữa 2 ca dưới 8 tiếng<br>💬 <b>Chỉ cảnh báo</b>: quá 48 giờ / tuần</p>',
+     say:'Luật xếp ca được viết thành từng class riêng cùng cài một interface IShiftRule, muốn thêm luật thì chỉ thêm class mới mà không phải sửa code cũ.',
+     f:'Features/Scheduling/ShiftRules.cs · ShiftService.cs → AssignAsync'},
+    {t:'Công bố lịch, nhân viên nhận ca',hl:['sh','t_nt','pos','t_sh'],flow:['w4','w5'],
+     b:'<p>Quản lý bấm <b>Công bố</b> cả tuần: ca chuyển <b>Draft → Published</b>, và mỗi người được xếp nhận <b>thông báo</b>.</p><p>Nhân viên vào POS <b>nhận</b> hoặc <b>từ chối</b> (phải ghi lý do). Ca còn trống thì ai cũng tự nhận được. Muốn xin nghỉ / đổi ca thì gửi yêu cầu cho quản lý duyệt.</p>',
+     say:'Lịch chỉ hiện với nhân viên sau khi công bố, và nhân viên phải xác nhận nhận ca, nên quản lý biết chắc ai sẽ đi làm.',
+     f:'ShiftService.cs → PublishAsync / AcceptAsync / ClaimAsync · WorkforceService.cs'},
+    {t:'Chấm công',hl:['pos','at','t_at'],flow:['w6','w7'],
+     b:'<p>Nhân viên check-in / check-out trên POS. Chỉ check-in được khi ca đã <b>Published</b> và mình đã <b>nhận</b> ca.</p><p>Quản lý xem và <b>duyệt</b> công. Chỉ công đã duyệt mới được tính lương.</p>',
+     say:'Chấm công gắn với ca đã nhận, nên không có chuyện chấm công vào ca không phải của mình.',
+     f:'Scheduling/AttendanceService.cs'},
+    {t:'Kết ca: đếm tiền mặt',hl:['pos','fi','t_fi'],flow:['w8','w9'],
+     b:'<p>Cuối ca, hệ thống tính <b>tiền mặt dự kiến</b> = tổng <code>CashPaidTotal</code> của mọi bill trong ca.</p><p>Nhân viên đếm két, nhập <b>số đếm thực tế</b>, xem chênh lệch rồi nộp. Biên bản chuyển sang <b>Submitted</b> và báo quản lý duyệt. Đã nộp thì không sửa được nữa.</p>',
+     say:'Biên bản kết ca so sánh tiền hệ thống ghi nhận với tiền thực tế trong két, giúp phát hiện thất thoát ngay trong ngày.',
+     f:'Finance/FinanceService.cs → PreviewAsync / SubmitClosingAsync'},
+    {t:'Khoản chi: không xoá, chỉ đảo',hl:['adm','fi','t_fi'],flow:['w11','w9'],
+     b:'<p>Quản lý nhập <b>khoản chi</b> (tiền điện, nguyên liệu…).</p><p>Nhập sai thì <b>không xoá, không sửa</b> mà tạo một <b>bút toán đảo</b> có số tiền ngược dấu, trỏ về khoản gốc qua <code>ReversesExpenseId</code>. Mỗi khoản chỉ đảo được 1 lần.</p>',
+     say:'Em làm theo nguyên tắc kế toán: dữ liệu tài chính không bị xoá, sai thì ghi bút toán đảo, nên luôn truy vết được ai đã sửa gì.',
+     f:'FinanceService.cs → CreateExpenseAsync / ReverseExpenseAsync'},
+    {t:'Tính lương tháng',hl:['adm','fi','t_at','t_fi'],flow:['w11','w10','w9'],
+     b:'<p>Lương lấy từ công <b>đã duyệt</b> trong tháng:</p><p><code>giờ làm × lương giờ</code> + <code>giờ đêm (22h–6h) × phụ cấp đêm</code>, làm tròn tới đồng.</p><p>Bảng lương đi từ <b>Draft</b>, quản lý điều chỉnh nếu cần, rồi <b>Finalized</b>. Đã chốt thì khoá luôn công của tháng đó, và nhân viên nhận được thông báo.</p>',
+     say:'Phần tính giờ đêm tách riêng thành PayrollCalculator, là hàm thuần nên em viết unit test được cho các ca qua đêm.',
+     f:'Finance/PayrollCalculator.cs · FinanceService.cs → GeneratePayrollAsync'},
+    {t:'Báo cáo',hl:['adm','rp','t_at','t_fi','t_sh'],flow:['w13','w12'],
+     b:'<p><code>ReportService</code> tổng hợp theo ngày / tuần / tháng:</p><p>• <b>Doanh thu</b><br>• <b>Lãi lỗ</b> (doanh thu − chi − lương)<br>• <b>Công suất ghế</b><br>• <b>So sánh chi nhánh</b><br>• <b>Dashboard</b> tổng quan</p>',
+     say:'Báo cáo được tính trực tiếp từ dữ liệu giao dịch, không nhập tay, nên số liệu luôn khớp với hoạt động thật.',
+     f:'Features/Reports/ReportService.cs'}
+  ],
+  qa:[
+    ['Sao luật xếp ca lại tách thành nhiều class?','Theo nguyên tắc Open/Closed: thêm luật mới chỉ cần thêm một class cài IShiftRule, không phải sửa ShiftService. Mỗi luật cũng test riêng được.'],
+    ['Tiền mặt dự kiến tính thế nào?','Cộng CashPaidTotal của mọi bill thuộc ca đó, gồm tiền vào chỗ, gia hạn và gọi đồ trả bằng tiền mặt. Tiền chuyển khoản không tính vì không nằm trong két.'],
+    ['Sao không cho xoá khoản chi?','Dữ liệu tài chính cần truy vết. Xoá thì mất dấu vết. Bút toán đảo giữ cả bản gốc lẫn bản sửa, và số dư vẫn đúng.'],
+    ['Giờ đêm tính thế nào khi ca qua 0h?','PayrollCalculator xét từng khung 22h–6h mà ca có thể chạm tới (từ tối hôm trước đến ngày check-out), lấy phần giao nhau với khoảng check-in đến check-out.'],
+    ['Chốt lương rồi mà muốn sửa công?','Không được. Đã Finalized thì duyệt lại công tháng đó bị chặn, để số liệu đã trả lương không bị thay đổi về sau.']
+  ]
+}
+};
+
+/* ---------- iso engine ---------- */
+const S = 30, CX = Math.cos(Math.PI/6)*S, CY = 0.5*S;
+const P = (x,y,z=0)=>[(x-y)*CX, (x+y)*CY - z*S];
+const pt = a=>a.map(v=>v.toFixed(1)).join(',');
+const poly = (pts,fill,stroke='#2b2622',sw=1.2)=>`<polygon points="${pts.map(pt).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+function shade(hex,f){const n=parseInt(hex.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;
+  const m=v=>Math.max(0,Math.min(255,Math.round(f<0?v*(1+f):v+(255-v)*f)));return `rgb(${m(r)},${m(g)},${m(b)})`;}
+function box(x,y,z,w,d,h,c){
+  const top=[P(x,y,z+h),P(x+w,y,z+h),P(x+w,y+d,z+h),P(x,y+d,z+h)];
+  const xf=[P(x+w,y,z),P(x+w,y+d,z),P(x+w,y+d,z+h),P(x+w,y,z+h)];
+  const yf=[P(x,y+d,z),P(x+w,y+d,z),P(x+w,y+d,z+h),P(x,y+d,z+h)];
+  return poly(yf,shade(c,-0.12))+poly(xf,shade(c,-0.28))+poly(top,shade(c,0.25));
+}
+function shape(n){
+  const {x,y,w,d,h,c}=n;
+  if(n.shape==='stack'){let s='',k=3,g=0.12,hh=(h-g*(k-1))/k;
+    for(let i=0;i<k;i++)s+=box(x,y,i*(hh+g),w,d,hh,c);return s;}
+  if(n.shape==='gate'){const p=0.32;
+    return box(x,y+d/2-p/2,0,p,p,h,c)+box(x+w-p,y+d/2-p/2,0,p,p,h,c)+box(x,y+d/2-p/2,h,w,p,0.3,c);}
+  return box(x,y,n.z||0,w,d,h,c);
+}
+function textAt(n){
+  if(n.side){const [sx,sy]=P(n.x+n.w,n.y,(n.z||0)+n.h*0.5);return `<text class="lbl" x="${sx+16}" y="${sy-2}" style="font-size:15px">${n.label}</text><text class="sub" x="${sx+16}" y="${sy+14}">${n.sub}</text>`;}
+  const top=n.shape==='gate'?n.h+0.3:n.h;
+  const [sx,sy]=P(n.x+n.w/2,n.y+n.d/2,top+0.25);
+  return `<text class="lbl" x="${sx}" y="${sy-14}" text-anchor="middle">${n.label}</text>`+
+    (n.sub?`<text class="sub" x="${sx}" y="${sy-1}" text-anchor="middle">${n.sub}</text>`:'');
+}
+const svg=document.getElementById('svg');
+let scene, sceneKey, step=0, anim=null;
+
+function render(){
+  const sc=scene;
+  let pl='',ed='',nd='';
+  for(const p of sc.platforms){
+    const pts=[P(p.x,p.y,0),P(p.x+p.w,p.y,0),P(p.x+p.w,p.y+p.d,0),P(p.x,p.y+p.d,0)];
+    pl+=`<polygon points="${pts.map(pt).join(' ')}" fill="#efe4d6" stroke="#cdbba5" stroke-width="1.2" stroke-dasharray="6 4"/>`;
+    const [lx,ly]=P(p.x+0.3,p.y+p.d-0.2,0);
+    const ang=Math.atan2(CY,-CX)*180/Math.PI+180; // along -y direction? use x-axis direction
+    const [ax,ay]=P(p.x+0.4,p.y+p.d-0.25,0);
+    pl+=`<text class="plat-lbl" transform="translate(${ax},${ay}) rotate(${Math.atan2(CY,CX)*180/Math.PI})" dy="-4">${p.label}</text>`;
+  }
+  for(const e of sc.edges){
+    const d='M'+e.pts.map(q=>pt(P(q[0],q[1],q[2]??0.02))).join(' L');
+    ed+=`<path class="edge" id="E-${e.id}" d="${d}"/>`;
+  }
+  const order=[...sc.nodes].sort((a,b)=>(a.x+a.w+a.y+a.d+(a.z||0)*0.01)-(b.x+b.w+b.y+b.d+(b.z||0)*0.01));
+  let tx='';for(const n of order){nd+=`<g class="node" id="N-${n.id}">${shape(n)}</g>`;tx+=`<g class="tl" id="T-${n.id}">${textAt(n)}</g>`;}
+  svg.innerHTML=`<g id="root">${pl}${ed}${nd}${tx}<g id="fx"></g></g>`;
+  const bb=svg.getElementById('root').getBBox();
+  const pad=22;
+  svg.setAttribute('viewBox',`${bb.x-pad} ${bb.y-pad-10} ${bb.width+pad*2} ${bb.height+pad*2+10}`);
+}
+
+function edgeById(id){return scene.edges.find(e=>e.id===id);}
+function showStep(i){
+  step=i; const st=scene.steps[i];
+  document.getElementById('stepno').textContent=`BƯỚC ${i+1} / ${scene.steps.length}`;
+  document.getElementById('stitle').textContent=st.t;
+  document.getElementById('sbody').innerHTML=st.b;
+  document.querySelector('#ssay span').textContent=st.say;
+  document.getElementById('sfile').innerHTML=st.f?`📁 <span class="mono">${st.f}</span>`:'';
+  document.getElementById('prev').disabled=i===0;
+  document.getElementById('next').textContent=i===scene.steps.length-1?'Từ đầu ↺':'Tiếp →';
+  document.querySelectorAll('.dot').forEach((d,k)=>d.classList.toggle('on',k===i));
+  const hl=st.hl==='*'?null:new Set(st.hl);
+  scene.nodes.forEach(n=>{const dm=!!hl&&!hl.has(n.id);svg.getElementById('N-'+n.id).classList.toggle('dim',dm);svg.getElementById('T-'+n.id).classList.toggle('dim',dm);});
+  const flows=st.flow.map(f=>typeof f==='string'?{e:f}:f);
+  const on=new Set(flows.map(f=>f.e));
+  scene.edges.forEach(e=>{const el=svg.getElementById('E-'+e.id);
+    el.classList.toggle('on',on.has(e.id)); el.classList.toggle('dim',!!hl&&!on.has(e.id));});
+  runFlow(flows);
+}
+
+function runFlow(flows){
+  if(anim)cancelAnimationFrame(anim);
+  const fx=svg.getElementById('fx'); fx.innerHTML='';
+  if(!flows.length)return;
+  const segs=flows.map(f=>{const e=edgeById(f.e);let pts=e.pts.map(q=>P(q[0],q[1],(q[2]??0)+0.35));if(f.rev)pts=[...pts].reverse();
+    let L=0;const cum=[0];for(let k=1;k<pts.length;k++){L+=Math.hypot(pts[k][0]-pts[k-1][0],pts[k][1]-pts[k-1][1]);cum.push(L);}
+    return {pts,cum,L,label:f.label||e.label};});
+  fx.innerHTML=`<g id="pk"><polygon points="0,-7 8,-2.5 0,2 -8,-2.5" fill="#f3a27c" stroke="#2b2622" stroke-width="1"/><polygon points="-8,-2.5 0,2 0,8 -8,3.5" fill="#d9643a" stroke="#2b2622" stroke-width="1"/><polygon points="8,-2.5 0,2 0,8 8,3.5" fill="#b44f2a" stroke="#2b2622" stroke-width="1"/></g><g class="elbl" id="el"><rect rx="6" ry="6"/><text text-anchor="middle" dy="4"></text></g>`;
+  const pk=svg.getElementById('pk'), el=svg.getElementById('el'), et=el.querySelector('text'), er=el.querySelector('rect');
+  const SEG_MS=2000, HOLD_MS=700; let si=0, t0=null, hold=0;
+  function setLabel(s){et.textContent=s.label;const w=et.getComputedTextLength()+16;er.setAttribute('x',-w/2);er.setAttribute('y',-10);er.setAttribute('width',w);er.setAttribute('height',20);
+    const m=at(s,s.L/2);el.setAttribute('transform',`translate(${m[0]},${m[1]-22})`);}
+  function at(s,dist){let k=1;while(k<s.cum.length-1&&s.cum[k]<dist)k++;const a=s.pts[k-1],b=s.pts[k],seg=(s.cum[k]-s.cum[k-1])||1,u=Math.min(1,Math.max(0,(dist-s.cum[k-1])/seg));
+    return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u];}
+  setLabel(segs[0]);
+  function tick(ts){
+    if(t0===null)t0=ts; const s=segs[si]; const dist=Math.min(1,(ts-t0)/SEG_MS)*s.L;
+    if(dist>=s.L){ if(!hold)hold=ts; const p=at(s,s.L);pk.setAttribute('transform',`translate(${p[0]},${p[1]})`);
+      if(ts-hold>HOLD_MS){si=(si+1)%segs.length;t0=null;hold=0;if(si===0){/* loop pause */} setLabel(segs[si]);} }
+    else{const p=at(s,dist);pk.setAttribute('transform',`translate(${p[0]},${p[1]})`);}
+    anim=requestAnimationFrame(tick);
+  }
+  anim=requestAnimationFrame(tick);
+}
+
+function loadScene(key){
+  sceneKey=key; scene=SCENES[key];
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.k===key));
+  render();
+  const dots=document.getElementById('dots');dots.innerHTML='';
+  scene.steps.forEach((_,k)=>{const b=document.createElement('button');b.className='dot';b.setAttribute('aria-label','Bước '+(k+1));b.onclick=()=>showStep(k);dots.appendChild(b);});
+  document.getElementById('qa').innerHTML=scene.qa.map(([q,a])=>`<details><summary>${q}</summary><p>${a}</p></details>`).join('');
+  showStep(0);
+  if(location.hash!=='#'+key)history.replaceState(null,'','#'+key);
+}
+
+const tabs=document.getElementById('tabs');
+Object.entries(SCENES).forEach(([k,s],i)=>{const b=document.createElement('button');b.className='tab';b.role='tab';b.dataset.k=k;
+  b.innerHTML=`<span class="n">${i}</span>${s.name}`;b.onclick=()=>loadScene(k);tabs.appendChild(b);});
+document.getElementById('next').onclick=()=>showStep(step===scene.steps.length-1?0:step+1);
+document.getElementById('prev').onclick=()=>step>0&&showStep(step-1);
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')document.getElementById('next').click();if(e.key==='ArrowLeft')document.getElementById('prev').click();});
+window.addEventListener('hashchange',()=>{const k=location.hash.slice(1);if(SCENES[k]&&k!==sceneKey)loadScene(k);});
+const start=location.hash.slice(1);
+(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>loadScene(SCENES[start]?start:'overview'));
+</script>
+</body>
+</html>
